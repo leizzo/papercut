@@ -21,8 +21,7 @@ set(TE_ADD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/tracktion_engine/modules/juce EXCLUDE_FROM_ALL)
 add_subdirectory(external/tracktion_engine EXCLUDE_FROM_ALL)
 
-# Only the initial GIN modules (brief section 23). gin_plugin is not registered:
-# it hard-depends on gin_dsp and gin_graphics, which are out of scope for now.
+# GIN is used for GUI/SVG only. Plugin UI is built on JUCE, not gin_plugin (ADR-0007).
 juce_add_module(external/gin/modules/gin)
 juce_add_module(external/gin/modules/gin_gui)
 juce_add_module(external/gin/modules/gin_svg)

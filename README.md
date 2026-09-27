@@ -8,9 +8,7 @@ A modular DAW built on JUCE + Tracktion Engine + GIN. See `CONTEXT.md` for the d
 |---|---|
 | `external/tracktion_engine` | Tracktion Engine 3.5.0, commit `964583ee` (3.5.0 plus an upstream fix for a null ProjectItem crash when saving an Edit outside a Tracktion project) |
 | `external/tracktion_engine/modules/juce` | JUCE 8.0.13 (`8.0.13-7-g37c894f8`), pinned by Tracktion |
-| `external/gin` | GIN, commit `ea795541`; only `gin`, `gin_gui`, `gin_svg` are built |
-
-`gin_plugin` is not built yet: it hard-depends on `gin_dsp` and `gin_graphics`, which are outside the initial module set.
+| `external/gin` | GIN, commit `ea795541`; modules `gin`, `gin_gui`, `gin_svg` (plugin UI uses JUCE, see ADR-0007) |
 
 ## Build (macOS)
 
