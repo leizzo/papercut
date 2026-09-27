@@ -46,6 +46,13 @@ public:
     /** The recovery Project folder. Open it with ApplicationModel::openProject. */
     juce::File getRecoveryFolder() const;
 
+    /** How often the running app writes a recovery copy. */
+    static constexpr int autosaveIntervalMs = 30 * 1000;
+
+    /** True when projectFolder/Recovery holds an Edit at least as new as the
+        Project's own Edit. Launch offers that copy. */
+    static bool hasNewerRecovery (const juce::File& projectFolder);
+
 private:
     ProjectManager& projects;
 

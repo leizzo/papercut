@@ -154,6 +154,15 @@ struct MixerTests : juce::UnitTest
             expectEquals (f.model.getTracks()[0].id, trackId);
         }
 
+        beginTest ("getTrackLevelDb is silence when the track has not played");
+        {
+            MixerFixture f;
+            f.invoke ("track.add");
+            const auto level = f.mixer.getTrackLevelDb (f.model.getTracks()[0].id);
+            expectWithinAbsoluteError ((double) level, ApplicationModel::minVolumeDb, 1.0e-3);
+            expectWithinAbsoluteError ((double) f.mixer.getMasterLevelDb(), ApplicationModel::minVolumeDb, 1.0e-3);
+        }
+
         beginTest ("getInserts on a fresh audio track is empty");
         {
             MixerFixture f;

@@ -21,7 +21,38 @@
 namespace papercut
 {
 
-class PapercutApplication : public juce::JUCEApplication
+namespace
+{
+    juce::File lastProjectFile()
+    {
+        return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                   .getChildFile ("Papercut")
+                   .getChildFile ("last-project.txt");
+    }
+
+    void rememberProjectFolder (const juce::File& folder)
+    {
+        auto file = lastProjectFile();
+
+        if (file.getParentDirectory().createDirectory().failed())
+            return;
+
+        file.replaceWithText (folder.getFullPathName());
+    }
+
+    juce::File rememberedProjectFolder()
+    {
+        auto file = lastProjectFile();
+
+        if (! file.existsAsFile())
+            return {};
+
+        return file.loadFileAsString().trim();
+    }
+}
+
+class PapercutApplication : public juce::JUCEApplication,
+                            private juce::Timer
 {
 public:
     const juce::String getApplicationName() override       { return "Papercut"; }
@@ -62,10 +93,14 @@ public:
             MainComponent::Services { *model, commands, theme, uiState, layoutSource,
                                       engine->describeActiveAudioDevice(),
                                       reportError, *plugins, *mixer, *session, *automation, *shaper });
+
+        offerRecovery();
+        startTimer (Production::autosaveIntervalMs);
     }
 
     void shutdown() override
     {
+        stopTimer();
         mainWindow.reset();
         chooser.reset();
 
@@ -85,6 +120,48 @@ public:
     }
 
     void systemRequestedQuit() override   { quit(); }
+
+    void timerCallback() override
+    {
+        if (projects == nullptr)
+            return;
+
+        if (commands.invoke ("project.autosave"))
+            rememberProjectFolder (projects->getProjectFolder());
+    }
+
+    void offerRecovery()
+    {
+        const auto folder = rememberedProjectFolder();
+
+        if (! Production::hasNewerRecovery (folder) || model == nullptr)
+            return;
+
+        const auto recovery = folder.getChildFile ("Recovery");
+        const auto message = "A newer recovery copy of \"" + folder.getFileName()
+                             + "\" was found. Open it?";
+
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon,
+                                            "Papercut", message, "Open Recovery", "Skip",
+                                            mainWindow.get(),
+                                            juce::ModalCallbackFunction::create ([this, recovery] (int result)
+                                            {
+                                                if (result != 1 || model == nullptr)
+                                                    return;
+
+                                                juce::var recovered;
+
+                                                if (auto r = model->openProject (recovery, recovered); r.wasOk())
+                                                {
+                                                    uiState.restore (recovered);
+                                                    rememberProjectFolder (recovery);
+                                                }
+                                                else
+                                                {
+                                                    reportError (r.getErrorMessage());
+                                                }
+                                            }));
+    }
 
 private:
     LayoutSource layoutSource;

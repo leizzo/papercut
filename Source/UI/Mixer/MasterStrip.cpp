@@ -82,6 +82,15 @@ void MasterStrip::setMaster (const MasterInfo& info)
     repaint();
 }
 
+void MasterStrip::setLevelDb (float db)
+{
+    if (std::abs (levelDb - db) < 0.25f)
+        return;
+
+    levelDb = db;
+    repaint (meterBounds);
+}
+
 void MasterStrip::applyTheme()
 {
     auto& theme = themeManager.getTheme();
@@ -102,6 +111,20 @@ void MasterStrip::paint (juce::Graphics& g)
     g.setColour (theme.accent);
     g.drawText ("Master", getLocalBounds().reduced (metrics.inset).removeFromTop (metrics.trackControlHeight),
                 juce::Justification::centredLeft, true);
+
+    if (! meterBounds.isEmpty())
+    {
+        g.setColour (theme.laneB);
+        g.fillRect (meterBounds);
+
+        const auto span = (float) (ApplicationModel::maxVolumeDb - ApplicationModel::minVolumeDb);
+        const auto norm = span <= 0.0f ? 0.0f
+                                       : juce::jlimit (0.0f, 1.0f, (levelDb - (float) ApplicationModel::minVolumeDb) / span);
+        auto filled = meterBounds;
+        filled.removeFromTop (juce::roundToInt ((1.0f - norm) * (float) filled.getHeight()));
+        g.setColour (theme.recording);
+        g.fillRect (filled);
+    }
 }
 
 void MasterStrip::resized()
@@ -112,6 +135,8 @@ void MasterStrip::resized()
     r.removeFromTop (metrics.inset);
     pan.setBounds (r.removeFromTop (metrics.trackControlHeight).removeFromLeft (metrics.trackControlHeight));
     r.removeFromTop (metrics.inset);
+    meterBounds = r.removeFromRight (metrics.trackButtonWidth);
+    r.removeFromRight (metrics.inset);
     volume.setBounds (r);
 }
 

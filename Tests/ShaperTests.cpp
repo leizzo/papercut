@@ -1,6 +1,7 @@
 #include "TestFixture.h"
 #include "Commands/AutomationCommands.h"
 #include "Engine/Automation.h"
+#include "Engine/Mixer.h"
 #include "Engine/Shaper.h"
 
 namespace papercut::test
@@ -61,6 +62,19 @@ struct ShaperTests : juce::UnitTest
             expectEquals ((int) restored.size(), 1);
             expectEquals (restored[0].id, again);
             expect (restored[0].mode == ShaperMode::loop);
+        }
+
+        beginTest ("shaper.add loop assigns a send");
+        {
+            ShapeFixture f;
+            Mixer mixer (f.projects);
+            expect (mixer.addReturn ("Return").wasOk());
+            expect (mixer.addSend (f.trackId(), mixer.getReturns()[0].bus).wasOk());
+            const auto key = "send:" + mixer.getSends (f.trackId())[0].id;
+
+            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), key, ShaperMode::loop)));
+            expectEquals (f.shaperWithKey (key).parameterKey, key);
+            expect (f.shaperWithKey (key).mode == ShaperMode::loop);
         }
 
         beginTest ("setLoop round-trips length, depth, and shape");

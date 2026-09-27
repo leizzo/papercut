@@ -85,6 +85,20 @@ namespace
         }
     };
 
+    struct AddMidiSlotClipCommand : SessionCommand
+    {
+        AddMidiSlotClipCommand (Session& s, AppCommandHost& h)
+            : SessionCommand ("session.addMidiSlotClip", "Add MIDI Slot Clip", s, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            int scene = 0;
+
+            if (readInt (args, sceneKey, scene))
+                report (session.addMidiSlotClip (args[trackIdKey].toString(), scene));
+        }
+    };
+
     struct ClearSlotCommand : SessionCommand
     {
         ClearSlotCommand (Session& s, AppCommandHost& h) : SessionCommand ("session.clearSlot", "Clear Slot", s, h) {}
@@ -145,6 +159,7 @@ void registerSessionCommands (CommandRegistry& registry, Session& session, AppCo
     registry.add (std::make_unique<SetSceneCountCommand> (session, host));
     registry.add (std::make_unique<RenameSceneCommand> (session, host));
     registry.add (std::make_unique<AddSlotClipCommand> (session, host));
+    registry.add (std::make_unique<AddMidiSlotClipCommand> (session, host));
     registry.add (std::make_unique<ClearSlotCommand> (session, host));
     registry.add (std::make_unique<LaunchSlotCommand> (session, host));
     registry.add (std::make_unique<LaunchSceneCommand> (session, host));

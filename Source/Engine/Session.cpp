@@ -105,55 +105,21 @@ namespace
         track.playSlotClips = active;
     }
 
-    double sourceLengthSeconds (te::Edit& edit, te::WaveAudioClip& clip)
+    te::TimePosition oneBarAfter (te::Edit& edit, te::TimePosition start)
     {
-        const auto fromClip = std::max (0.0, clip.getSourceLength().inSeconds());
-        te::AudioFile audio (edit.engine, clip.getOriginalFile());
-        const auto fromFile = audio.isValid() ? std::max (0.0, audio.getLength()) : 0.0;
-
-        if (fromFile <= 0.0)
-            return fromClip;
-
-        if (fromClip <= 0.0)
-            return fromFile;
-
-        return std::min (fromFile, fromClip);
-    }
-
-    /** Arrangement media lives in the Project Audio folder, as recordings do. */
-    juce::File copyIntoAudioFolder (te::Edit& edit, const juce::File& source, const juce::String& clipName)
-    {
-        if (! edit.editFileRetriever || ! source.existsAsFile())
-            return {};
-
-        auto folder = ProjectManager::getAudioFolder (edit.editFileRetriever().getParentDirectory());
-
-        if (folder.createDirectory().failed())
-            return {};
-
-        auto base = juce::File::createLegalFileName (clipName);
-        auto extension = source.getFileExtension();
-
-        if (base.isEmpty())
-            base = "Arrangement";
-
-        if (extension.isEmpty())
-            extension = ".wav";
-
-        auto dest = folder.getNonexistentChildFile (base, extension);
-
-        if (! source.copyFileTo (dest))
-            return {};
-
-        return dest;
+        auto& tempo = edit.tempoSequence;
+        auto bars = tempo.toBarsAndBeats (start);
+        ++bars.bars;
+        return tempo.toTime (bars);
     }
 
     struct CapturedSlot
     {
         te::AudioTrack* track = nullptr;
-        juce::File file;
-        juce::String name;
+        te::WaveAudioClip* wave = nullptr;
+        te::MidiClip* midi = nullptr;
         double lengthSeconds = 0;
+        double offsetSeconds = 0;
     };
 }
 
@@ -265,6 +231,42 @@ juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, 
         return juce::Result::fail ("The engine refused the clip: " + audioFile.getFullPathName());
 
     clip->getSourceFileReference().setToFile (audioFile, te::SourceFileReference::PathStyle::alwaysAbsolute, false);
+    return juce::Result::ok();
+}
+
+juce::Result Session::addMidiSlotClip (const juce::String& trackId, int sceneIndex)
+{
+    auto& edit = projects.getEdit();
+    auto* track = findTrack (edit, trackId);
+
+    if (track == nullptr)
+        return juce::Result::fail ("Unknown track");
+
+    if (! isMidiTrack (*track))
+        return juce::Result::fail ("MIDI slot clips go on MIDI tracks");
+
+    if (! juce::isPositiveAndBelow (sceneIndex, edit.getSceneList().getNumScenes()))
+        return juce::Result::fail ("No such scene");
+
+    auto* slots = existingSlots (*track);
+
+    if (slots == nullptr)
+        return juce::Result::fail ("No slot for that scene");
+
+    edit.getUndoManager().beginNewTransaction ("Add Slot Clip");
+    slots->ensureNumberOfSlots (sceneIndex + 1);
+
+    auto* slot = slotAt (*track, sceneIndex);
+
+    if (slot == nullptr)
+        return juce::Result::fail ("No slot for that scene");
+
+    const auto end = oneBarAfter (edit, te::TimePosition());
+    auto clip = te::insertMIDIClip (*slot, "MIDI Clip", { te::TimePosition(), end });
+
+    if (clip == nullptr)
+        return juce::Result::fail ("The engine refused the MIDI clip");
+
     return juce::Result::ok();
 }
 
@@ -415,33 +417,45 @@ juce::Result Session::recordIntoArrangement()
         for (auto* slot : slots->getClipSlots())
         {
             auto* clip = slot != nullptr ? slot->getClip() : nullptr;
-            auto* wave = dynamic_cast<te::WaveAudioClip*> (clip);
 
-            if (wave == nullptr || (! isPlayQueued (*wave) && ! isSlotPlaying (*wave)))
+            // Queued and not yet playing stays in the slot. The Arrangement
+            // receives what is sounding, from the playhead.
+            if (clip == nullptr || ! isSlotPlaying (*clip))
                 continue;
 
-            const auto length = sourceLengthSeconds (edit, *wave);
-            const auto source = wave->getOriginalFile();
+            const auto position = clip->getPosition();
+            const auto length = position.getLength().inSeconds();
 
-            if (length <= 0.0 || ! source.existsAsFile())
-                return juce::Result::fail ("Slot clip has no audio file");
+            if (length <= 0.0)
+                return juce::Result::fail ("Slot clip has no length");
 
-            auto copy = copyIntoAudioFolder (edit, source, wave->getName());
+            CapturedSlot cap;
+            cap.track = track;
+            cap.lengthSeconds = length;
+            cap.offsetSeconds = position.getOffset().inSeconds();
 
-            if (! copy.existsAsFile())
+            if (auto* wave = dynamic_cast<te::WaveAudioClip*> (clip))
             {
-                for (auto& earlier : captured)
-                    earlier.file.deleteFile();
+                if (! wave->getOriginalFile().existsAsFile())
+                    return juce::Result::fail ("Slot clip has no audio file");
 
-                return juce::Result::fail ("Could not copy slot audio into the project");
+                cap.wave = wave;
+            }
+            else if (auto* midi = dynamic_cast<te::MidiClip*> (clip))
+            {
+                cap.midi = midi;
+            }
+            else
+            {
+                continue;
             }
 
-            captured.push_back ({ track, copy, wave->getName(), length });
+            captured.push_back (cap);
         }
     }
 
     if (captured.empty())
-        return juce::Result::fail ("No slot clips are queued or playing");
+        return juce::Result::fail ("No slot clips are playing");
 
     const auto startSeconds = std::max (0.0, edit.getTransport().getPosition().inSeconds());
     const auto maxEnd = te::Edit::getMaximumEditEnd().inSeconds();
@@ -461,28 +475,42 @@ juce::Result Session::recordIntoArrangement()
         if (length <= 0.0)
             continue;
 
-        // Same path as an Arrangement wave clip: the track owns it, so getTracks() lists it.
-        auto clip = cap.track->insertWaveClip (cap.name, cap.file,
-                                               { { te::TimePosition::fromSeconds (startSeconds),
-                                                   te::TimeDuration::fromSeconds (length) },
-                                                 {} },
-                                               false);
+        const auto start = te::TimePosition::fromSeconds (startSeconds);
+        const auto range = te::TimeRange::between (start, start + te::TimeDuration::fromSeconds (length));
 
-        if (clip == nullptr)
-            continue;
+        if (cap.wave != nullptr)
+        {
+            // The slot already owns the source. The Arrangement clip points at
+            // that file, from the slot's offset, instead of a full extra copy.
+            auto clip = cap.track->insertWaveClip (cap.wave->getName(), cap.wave->getOriginalFile(),
+                                                   { range, te::TimeDuration::fromSeconds (cap.offsetSeconds) },
+                                                   false);
 
-        clip->getSourceFileReference().setToFile (cap.file, te::SourceFileReference::PathStyle::alwaysAbsolute, false);
-        clip->beginRenderingNewProxyIfNeeded();
-        ++inserted;
+            if (clip == nullptr)
+                continue;
+
+            clip->getSourceFileReference().setToFile (cap.wave->getOriginalFile(),
+                                                      te::SourceFileReference::PathStyle::alwaysAbsolute,
+                                                      false);
+            clip->beginRenderingNewProxyIfNeeded();
+            ++inserted;
+        }
+        else if (cap.midi != nullptr)
+        {
+            auto clip = cap.track->insertMIDIClip (cap.midi->getName(), range, nullptr);
+
+            if (clip == nullptr)
+                continue;
+
+            for (auto* note : cap.midi->getSequence().getNotes())
+                clip->getSequence().addNote (*note, &edit.getUndoManager());
+
+            ++inserted;
+        }
     }
 
     if (inserted == 0)
-    {
-        for (auto& cap : captured)
-            cap.file.deleteFile();
-
         return juce::Result::fail ("The engine refused the arrangement clip");
-    }
 
     return juce::Result::ok();
 }

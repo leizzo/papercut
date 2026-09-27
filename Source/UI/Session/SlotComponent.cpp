@@ -9,8 +9,7 @@ SlotComponent::SlotComponent (CommandRegistry& c, ThemeManager& tm, const juce::
     : commands (c), themeManager (tm), trackId (id), kind (trackKind)
 {
     setSlot (info);
-    setMouseCursor (kind == TrackKind::midi ? juce::MouseCursor::NormalCursor
-                                            : juce::MouseCursor::PointingHandCursor);
+    setMouseCursor (juce::MouseCursor::PointingHandCursor);
 }
 
 void SlotComponent::setSlot (const SlotInfo& info)
@@ -57,9 +56,6 @@ void SlotComponent::paint (juce::Graphics& g)
 
 void SlotComponent::mouseDown (const juce::MouseEvent& e)
 {
-    if (kind == TrackKind::midi)
-        return;
-
     const auto args = sessionSlotArgs (trackId, slot.sceneIndex);
 
     if (e.mods.isPopupMenu())
@@ -70,7 +66,13 @@ void SlotComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    commands.invoke (slot.hasClip ? "session.launchSlot" : "session.addSlotClip", args);
+    if (slot.hasClip)
+    {
+        commands.invoke ("session.launchSlot", args);
+        return;
+    }
+
+    commands.invoke (kind == TrackKind::midi ? "session.addMidiSlotClip" : "session.addSlotClip", args);
 }
 
 } // namespace papercut

@@ -4,6 +4,8 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
+#include <map>
+
 namespace te = tracktion;
 
 namespace papercut
@@ -110,7 +112,135 @@ namespace
     }
 }
 
-Mixer::Mixer (ProjectManager& pm) : projects (pm) {}
+struct Mixer::MeterState
+{
+    const void* edit = nullptr;
+
+    struct Slot
+    {
+        juce::String pluginId;
+        te::LevelMeasurer::Client client;
+        bool added = false;
+    };
+
+    std::map<juce::String, Slot> slots;
+
+    static void detach (te::Edit& edit, Slot& slot);
+};
+
+namespace
+{
+    te::LevelMeterPlugin* meterOnTrack (te::Track& track)
+    {
+        auto meters = track.pluginList.getPluginsOfType<te::LevelMeterPlugin>();
+        return meters.isEmpty() ? nullptr : meters.getLast();
+    }
+
+    te::LevelMeterPlugin* findMeterById (te::Edit& edit, const juce::String& pluginId)
+    {
+        if (pluginId.isEmpty())
+            return nullptr;
+
+        auto matches = [&] (te::Track& track) -> te::LevelMeterPlugin*
+        {
+            for (auto* meter : track.pluginList.getPluginsOfType<te::LevelMeterPlugin>())
+                if (meter->itemID.toString() == pluginId)
+                    return meter;
+
+            return nullptr;
+        };
+
+        for (auto* track : te::getAudioTracks (edit))
+            if (auto* meter = matches (*track))
+                return meter;
+
+        if (auto* master = edit.getMasterTrack())
+            if (auto* meter = matches (*master))
+                return meter;
+
+        return nullptr;
+    }
+
+    float readPeakDb (te::LevelMeasurer::Client& client)
+    {
+        const int channels = juce::jlimit (1, 8, juce::jmax (1, client.getNumChannelsUsed()));
+        float db = (float) ApplicationModel::minVolumeDb;
+
+        for (int channel = 0; channel < channels; ++channel)
+            db = juce::jmax (db, client.getAndClearAudioLevel (channel).dB);
+
+        return db;
+    }
+}
+
+void Mixer::MeterState::detach (te::Edit& edit, Slot& slot)
+{
+    if (slot.added)
+        if (auto* meter = findMeterById (edit, slot.pluginId))
+            meter->measurer.removeClient (slot.client);
+
+    slot.client.reset();
+    slot.added = false;
+    slot.pluginId.clear();
+}
+
+Mixer::Mixer (ProjectManager& pm)
+    : projects (pm), meters (std::make_unique<MeterState>())
+{
+}
+
+Mixer::~Mixer()
+{
+    auto& edit = projects.getEdit();
+
+    for (auto& [id, slot] : meters->slots)
+        MeterState::detach (edit, slot);
+}
+
+float Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
+{
+    auto* meter = static_cast<te::LevelMeterPlugin*> (meterPlugin);
+    auto& edit = projects.getEdit();
+
+    if (meters->edit != &edit)
+    {
+        // The previous Edit, and its meters, are already gone.
+        meters->slots.clear();
+        meters->edit = &edit;
+    }
+
+    auto& slot = meters->slots[slotId];
+    const auto pluginId = meter != nullptr ? meter->itemID.toString() : juce::String();
+
+    if (slot.pluginId != pluginId || slot.added != (meter != nullptr))
+    {
+        MeterState::detach (edit, slot);
+        slot.pluginId = pluginId;
+
+        if (meter != nullptr)
+        {
+            meter->measurer.addClient (slot.client);
+            slot.added = true;
+        }
+    }
+
+    if (meter == nullptr)
+        return (float) ApplicationModel::minVolumeDb;
+
+    return readPeakDb (slot.client);
+}
+
+float Mixer::getTrackLevelDb (const juce::String& trackId)
+{
+    auto* track = findAudioTrack (projects.getEdit(), trackId);
+    return levelOf (trackId, track != nullptr ? track->getLevelMeterPlugin() : nullptr);
+}
+
+float Mixer::getMasterLevelDb()
+{
+    auto* master = projects.getEdit().getMasterTrack();
+    return levelOf ("master", master != nullptr ? meterOnTrack (*master) : nullptr);
+}
 
 void Mixer::beginUndoStep (const juce::String& name)
 {
@@ -329,8 +459,9 @@ MasterInfo Mixer::getMaster() const
     if (plugin == nullptr)
         return {};
 
-    // ApplicationModel::undo re-syncs track faders only (ADR-0009). Read the
-    // master from its state, and catch the live parameter up so playback follows.
+    // Undo re-syncs this fader in ApplicationModel::syncVolumeParametersFromState
+    // (ADR-0009). Read it from state, and catch the live parameter up so a
+    // later playback follows even if nothing has undone yet.
     if (plugin->volParam != nullptr)
         syncParameter (*plugin->volParam, plugin->volume);
 

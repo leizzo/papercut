@@ -197,6 +197,15 @@ void ChannelStrip::setState (const TrackInfo& info, const std::vector<SendInfo>&
     resized();
 }
 
+void ChannelStrip::setLevelDb (float db)
+{
+    if (std::abs (levelDb - db) < 0.25f)
+        return;
+
+    levelDb = db;
+    repaint (meterBounds);
+}
+
 void ChannelStrip::applyTheme()
 {
     auto& theme = themeManager.getTheme();
@@ -240,6 +249,20 @@ void ChannelStrip::paint (juce::Graphics& g)
     g.drawText (track.name, row, juce::Justification::centredLeft, true);
     g.setColour (theme.accent);
     g.drawText (kind, kindArea, juce::Justification::centredRight, true);
+
+    if (! meterBounds.isEmpty())
+    {
+        g.setColour (theme.laneB);
+        g.fillRect (meterBounds);
+
+        const auto span = (float) (ApplicationModel::maxVolumeDb - ApplicationModel::minVolumeDb);
+        const auto norm = span <= 0.0f ? 0.0f
+                                       : juce::jlimit (0.0f, 1.0f, (levelDb - (float) ApplicationModel::minVolumeDb) / span);
+        auto filled = meterBounds;
+        filled.removeFromTop (juce::roundToInt ((1.0f - norm) * (float) filled.getHeight()));
+        g.setColour (theme.accent);
+        g.fillRect (filled);
+    }
 }
 
 void ChannelStrip::resized()
@@ -270,6 +293,8 @@ void ChannelStrip::resized()
     }
 
     r.removeFromTop (metrics.inset);
+    meterBounds = r.removeFromRight (metrics.trackButtonWidth);
+    r.removeFromRight (metrics.inset);
     volume.setBounds (r);
 }
 

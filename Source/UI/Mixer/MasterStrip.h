@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/ApplicationModel.h"
 #include "Engine/Mixer.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -18,6 +19,7 @@ public:
     MasterStrip (CommandRegistry&, ThemeManager&);
 
     void setMaster (const MasterInfo&);
+    void setLevelDb (float db);
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -46,6 +48,8 @@ private:
     ThemeManager& themeManager;
     MasterInfo master;
     GestureSlider pan, volume;
+    float levelDb = (float) ApplicationModel::minVolumeDb;
+    juce::Rectangle<int> meterBounds;
 };
 
 } // namespace papercut

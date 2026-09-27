@@ -53,6 +53,17 @@ namespace
                 return volume->panParam.get();
         }
 
+        if (key.startsWith ("send:"))
+        {
+            const auto sendId = key.fromFirstOccurrenceOf ("send:", false, false);
+
+            for (auto* send : track.pluginList.getPluginsOfType<te::AuxSendPlugin>())
+                if (send->itemID.toString() == sendId && send->gain != nullptr)
+                    return send->gain.get();
+
+            return nullptr;
+        }
+
         if (! key.startsWith ("plugin:"))
             return nullptr;
 
@@ -195,13 +206,20 @@ namespace
                 return "pan";
         }
 
+        for (auto* send : track.pluginList.getPluginsOfType<te::AuxSendPlugin>())
+            if (send->gain != nullptr && assigned (send->gain.get()))
+                return "send:" + send->itemID.toString();
+
         const int end = indexBeforeVolume (track);
 
         for (int i = 0; i < end; ++i)
         {
             auto* plugin = track.pluginList[i];
 
-            if (plugin == nullptr || plugin == track.getVolumePlugin())
+            if (plugin == nullptr || plugin == track.getVolumePlugin()
+                || dynamic_cast<te::AuxSendPlugin*> (plugin) != nullptr
+                || dynamic_cast<te::AuxReturnPlugin*> (plugin) != nullptr
+                || dynamic_cast<te::LevelMeterPlugin*> (plugin) != nullptr)
                 continue;
 
             for (auto* param : plugin->getAutomatableParameters())

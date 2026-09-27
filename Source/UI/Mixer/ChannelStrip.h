@@ -25,6 +25,9 @@ public:
 
     void setState (const TrackInfo&, const std::vector<SendInfo>&, const std::vector<InsertSummary>&);
 
+    /** Peak from the track's level meter, in dB. */
+    void setLevelDb (float db);
+
     void paint (juce::Graphics&) override;
     void resized() override;
     void applyTheme();
@@ -70,6 +73,8 @@ private:
 
     juce::TextButton muteButton { "M" }, soloButton { "S" };
     GestureSlider pan, volume;
+    float levelDb = (float) ApplicationModel::minVolumeDb;
+    juce::Rectangle<int> meterBounds;
     std::vector<std::unique_ptr<SendRow>> sendRows;
     std::vector<std::unique_ptr<juce::Label>> insertLabels;
 

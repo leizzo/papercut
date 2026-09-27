@@ -52,10 +52,15 @@ public:
     /** Scene names live on the engine Scene. Returns false if the index is unknown or the name is unchanged. */
     bool renameScene (int index, const juce::String& name);
 
-    /** Puts a WAV in that track's slot for the scene.
+    /** Puts a WAV in an audio track's slot for the scene.
         Fails if the track is MIDI (papercutKind == "midi"), the scene does not exist, or the file is missing.
         The clip is parented to the ClipSlot, so it is not an Arrangement clip. */
     juce::Result addSlotClip (const juce::String& trackId, int sceneIndex, const juce::File& audioFile);
+
+    /** Puts an empty one-bar MIDI clip in a MIDI track's slot.
+        Fails if the track is not MIDI or the scene does not exist.
+        The clip is parented to the ClipSlot, so it is not an Arrangement clip. */
+    juce::Result addMidiSlotClip (const juce::String& trackId, int sceneIndex);
 
     /** Removes the slot's clip. Returns false if the slot was already vacant or unknown. */
     bool clearSlot (const juce::String& trackId, int sceneIndex);
@@ -77,9 +82,11 @@ public:
     /** Stops every queued or playing slot. Not undoable. Returns false if nothing was running. */
     bool stopAll();
 
-    /** For each playing or queued slot clip, inserts an Arrangement clip of the same audio
-        at the playhead. Length is the source length, clamped to the source and to the Edit.
-        One undo step. Does not need the audio thread: the slot's audio is copied onto the Arrangement. */
+    /** For each slot clip that is playing, inserts an Arrangement clip of the same
+        kind at the playhead. A queued slot is left alone. Audio keeps the slot's
+        source file and offset; it is not copied. MIDI notes are copied onto a new
+        MIDI clip. Length is the slot clip's length, clamped to the Edit.
+        One undo step. */
     juce::Result recordIntoArrangement();
 
 private:

@@ -9,8 +9,8 @@ namespace papercut
 
 /** One breakpoint on a parameter's automation curve.
 
-    value is the parameter's native unit: dB for "volume"
-    (ApplicationModel::minVolumeDb..maxVolumeDb), -1..1 for "pan",
+    value is the parameter's native unit: dB for "volume" and for
+    "send:<sendId>" (ApplicationModel::minVolumeDb..maxVolumeDb), -1..1 for "pan",
     and 0..1 for a plug-in parameter.
 */
 struct AutomationPointInfo
@@ -29,8 +29,9 @@ struct ParameterInfo
 
 /** Facade over one parameter's Tracktion AutomationCurve (ADR-0001, ADR-0012).
 
-    A target parameter is "volume", "pan", or "plugin:<pluginItemId>:<parameterID>"
-    for an insert ahead of the track's volume plug-in. Every call re-reads
+    A target parameter is "volume", "pan", "send:<sendId>" for an aux send on
+    the track, or "plugin:<pluginItemId>:<parameterID>" for an insert ahead of
+    the track's volume plug-in. Every call re-reads
     ProjectManager::getEdit(). An unknown track or key changes nothing and
     records no undo step.
 */

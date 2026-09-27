@@ -38,6 +38,11 @@ namespace
         return "plugin:" + plugin.itemID.toString() + ":" + param.paramID;
     }
 
+    bool isSendKey (const juce::String& key)
+    {
+        return key.startsWith ("send:");
+    }
+
     te::AutomatableParameter* findParameter (te::AudioTrack& track, const juce::String& key)
     {
         if (auto* volume = track.getVolumePlugin())
@@ -47,6 +52,17 @@ namespace
 
             if (key == "pan")
                 return volume->panParam.get();
+        }
+
+        if (isSendKey (key))
+        {
+            const auto sendId = key.fromFirstOccurrenceOf ("send:", false, false);
+
+            for (auto* send : track.pluginList.getPluginsOfType<te::AuxSendPlugin>())
+                if (send->itemID.toString() == sendId && send->gain != nullptr)
+                    return send->gain.get();
+
+            return nullptr;
         }
 
         if (! key.startsWith ("plugin:"))
@@ -83,7 +99,7 @@ namespace
     // native range; this facade speaks 0..1 via NormalisableRange.
     float publicToCurve (const te::AutomatableParameter& param, const juce::String& key, float value)
     {
-        if (key == "volume")
+        if (key == "volume" || isSendKey (key))
         {
             const auto db = juce::jlimit ((float) ApplicationModel::minVolumeDb,
                                           (float) ApplicationModel::maxVolumeDb, value);
@@ -98,7 +114,7 @@ namespace
 
     float curveToPublic (const te::AutomatableParameter& param, const juce::String& key, float curveValue)
     {
-        if (key == "volume")
+        if (key == "volume" || isSendKey (key))
             return te::volumeFaderPositionToDB (curveValue);
 
         if (key == "pan")
@@ -129,13 +145,21 @@ std::vector<ParameterInfo> Automation::getTargets (const juce::String& trackId) 
         targets.push_back ({ "pan", "Pan" });
     }
 
+    for (auto* send : track->pluginList.getPluginsOfType<te::AuxSendPlugin>())
+        if (send->gain != nullptr)
+            targets.push_back ({ "send:" + send->itemID.toString(),
+                                 "Send " + juce::String (send->getBusNumber()) });
+
     const int end = indexBeforeVolume (*track);
 
     for (int i = 0; i < end; ++i)
     {
         auto* plugin = track->pluginList[i];
 
-        if (plugin == nullptr || plugin == track->getVolumePlugin())
+        if (plugin == nullptr || plugin == track->getVolumePlugin()
+            || dynamic_cast<te::AuxSendPlugin*> (plugin) != nullptr
+            || dynamic_cast<te::AuxReturnPlugin*> (plugin) != nullptr
+            || dynamic_cast<te::LevelMeterPlugin*> (plugin) != nullptr)
             continue;
 
         for (auto* param : plugin->getAutomatableParameters())

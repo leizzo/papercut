@@ -1,6 +1,7 @@
 #include "TestFixture.h"
 #include "Commands/AutomationCommands.h"
 #include "Engine/Automation.h"
+#include "Engine/Mixer.h"
 #include "Engine/Shaper.h"
 
 namespace papercut::test
@@ -80,6 +81,31 @@ struct AutomationTests : juce::UnitTest
 
             expect (f.invoke ("automation.clear", automationClearArgs (f.trackId(), "volume")));
             expectEquals ((int) f.automation.getPoints (f.trackId(), "volume").size(), 0);
+        }
+
+        beginTest ("a send is an automation target in dB; undo removes the point");
+        {
+            AutoFixture f;
+            Mixer mixer (f.projects);
+            expect (mixer.addReturn ("Return").wasOk());
+            const auto trackId = f.trackId();
+            expect (mixer.addSend (trackId, mixer.getReturns()[0].bus).wasOk());
+            const auto key = "send:" + mixer.getSends (trackId)[0].id;
+
+            bool listed = false;
+
+            for (auto& target : f.automation.getTargets (trackId))
+                listed = listed || target.key == key;
+
+            expect (listed);
+            expect (f.invoke ("automation.addPoint", automationPointArgs (trackId, key, 1.0, -12.0f)));
+
+            auto points = f.automation.getPoints (trackId, key);
+            expectEquals ((int) points.size(), 1);
+            expectWithinAbsoluteError ((double) points[0].value, -12.0, 1.0e-2);
+
+            f.invoke ("edit.undo");
+            expectEquals ((int) f.automation.getPoints (trackId, key).size(), 0);
         }
 
         beginTest ("An unknown parameter key records no undo step");

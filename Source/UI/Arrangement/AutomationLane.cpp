@@ -45,7 +45,7 @@ void AutomationLane::reload()
 
 AutomationLane::ValueSpan AutomationLane::valueSpan() const
 {
-    if (parameterKey == "volume")
+    if (parameterKey == "volume" || parameterKey.startsWith ("send:"))
         return { (float) ApplicationModel::minVolumeDb, (float) ApplicationModel::maxVolumeDb };
 
     if (parameterKey == "pan")
@@ -140,7 +140,8 @@ void AutomationLane::paint (juce::Graphics& g)
         return a.timeSeconds < b.timeSeconds;
     });
 
-    const float unity = parameterKey == "volume" ? 0.0f : parameterKey == "pan" ? 0.0f : 0.5f;
+    const float unity = parameterKey == "volume" || parameterKey.startsWith ("send:") ? 0.0f
+                                                                                     : parameterKey == "pan" ? 0.0f : 0.5f;
     AutomationPointInfo reference;
     reference.value = unity;
     const auto referenceY = pointToXY (reference).y;

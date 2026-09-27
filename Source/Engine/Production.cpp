@@ -302,4 +302,21 @@ juce::File Production::getRecoveryFolder() const
     return recoveryFolder (projects);
 }
 
+bool Production::hasNewerRecovery (const juce::File& projectFolder)
+{
+    auto recovery = projectFolder.getChildFile (recoveryFolderName);
+    auto recoveryEdits = editFilesIn (recovery);
+
+    if (recoveryEdits.size() != 1 || ! recovery.getChildFile (ProjectManager::projectFileName).existsAsFile())
+        return false;
+
+    auto projectEdits = editFilesIn (projectFolder);
+
+    if (projectEdits.isEmpty())
+        return true;
+
+    return recoveryEdits.getFirst().getLastModificationTime()
+           >= projectEdits.getFirst().getLastModificationTime();
+}
+
 } // namespace papercut

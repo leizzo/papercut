@@ -14,6 +14,7 @@ struct AppCommandHost;
     session.setSceneCount   count
     session.renameScene     index, name
     session.addSlotClip     trackId, scene
+    session.addMidiSlotClip trackId, scene
     session.clearSlot       trackId, scene
     session.launchSlot      trackId, scene
     session.launchScene     index

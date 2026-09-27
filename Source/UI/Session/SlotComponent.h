@@ -9,9 +9,9 @@ namespace papercut
 class CommandRegistry;
 class ThemeManager;
 
-/** One cell in the session grid. Click an empty audio slot to add a clip,
-    click a filled slot to launch it, right-click a clip to clear it.
-    Every change goes through a Session command. */
+/** One cell in the session grid. Click an empty audio slot to add a WAV,
+    an empty MIDI slot to add a MIDI clip, a filled slot to launch it, and
+    right-click a clip to clear it. Every change goes through a Session command. */
 class SlotComponent : public juce::Component
 {
 public:

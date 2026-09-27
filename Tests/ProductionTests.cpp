@@ -150,6 +150,28 @@ struct ProductionTests : juce::UnitTest
             expectEquals ((double) h.f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
         }
 
+        beginTest ("hasNewerRecovery follows which Edit was written last");
+        {
+            Harness h;
+            h.f.uiState = sampleUIState();
+            const auto project = h.f.projects.getProjectFolder();
+            expect (! Production::hasNewerRecovery (project));
+
+            expect (h.f.invoke ("project.autosave"));
+            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+
+            auto recoveryEdits = project.getChildFile ("Recovery").findChildFiles (juce::File::findFiles, false, "*.tracktionedit");
+            auto projectEdits = project.findChildFiles (juce::File::findFiles, false, "*.tracktionedit");
+            expectEquals (recoveryEdits.size(), 1);
+            expect (! projectEdits.isEmpty());
+
+            recoveryEdits[0].setLastModificationTime (projectEdits[0].getLastModificationTime() + juce::RelativeTime::seconds (2));
+            expect (Production::hasNewerRecovery (project));
+
+            projectEdits[0].setLastModificationTime (recoveryEdits[0].getLastModificationTime() + juce::RelativeTime::seconds (2));
+            expect (! Production::hasNewerRecovery (project));
+        }
+
         beginTest ("theme.use light then dark changes colour and keeps trackHeight");
         {
             Harness h;

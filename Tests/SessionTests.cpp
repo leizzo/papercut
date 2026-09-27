@@ -2,8 +2,44 @@
 #include "Engine/Session.h"
 #include "Commands/SessionCommands.h"
 
+#include <tracktion_engine/tracktion_engine.h>
+
+namespace te = tracktion;
+
 namespace papercut::test
 {
+
+/** launchSlot only queues. The audio thread is what marks a slot playing;
+    this steps the LaunchHandle the same way, so a headless test can require it. */
+static void markSlotPlaying (te::Edit& edit, const juce::String& clipId)
+{
+    for (auto* track : te::getAudioTracks (edit))
+    {
+        if (! track->state.getChildWithName (te::IDs::CLIPSLOTS).isValid())
+            continue;
+
+        for (auto* slot : track->getClipSlotList().getClipSlots())
+        {
+            auto* clip = slot != nullptr ? slot->getClip() : nullptr;
+
+            if (clip == nullptr || clip->itemID.toString() != clipId)
+                continue;
+
+            auto handle = clip->getLaunchHandle();
+
+            if (handle == nullptr)
+                return;
+
+            te::SyncRange sync;
+            auto end = sync.end;
+            const auto step = te::BeatDuration::fromBeats (0.5);
+            end.monotonicBeat.v = end.monotonicBeat.v + step;
+            end.beat = end.beat + step;
+            handle->advance ({ sync.end, end });
+            return;
+        }
+    }
+}
 
 struct SessionTests : juce::UnitTest
 {
@@ -18,8 +54,8 @@ struct SessionTests : juce::UnitTest
             registerSessionCommands (f.commands, session, f.host);
 
             for (const char* id : { "session.setSceneCount", "session.renameScene", "session.addSlotClip",
-                                    "session.clearSlot", "session.launchSlot", "session.launchScene",
-                                    "session.stopAll", "session.recordToArrangement" })
+                                    "session.addMidiSlotClip", "session.clearSlot", "session.launchSlot",
+                                    "session.launchScene", "session.stopAll", "session.recordToArrangement" })
                 expect (f.commands.contains (id));
 
             // The Project already has an empty SCENES node, created outside undo.
@@ -132,7 +168,28 @@ struct SessionTests : juce::UnitTest
             expectEquals ((int) session.getScenes().size(), 2);
         }
 
-        beginTest ("recordIntoArrangement copies a queued slot onto the Arrangement");
+        beginTest ("addMidiSlotClip stays off the Arrangement; a WAV on a MIDI track still fails");
+        {
+            Fixture f;
+            Session session (f.projects);
+
+            f.invoke ("track.addMidi");
+            expect (session.setSceneCount (1).wasOk());
+            const auto id = f.model.getTracks()[0].id;
+
+            expect (session.addMidiSlotClip (id, 0).wasOk());
+            expect (session.getSlots (id)[0].hasClip);
+            expect (f.model.getTracks()[0].clips.empty());
+
+            f.invoke ("edit.undo");
+            expect (! session.getSlots (id)[0].hasClip);
+
+            f.invoke ("track.add");
+            const auto audioId = f.model.getTracks()[1].id;
+            expect (session.addMidiSlotClip (audioId, 0).failed());
+        }
+
+        beginTest ("recordIntoArrangement places a playing slot at the playhead and skips a queued one");
         {
             Fixture f;
             Session session (f.projects);
@@ -145,6 +202,8 @@ struct SessionTests : juce::UnitTest
             const auto wav = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 2.0);
             expect (session.addSlotClip (id, 0, wav).wasOk());
 
+            expect (session.launchSlot (id, 0));
+            expect (session.getSlots (id)[0].queued);
             expect (session.recordIntoArrangement().failed());
             f.invoke ("edit.undo");
             expect (! session.getSlots (id)[0].hasClip);   // the failed record recorded nothing
@@ -152,17 +211,42 @@ struct SessionTests : juce::UnitTest
 
             expect (f.model.setTransportPosition (1.25));
             expect (session.launchSlot (id, 0));
+            markSlotPlaying (f.projects.getEdit(), session.getSlots (id)[0].clipId);
+            expect (session.getSlots (id)[0].playing);
             expect (session.recordIntoArrangement().wasOk());
 
             auto clips = f.model.getTracks()[0].clips;
             expectEquals ((int) clips.size(), 1);
             expectWithinAbsoluteError (clips[0].startSeconds, 1.25, 1e-6);
             expectWithinAbsoluteError (clips[0].lengthSeconds, 2.0, 1e-3);
-            expect (clips[0].file.isAChildOf (ProjectManager::getAudioFolder (f.projects.getProjectFolder())));
+            expect (clips[0].file == wav);
             expect (session.getSlots (id)[0].hasClip);
 
             f.invoke ("edit.undo");
             expect (f.model.getTracks()[0].clips.empty());
+            expect (session.getSlots (id)[0].hasClip);
+        }
+
+        beginTest ("recordIntoArrangement places a playing MIDI slot on the Arrangement");
+        {
+            Fixture f;
+            Session session (f.projects);
+
+            f.invoke ("track.addMidi");
+            expect (session.setSceneCount (1).wasOk());
+            const auto id = f.model.getTracks()[0].id;
+            expect (session.addMidiSlotClip (id, 0).wasOk());
+            expect (session.launchSlot (id, 0));
+            markSlotPlaying (f.projects.getEdit(), session.getSlots (id)[0].clipId);
+            expect (session.getSlots (id)[0].playing);
+
+            expect (f.model.setTransportPosition (0.5));
+            expect (session.recordIntoArrangement().wasOk());
+
+            auto clips = f.model.getTracks()[0].clips;
+            expectEquals ((int) clips.size(), 1);
+            expect (clips[0].kind == TrackKind::midi);
+            expectWithinAbsoluteError (clips[0].startSeconds, 0.5, 1.0e-4);
             expect (session.getSlots (id)[0].hasClip);
         }
     }

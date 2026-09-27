@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <memory>
 #include <vector>
 
 namespace papercut
@@ -63,6 +64,7 @@ class Mixer
 {
 public:
     explicit Mixer (ProjectManager&);
+    ~Mixer();
 
     /** An audio track with an aux return on the next free bus number. */
     juce::Result addReturn (const juce::String& name);
@@ -92,6 +94,13 @@ public:
 
     MasterInfo getMaster() const;
 
+    /** Peak of the track's level meter, in dB. Silence (minVolumeDb) when the
+        track has no meter or the meter has not seen audio. */
+    float getTrackLevelDb (const juce::String& trackId);
+
+    /** Peak of the master track's level meter, in dB. Same silence rule. */
+    float getMasterLevelDb();
+
     /** Master fader, not a track fader. continuesGesture as for setSendGain. */
     bool setMasterVolume (double db, bool continuesGesture = false);
     bool setMasterPan (double pan, bool continuesGesture = false);
@@ -101,8 +110,15 @@ public:
     std::vector<InsertSummary> getInserts (const juce::String& trackId) const;
 
 private:
+    struct MeterState;
+
     ProjectManager& projects;
     juce::String openGestureKey;
+    std::unique_ptr<MeterState> meters;
+
+    /** meterPlugin is a tracktion::LevelMeterPlugin*. Kept as void* so this
+        header stays free of Tracktion types. */
+    float levelOf (const juce::String& slotId, void* meterPlugin);
 
     void beginUndoStep (const juce::String& name);
     void beginGestureStep (const juce::String& name, const juce::String& gestureKey, bool continues);
