@@ -88,7 +88,7 @@ The scanned list of plug-ins the user can insert: name, manufacturer, format, pa
 _Avoid_: plugin database (the on-disk cache is an implementation detail)
 
 **Insert**:
-One plug-in on a track's insert chain, ahead of that track's volume plug-in. A MIDI track has one instrument: inserting an instrument replaces the built-in synth and the track stays a MIDI track (ADR-0011).
+One plug-in on a track's insert chain, ahead of that track's volume plug-in. A MIDI track has one instrument: inserting an instrument replaces the built-in synth and the track stays a MIDI track.
 
 ### Mixer
 
