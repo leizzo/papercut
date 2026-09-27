@@ -1,4 +1,5 @@
 #include "EngineManager.h"
+#include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -15,9 +16,18 @@ namespace
         explicit PapercutEngineBehaviour (EngineManager::AudioDevice d) : audioDevice (d) {}
 
         bool autoInitialiseDeviceManager() override    { return audioDevice == EngineManager::AudioDevice::initialise; }
+        bool shouldOpenAudioInputByDefault() override   { return true; }
 
-        // Recording is out of scope; opening inputs would only trigger a microphone prompt.
-        bool shouldOpenAudioInputByDefault() override   { return false; }
+        /** Recordings go into the Project's audio folder, named after their track. */
+        juce::File getFileForNewAudioRecording (te::Track& track, const juce::String& fileExtension) override
+        {
+            const auto folder = ProjectManager::getAudioFolder (track.edit.editFileRetriever().getParentDirectory());
+            const auto name = juce::File::createLegalFileName (track.getName()) + " Recording ";
+
+            for (int n = 1;; ++n)
+                if (auto file = folder.getChildFile (name + juce::String (n) + fileExtension); ! file.exists())
+                    return file;
+        }
 
     private:
         EngineManager::AudioDevice audioDevice;

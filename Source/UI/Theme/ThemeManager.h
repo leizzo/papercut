@@ -11,7 +11,9 @@ class LayoutSource;
 struct Theme
 {
     juce::Colour background, panel, text, mutedText, accent,
-                 laneA, laneB, trackHeader, trackHeaderSelected, mute, solo,
+                 laneA, laneB, trackHeader, trackHeaderSelected, mute, solo, armed,
+                 recording,   ///< a recording in progress in its lane
+                 loop,        ///< the loop range on the ruler
                  clip, clipSelected, clipText, waveform, ruler, playhead, error;
     float cornerRadius = 0;
     float fontSize = 0;

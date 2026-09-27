@@ -12,6 +12,7 @@ namespace
 
 ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& commands, ThemeManager& tm, UIStateStore& uiState)
     : model (m), themeManager (tm), view (uiState.getState (componentId)),
+      timeline (model, commands, themeManager, view),
       trackList (commands, themeManager, view),
       lanes (model, commands, themeManager, view)
 {
@@ -40,8 +41,9 @@ ArrangementView::~ArrangementView()
 void ArrangementView::refresh()
 {
     tracks = model.getTracks();
-    trackList.setTracks (tracks);
+    trackList.setTracks (tracks, model.getAudioInputs());
     lanes.setTracks (tracks);
+    timeline.repaint();   // the loop
     clampVerticalScroll();
 }
 

@@ -7,8 +7,9 @@ namespace papercut
 {
 
 /** A clip's waveform, generated on a background thread by the engine's
-    thumbnail cache (te::SmartThumbnail). Repaints its target component as
-    data arrives. Obtain one from ApplicationModel::createWaveform().
+    thumbnail cache (te::SmartThumbnail), which repaints its target component
+    as data arrives; or a recording's, growing as it records. Obtain one from
+    ApplicationModel::createWaveform() or createRecordingWaveform().
 */
 class ClipWaveform
 {

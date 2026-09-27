@@ -79,6 +79,12 @@ void ProjectManager::newProject()
 
     auto id = te::ProjectItemID::createNewID (te::ProjectID{});
     setCurrent (createEdit (engine, te::loadEditFromFile (engine, juce::File(), id), editFileFor (folder)), folder, true);
+
+    // The engine stores a recording's path relative to the Edit file, but measures
+    // from the file's folder only if the file exists. Written out, the untitled
+    // Project stores paths exactly as a saved one does, so they survive Save As.
+    [[maybe_unused]] auto written = writeProject (folder, {});
+    jassert (written.wasOk());
 }
 
 juce::Result ProjectManager::readProjectFile (const juce::File& folder, juce::var& uiState)
@@ -131,7 +137,7 @@ juce::Result ProjectManager::open (const juce::File& folder, juce::var& uiState)
 
 juce::Result ProjectManager::writeProject (const juce::File& folder, const juce::var& uiState)
 {
-    for (auto sub : { folder, folder.getChildFile ("Audio"), folder.getChildFile ("Cache") })
+    for (auto sub : { folder, getAudioFolder (folder), folder.getChildFile ("Cache") })
         if (auto r = sub.createDirectory(); r.failed())
             return r;
 
@@ -163,6 +169,10 @@ juce::Result ProjectManager::saveAs (const juce::File& folder, const juce::var& 
 {
     if (auto r = writeProject (folder, uiState); r.failed())
         return r;
+
+    if (auto audio = getAudioFolder (projectFolder); audio.isDirectory() && folder != projectFolder)
+        if (! audio.copyDirectoryTo (getAudioFolder (folder)))
+            return juce::Result::fail ("Could not copy " + audio.getFullPathName() + " into " + folder.getFullPathName());
 
     edit->editFileRetriever = [f = editFileFor (folder)] { return f; };
     edit->resetChangedStatus();

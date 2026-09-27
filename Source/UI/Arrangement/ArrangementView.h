@@ -39,7 +39,7 @@ private:
     ThemeManager& themeManager;
     ArrangementViewState view;
 
-    TimelineHeader timeline { themeManager, view };
+    TimelineHeader timeline;
     TrackList trackList;
     TrackLanes lanes;
     Playhead playhead { model, themeManager, view };

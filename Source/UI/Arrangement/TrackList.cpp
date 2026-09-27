@@ -10,7 +10,7 @@ TrackList::TrackList (CommandRegistry& c, ThemeManager& tm, ArrangementViewState
 {
 }
 
-void TrackList::setTracks (const std::vector<TrackInfo>& newTracks)
+void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::StringArray& inputs)
 {
     tracks = newTracks;
     std::map<juce::String, std::unique_ptr<TrackHeader>> kept;
@@ -19,12 +19,12 @@ void TrackList::setTracks (const std::vector<TrackInfo>& newTracks)
     {
         if (auto existing = headers.find (track.id); existing != headers.end())
         {
-            existing->second->setTrack (track);
+            existing->second->setTrack (track, inputs);
             kept[track.id] = std::move (existing->second);
         }
         else
         {
-            auto header = std::make_unique<TrackHeader> (commands, themeManager, track);
+            auto header = std::make_unique<TrackHeader> (commands, themeManager, track, inputs);
             addAndMakeVisible (*header);
             kept[track.id] = std::move (header);
         }

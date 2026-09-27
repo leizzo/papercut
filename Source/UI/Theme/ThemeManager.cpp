@@ -144,7 +144,8 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "mutedText", &Theme::mutedText }, { "accent", &Theme::accent },
         { "laneA", &Theme::laneA }, { "laneB", &Theme::laneB },
         { "trackHeader", &Theme::trackHeader }, { "trackHeaderSelected", &Theme::trackHeaderSelected },
-        { "mute", &Theme::mute }, { "solo", &Theme::solo },
+        { "mute", &Theme::mute }, { "solo", &Theme::solo }, { "armed", &Theme::armed },
+        { "recording", &Theme::recording }, { "loop", &Theme::loop },
         { "clip", &Theme::clip }, { "clipSelected", &Theme::clipSelected }, { "clipText", &Theme::clipText }, { "waveform", &Theme::waveform },
         { "ruler", &Theme::ruler }, { "playhead", &Theme::playhead }, { "error", &Theme::error },
     };

@@ -9,6 +9,7 @@ namespace papercut
 TrackLanes::TrackLanes (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
     : model (m), commands (c), themeManager (tm), view (v)
 {
+    startTimerHz (30);
 }
 
 void TrackLanes::setTracks (const std::vector<TrackInfo>& newTracks)
@@ -89,6 +90,56 @@ void TrackLanes::paint (juce::Graphics& g)
     }
 }
 
+void TrackLanes::paintOverChildren (juce::Graphics& g)
+{
+    auto& theme = themeManager.getTheme();
+    auto& metrics = themeManager.getMetrics();
+
+    for (auto& recording : recordings)
+    {
+        const auto row = rowOfTrack (recording.trackId);
+
+        if (row < 0)
+            continue;
+
+        const auto x = view.timeToX (recording.startSeconds);
+        const auto width = (float) (recording.lengthSeconds * view.getPixelsPerSecond());
+        const auto area = juce::Rectangle<float> (x, (float) view.rowToY (row, metrics.trackHeight), width, (float) metrics.trackHeight)
+                              .getSmallestIntegerContainer()
+                              .reduced (0, metrics.inset);
+
+        g.setColour (theme.recording);
+        g.fillRoundedRectangle (area.toFloat(), theme.cornerRadius);
+
+        if (auto waveform = recordingWaveforms.find (recording.trackId); waveform != recordingWaveforms.end())
+        {
+            g.setColour (theme.waveform);
+            waveform->second->draw (g, area.withTrimmedTop (metrics.clipHeaderHeight), 0.0, recording.lengthSeconds);
+        }
+    }
+}
+
+void TrackLanes::timerCallback()
+{
+    auto now = model.getRecordings();
+
+    if (now.empty() && recordings.empty())
+        return;
+
+    std::map<juce::String, std::unique_ptr<ClipWaveform>> kept;
+
+    for (auto& recording : now)
+    {
+        if (auto existing = recordingWaveforms.find (recording.trackId); existing != recordingWaveforms.end())
+            kept[recording.trackId] = std::move (existing->second);
+        else if (auto waveform = model.createRecordingWaveform (recording.trackId))
+            kept[recording.trackId] = std::move (waveform);
+    }
+
+    recordings = std::move (now);
+    recordingWaveforms = std::move (kept);
+    repaint();
+}
 //==============================================================================
 ClipComponent* TrackLanes::clipAt (juce::Point<int> p) const
 {
@@ -118,6 +169,29 @@ TrackLanes::DragMode TrackLanes::dragModeAt (const ClipComponent& clip, juce::Po
     return DragMode::move;
 }
 
+int TrackLanes::rowOfTrack (const juce::String& trackId) const
+{
+    for (size_t row = 0; row < tracks.size(); ++row)
+        if (tracks[row].id == trackId)
+            return (int) row;
+
+    return -1;
+}
+
+void TrackLanes::showTakeMenu (const ClipInfo& clip)
+{
+    juce::PopupMenu menu;
+
+    if (clip.numTakes == 0)
+        menu.addItem ("No takes: loop-record to make some", false, false, nullptr);
+
+    for (int take = 0; take < clip.numTakes; ++take)
+        menu.addItem ("Take " + juce::String (take + 1), true, take == clip.currentTake,
+                      [this, id = clip.id, take] { commands.invoke ("clip.setTake", clipTakeArgs (id, take)); });
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+}
+
 int TrackLanes::rowOf (const juce::String& clipId) const
 {
     for (size_t row = 0; row < tracks.size(); ++row)
@@ -142,6 +216,14 @@ void TrackLanes::mouseDown (const juce::MouseEvent& e)
     if (auto* clip = clipAt (e.getPosition()))
     {
         auto info = clip->getClip();
+
+        if (e.mods.isPopupMenu())
+        {
+            model.selectClip (info.id);
+            showTakeMenu (info);
+            return;
+        }
+
         info.selected = true;
         drag = Drag { dragModeAt (*clip, e.getPosition()), info, info, rowOf (info.id), view.xToTime ((float) e.x) };
         model.selectClip (info.id);

@@ -15,9 +15,10 @@ class EngineManager;
     A Project is a folder:
         <Name>.tracktionedit   the Edit (engine-owned state)
         project.json           format version + UI State only (ADR-0002)
-        Audio/, Cache/         media and cache subfolders
+        Audio/, Cache/         media (recordings among it) and cache subfolders
 
-    A New Project lives in a temporary "untitled" folder until it is saved with Save As.
+    A New Project lives in a temporary "untitled" folder, written out like any
+    other Project, until it is saved with Save As.
 */
 class ProjectManager
 {
@@ -39,7 +40,9 @@ public:
     /** Saves in place. Fails for an untitled Project: use saveAs(). */
     juce::Result save (const juce::var& uiState);
 
-    /** Writes the Project into a new folder and makes that folder the current Project. */
+    /** Writes the Project into a new folder and makes that folder the current
+        Project. The Project's Audio folder comes along: the Edit refers to
+        recordings by paths relative to itself. */
     juce::Result saveAs (const juce::File& projectFolder, const juce::var& uiState);
 
     bool isUntitled() const noexcept                { return untitled; }
@@ -47,6 +50,9 @@ public:
     juce::String getProjectName() const;
 
     tracktion::Edit& getEdit() const noexcept;
+
+    /** Where a Project keeps its media, recordings included. */
+    static juce::File getAudioFolder (const juce::File& projectFolder)   { return projectFolder.getChildFile ("Audio"); }
 
     /** Reads project.json from a Project folder. Fails on a missing file, bad JSON,
         or an unsupported format version. */

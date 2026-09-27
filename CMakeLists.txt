@@ -151,7 +151,8 @@ juce_add_gui_app(Papercut
     PRODUCT_NAME "Papercut"
     BUNDLE_ID "com.papercut.Papercut"
     COMPANY_NAME "Papercut"
-    MICROPHONE_PERMISSION_ENABLED FALSE
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "Papercut records audio from your inputs onto armed tracks."
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 
@@ -176,6 +177,7 @@ target_sources(PapercutTests PRIVATE
     Tests/TransportCommandTests.cpp
     Tests/ClipCommandTests.cpp
     Tests/ClipEditingTests.cpp
+    Tests/RecordingTests.cpp
     Tests/RenderTests.cpp
     Tests/ComponentFactoryTests.cpp)
 

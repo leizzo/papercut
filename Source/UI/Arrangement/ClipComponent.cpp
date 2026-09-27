@@ -36,7 +36,10 @@ void ClipComponent::paint (juce::Graphics& g)
     g.setFont (themeManager.getFont (0.85f));
     // Keep the name readable when the clip starts off-screen.
     auto nameArea = header.withLeft (std::max (header.getX(), g.getClipBounds().getX())).reduced (metrics.textPadding, 0);
-    g.drawText (clip.name, nameArea, juce::Justification::centredLeft, true);
+    const auto take = clip.numTakes == 0 ? juce::String()
+                    : clip.currentTake < 0 ? "  (" + juce::String (clip.numTakes) + " takes)"
+                                           : "  (Take " + juce::String (clip.currentTake + 1) + "/" + juce::String (clip.numTakes) + ")";
+    g.drawText (clip.name + take, nameArea, juce::Justification::centredLeft, true);
 
     if (waveform == nullptr || getWidth() <= 0 || clip.lengthSeconds <= 0)
         return;

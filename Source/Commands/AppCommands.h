@@ -32,13 +32,15 @@ struct AppCommandHost
     project.new  project.open  project.save  project.saveAs
     track.add    track.remove
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
-    clip.add     clip.move     clip.resize   clip.split
+    track.setInput   track.toggleArm
+    clip.add     clip.move     clip.resize   clip.split   clip.setTake
     edit.undo    edit.redo
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
+    transport.record  transport.toggleLoop  transport.setLoopRange
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
 
-/** Arguments for track.toggleMute and track.toggleSolo. */
+/** Arguments for track.toggleMute, track.toggleSolo and track.toggleArm. */
 juce::var trackArgs (const juce::String& trackId);
 
 /** Arguments for track.setVolume. A continuous gesture (a fader drag) passes
@@ -49,11 +51,21 @@ juce::var trackVolumeArgs (const juce::String& trackId, double db, bool continue
 /** Arguments for track.setPan (-1 left to 1 right); continuesGesture as for trackVolumeArgs. */
 juce::var trackPanArgs (const juce::String& trackId, double pan, bool continuesGesture = false);
 
+/** Arguments for track.setInput: an input named by ApplicationModel::getAudioInputs(),
+    or empty for none. */
+juce::var trackInputArgs (const juce::String& trackId, const juce::String& inputName);
+
 /** Arguments for clip.move: the clip, its new start, and optionally the track to
     move it to. Invoked with anything else, clip.move does nothing. */
 juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId = {});
 
 /** Arguments for clip.resize: the clip and its new edges. */
 juce::var clipResizeArgs (const juce::String& clipId, double startSeconds, double endSeconds);
+
+/** Arguments for clip.setTake: the clip and a 0-based take index. */
+juce::var clipTakeArgs (const juce::String& clipId, int takeIndex);
+
+/** Arguments for transport.setLoopRange, which also turns looping on. */
+juce::var loopRangeArgs (double startSeconds, double endSeconds);
 
 } // namespace papercut

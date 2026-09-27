@@ -1072,10 +1072,10 @@ Plugin parameter IDs should be connected to the automation system.
 
 ## Phase 4 — Recording
 
-* [ ] Audio Input
-* [ ] Record
-* [ ] Waveform
-* [ ] Take Management
+* [x] Audio Input
+* [x] Record
+* [x] Waveform
+* [x] Take Management
 
 ## Phase 5 — MIDI
 

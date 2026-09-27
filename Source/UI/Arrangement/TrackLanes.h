@@ -17,9 +17,14 @@ class CommandRegistry;
 
     Clip gestures: clicking a clip selects it; dragging its body moves it (across
     lanes too), dragging an edge resizes it. The drag is previewed here and
-    committed on release as one clip.move / clip.resize Command.
+    committed on release as one clip.move / clip.resize Command. Right-clicking
+    a clip offers its takes (clip.setTake).
+
+    While recording, each recording is drawn in its lane with its waveform
+    growing, polled from the model at ~30 Hz like the Playhead.
 */
-class TrackLanes : public juce::Component
+class TrackLanes : public juce::Component,
+                   private juce::Timer
 {
 public:
     TrackLanes (ApplicationModel&, CommandRegistry&, ThemeManager&, ArrangementViewState&);
@@ -30,6 +35,7 @@ public:
     void layoutClips();
 
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void resized() override   { layoutClips(); }
     void mouseMove (const juce::MouseEvent&) override;
     void mouseDown (const juce::MouseEvent&) override;
@@ -59,9 +65,16 @@ private:
     std::map<juce::String, std::unique_ptr<ClipComponent>> clips;
     std::optional<Drag> drag;
 
+    std::vector<RecordingInfo> recordings;
+    std::map<juce::String, std::unique_ptr<ClipWaveform>> recordingWaveforms;   ///< by track ID
+
     ClipComponent* clipAt (juce::Point<int>) const;
     DragMode dragModeAt (const ClipComponent&, juce::Point<int>) const;
     int rowOf (const juce::String& clipId) const;
+    int rowOfTrack (const juce::String& trackId) const;
+    void showTakeMenu (const ClipInfo&);
+
+    void timerCallback() override;
 };
 
 } // namespace papercut

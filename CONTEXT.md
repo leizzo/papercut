@@ -28,7 +28,22 @@ JUCE's menu/keyboard-shortcut command ID. Always spelled in full.
 _Avoid_: Command
 
 **Engine Undo**:
-Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, track volume and pan, insert/move/resize/split clip); a continuous gesture such as a fader drag is one undo step. Not undoable: transport, selection, zoom, scroll, mute, solo.
+Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, track volume and pan, insert/move/resize/split clip, switching a clip's Take, and each Recording as a whole); a continuous gesture such as a fader drag is one undo step. Not undoable: transport (including the Loop), selection, zoom, scroll, mute, solo, a track's Input and arming.
+
+### Recording
+
+**Input**:
+One of the engine's audio inputs, assigned to a track; a track has at most one. **Arming** a track makes it record its Input when the transport records.
+
+**Recording**:
+What one press of Record captures on each armed track: a WAV file in the Project's `Audio/` folder, which becomes a clip when the transport stops.
+
+**Loop**:
+A time range on the transport, played over and over while looping is on. Recording while looping records a Take per pass.
+
+**Take**:
+One pass of a loop Recording. The passes share one clip; the clip plays one Take at a time and the user switches between them.
+_Avoid_: Comp (compositing Takes is not supported)
 
 ### Presentation
 

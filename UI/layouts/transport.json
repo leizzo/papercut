@@ -7,6 +7,8 @@
     { "type": "button", "id": "transport.returnToStart", "text": "|<", "command": "transport.returnToStart", "size": 40 },
     { "type": "button", "id": "transport.play", "text": "Play", "command": "transport.play", "size": 72 },
     { "type": "button", "id": "transport.stop", "text": "Stop", "command": "transport.stop", "size": 72 },
+    { "type": "button", "id": "transport.record", "text": "Record", "command": "transport.record", "size": 72 },
+    { "type": "button", "id": "transport.loop", "text": "Loop", "command": "transport.toggleLoop", "size": 56 },
     { "type": "panel", "id": "transport.divider", "size": 1 },
     { "type": "button", "id": "transport.addTrack", "text": "Add Track", "command": "track.add", "size": 96 },
     { "type": "button", "id": "transport.addClip", "text": "Add Clip...", "command": "clip.add", "size": 96 },

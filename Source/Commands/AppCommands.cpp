@@ -11,7 +11,8 @@ namespace
     namespace ArgKeys
     {
         const juce::Identifier clipId ("clipId"), start ("start"), end ("end"), trackId ("trackId"),
-                               value ("value"), continuesGesture ("continuesGesture");
+                               value ("value"), continuesGesture ("continuesGesture"), input ("input"),
+                               take ("take");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -128,7 +129,18 @@ namespace
         }
     };
 
-    /** Flips mute or solo on the track in trackArgs. */
+    /** A track header's input menu. */
+    struct SetTrackInputCommand : ModelCommand
+    {
+        SetTrackInputCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.setInput", "Set Track Input", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            model.setTrackInput (args[ArgKeys::trackId], args[ArgKeys::input]);
+        }
+    };
+
+    /** Flips mute, solo or arm on the track in trackArgs. */
     struct ToggleTrackFlagCommand : ModelCommand
     {
         using Getter = bool (*) (const TrackInfo&);
@@ -200,6 +212,18 @@ namespace
         }
     };
 
+    /** A clip's take menu. */
+    struct SetClipTakeCommand : ModelCommand
+    {
+        SetClipTakeCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.setTake", "Switch Take", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::take].isInt())
+                model.setClipTake (args[ArgKeys::clipId], args[ArgKeys::take]);
+        }
+    };
+
     //==============================================================================
     struct UndoCommand : ModelCommand
     {
@@ -240,6 +264,31 @@ namespace
         CommandRegistry& registry;
     };
 
+    struct RecordCommand : ModelCommand
+    {
+        RecordCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.record", "Record", m, h) {}
+        void execute (const juce::var&) override   { report (model.record()); }
+    };
+
+    struct ToggleLoopCommand : ModelCommand
+    {
+        ToggleLoopCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.toggleLoop", "Loop", m, h) {}
+        void execute (const juce::var&) override   { model.setLooping (! model.isLooping()); }
+    };
+
+    /** A drag along the timeline ruler. */
+    struct SetLoopRangeCommand : ModelCommand
+    {
+        SetLoopRangeCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.setLoopRange", "Set Loop", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::start].isDouble() && args[ArgKeys::end].isDouble()
+                 && model.setLoopRange (args[ArgKeys::start], args[ArgKeys::end]))
+                model.setLooping (true);
+        }
+    };
+
     struct ReturnToStartCommand : ModelCommand
     {
         ReturnToStartCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.returnToStart", "Return to Start", m, h) {}
@@ -265,10 +314,14 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
                                                             [] (const TrackInfo& t) { return t.muted; }, &ApplicationModel::setTrackMuted));
     registry.add (std::make_unique<ToggleTrackFlagCommand> ("track.toggleSolo", "Solo Track", model, host,
                                                             [] (const TrackInfo& t) { return t.solo; }, &ApplicationModel::setTrackSolo));
+    registry.add (std::make_unique<ToggleTrackFlagCommand> ("track.toggleArm", "Arm Track for Recording", model, host,
+                                                            [] (const TrackInfo& t) { return t.armed; }, &ApplicationModel::setTrackArmed));
+    registry.add (std::make_unique<SetTrackInputCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
     registry.add (std::make_unique<MoveClipCommand> (model, host));
     registry.add (std::make_unique<ResizeClipCommand> (model, host));
     registry.add (std::make_unique<SplitClipCommand> (model, host));
+    registry.add (std::make_unique<SetClipTakeCommand> (model, host));
 
     registry.add (std::make_unique<UndoCommand> (model, host));
     registry.add (std::make_unique<RedoCommand> (model, host));
@@ -277,6 +330,9 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<StopCommand> (model, host));
     registry.add (std::make_unique<TogglePlayCommand> (model, host, registry));
     registry.add (std::make_unique<ReturnToStartCommand> (model, host));
+    registry.add (std::make_unique<RecordCommand> (model, host));
+    registry.add (std::make_unique<ToggleLoopCommand> (model, host));
+    registry.add (std::make_unique<SetLoopRangeCommand> (model, host));
 }
 
 juce::var trackArgs (const juce::String& trackId)
@@ -299,6 +355,13 @@ juce::var trackPanArgs (const juce::String& trackId, double pan, bool continuesG
     return trackVolumeArgs (trackId, pan, continuesGesture);   // same shape
 }
 
+juce::var trackInputArgs (const juce::String& trackId, const juce::String& inputName)
+{
+    auto args = trackArgs (trackId);
+    args.getDynamicObject()->setProperty (ArgKeys::input, inputName);
+    return args;
+}
+
 juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId)
 {
     auto args = new juce::DynamicObject();
@@ -312,6 +375,22 @@ juce::var clipResizeArgs (const juce::String& clipId, double startSeconds, doubl
 {
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::start, startSeconds);
+    args->setProperty (ArgKeys::end, endSeconds);
+    return args;
+}
+
+juce::var clipTakeArgs (const juce::String& clipId, int takeIndex)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::take, takeIndex);
+    return args;
+}
+
+juce::var loopRangeArgs (double startSeconds, double endSeconds)
+{
+    auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::start, startSeconds);
     args->setProperty (ArgKeys::end, endSeconds);
     return args;

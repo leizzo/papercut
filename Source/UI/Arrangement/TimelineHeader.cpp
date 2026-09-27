@@ -1,4 +1,5 @@
 #include "TimelineHeader.h"
+#include "Commands/AppCommands.h"
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
@@ -26,8 +27,8 @@ namespace
     }
 }
 
-TimelineHeader::TimelineHeader (ThemeManager& tm, ArrangementViewState& v)
-    : themeManager (tm), view (v)
+TimelineHeader::TimelineHeader (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
+    : model (m), commands (c), themeManager (tm), view (v)
 {
 }
 
@@ -35,6 +36,16 @@ void TimelineHeader::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
     g.fillAll (theme.panel);
+
+    // The loop, in the ruler's upper half.
+    const auto loop = draggedLoop.value_or (model.getLoopRange());
+
+    if (loop.end > loop.start)
+    {
+        const auto x1 = view.timeToX (loop.start), x2 = view.timeToX (loop.end);
+        g.setColour (theme.loop.withMultipliedAlpha (draggedLoop || model.isLooping() ? 0.8f : 0.25f));
+        g.fillRect (juce::Rectangle<float> (x1, 0.0f, x2 - x1, (float) getHeight() * 0.5f));
+    }
 
     const auto font = themeManager.getFont (0.8f);
     const auto textPadding = themeManager.getMetrics().textPadding / 2;
@@ -60,6 +71,27 @@ void TimelineHeader::paint (juce::Graphics& g)
     }
 
     g.drawHorizontalLine (getHeight() - 1, 0.0f, (float) getWidth());
+}
+
+void TimelineHeader::mouseDown (const juce::MouseEvent& e)
+{
+    dragStartSeconds = std::max (0.0, view.xToTime ((float) e.x));
+    draggedLoop.reset();
+}
+
+void TimelineHeader::mouseDrag (const juce::MouseEvent& e)
+{
+    const auto now = std::max (0.0, view.xToTime ((float) e.x));
+    draggedLoop = TimeRangeSeconds { std::min (dragStartSeconds, now), std::max (dragStartSeconds, now) };
+    repaint();
+}
+
+void TimelineHeader::mouseUp (const juce::MouseEvent&)
+{
+    if (auto loop = std::exchange (draggedLoop, std::nullopt))
+        commands.invoke ("transport.setLoopRange", loopRangeArgs (loop->start, loop->end));
+
+    repaint();
 }
 
 } // namespace papercut

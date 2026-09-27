@@ -115,6 +115,94 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     }
 
     //==============================================================================
+    te::TransportControl& transport() const   { return edit().getTransport(); }
+
+    /** The Edit's audio inputs. Allocates the playback context, which owns them. */
+    juce::Array<te::InputDeviceInstance*> audioInputs() const
+    {
+        transport().ensureContextAllocated();
+        juce::Array<te::InputDeviceInstance*> inputs;
+
+        if (auto* context = edit().getCurrentPlaybackContext())
+            for (auto* input : context->getAllInputs())
+                if (input->getInputDevice().getDeviceType() == te::InputDevice::waveDevice)
+                    inputs.add (input);
+
+        return inputs;
+    }
+
+    te::InputDeviceInstance* findInput (const juce::String& name) const
+    {
+        for (auto* input : audioInputs())
+            if (input->getInputDevice().getName() == name)
+                return input;
+
+        return nullptr;
+    }
+
+    /** The input a track records from (a track has at most one). */
+    te::InputDeviceInstance* inputOf (const te::AudioTrack& track) const
+    {
+        return inputOf (track, audioInputs());
+    }
+
+    te::InputDeviceInstance* inputOf (const te::AudioTrack& track, const juce::Array<te::InputDeviceInstance*>& inputs) const
+    {
+        for (auto* input : inputs)
+            if (input->getTargets().contains (track.itemID))
+                return input;
+
+        return nullptr;
+    }
+
+    /** A take's audio file; takes store their source as a clip does. */
+    juce::File takeFile (juce::ValueTree take) const
+    {
+        return te::SourceFileReference (edit(), take, te::IDs::source).getFile();
+    }
+
+    static juce::ValueTree takesOf (const te::Clip& clip)   { return clip.state.getChildWithName (te::IDs::TAKES); }
+
+    int currentTakeOf (te::WaveAudioClip& clip) const
+    {
+        const auto takes = takesOf (clip);
+        const auto playing = clip.getSourceFileReference().getFile();
+
+        for (int i = 0; i < takes.getNumChildren(); ++i)
+            if (takeFile (takes.getChild (i)) == playing)
+                return i;
+
+        return -1;
+    }
+
+    /** A loop recording lists its first pass twice among its takes (the engine
+        adds the file both before and after cutting the later passes out of it). */
+    void removeDuplicateTakes()
+    {
+        for (auto* t : te::getAudioTracks (edit()))
+        {
+            for (auto* c : t->getClips())
+            {
+                auto takes = takesOf (*c);
+                juce::Array<juce::File> seen;
+
+                for (int i = 0; i < takes.getNumChildren();)
+                {
+                    if (auto file = takeFile (takes.getChild (i)); seen.contains (file))
+                    {
+                        takes.removeChild (i, &undoManager());
+                    }
+                    else
+                    {
+                        seen.add (file);
+                        ++i;
+                    }
+                }
+            }
+        }
+    }
+
+    //==============================================================================
     te::AudioTrack* findTrack (const juce::String& id) const
     {
         for (auto* t : te::getAudioTracks (edit()))
@@ -305,6 +393,59 @@ bool ApplicationModel::setTrackSolo (const juce::String& trackId, bool solo)
     return true;
 }
 
+//==============================================================================
+juce::StringArray ApplicationModel::getAudioInputs() const
+{
+    juce::StringArray names;
+
+    for (auto* input : impl->audioInputs())
+        names.add (input->getInputDevice().getName());
+
+    return names;
+}
+
+bool ApplicationModel::setTrackInput (const juce::String& trackId, const juce::String& inputName)
+{
+    auto* track = impl->findTrack (trackId);
+    auto* current = track != nullptr ? impl->inputOf (*track) : nullptr;
+    auto* input = inputName.isEmpty() ? nullptr : impl->findInput (inputName);
+
+    if (track == nullptr || input == current || (input == nullptr && inputName.isNotEmpty()))
+        return false;
+
+    // Inputs live outside the UndoManager, like mute and solo.
+    const bool armed = current != nullptr && current->isRecordingEnabled (track->itemID);
+
+    if (current != nullptr)
+        (void) current->removeTarget (track->itemID, nullptr);
+
+    if (input != nullptr)
+        if (auto destination = input->setTarget (track->itemID, false, nullptr); destination.has_value())
+            (*destination)->recordEnabled = armed;
+
+    return true;
+}
+
+bool ApplicationModel::setTrackArmed (const juce::String& trackId, bool armed)
+{
+    auto* track = impl->findTrack (trackId);
+
+    if (track == nullptr)
+        return false;
+
+    auto* input = impl->inputOf (*track);
+
+    if (input == nullptr && armed)
+        if (setTrackInput (trackId, getAudioInputs()[0]))
+            input = impl->inputOf (*track);
+
+    if (input == nullptr || input->isRecordingEnabled (track->itemID) == armed)
+        return false;
+
+    input->setRecordingEnabled (track->itemID, armed);
+    return true;
+}
+
 juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
 {
     auto& edit = impl->edit();
@@ -418,6 +559,25 @@ bool ApplicationModel::splitClip (const juce::String& clipId, double timeSeconds
     });
 }
 
+bool ApplicationModel::setClipTake (const juce::String& clipId, int takeIndex)
+{
+    // Not WaveAudioClip::setCurrentTake: that only knows takes that are items of a
+    // te::Project, and deletes the file takes a loop recording makes here.
+    auto* clip = impl->findClip (clipId);
+
+    if (clip == nullptr || takeIndex == impl->currentTakeOf (*clip))
+        return false;
+
+    const auto take = Impl::takesOf (*clip).getChild (takeIndex);
+
+    if (! take.isValid())
+        return false;
+
+    impl->beginUndoStep ("Switch Take");
+    clip->state.setProperty (te::IDs::source, take[te::IDs::source], &impl->undoManager());
+    return true;
+}
+
 //==============================================================================
 bool ApplicationModel::undo()
 {
@@ -469,17 +629,90 @@ void ApplicationModel::play()
 
 void ApplicationModel::stop()
 {
-    impl->edit().getTransport().stop (false, false);
+    if (! isRecording())
+    {
+        impl->transport().stop (false, false);
+        return;
+    }
+
+    // Stopping turns the recording into clips.
+    impl->beginUndoStep ("Record");
+    impl->transport().stop (false, false);
+    impl->removeDuplicateTakes();
+}
+
+juce::Result ApplicationModel::record()
+{
+    // The engine checks these too, but only tells its UIBehaviour.
+    auto tracks = getTracks();
+
+    if (std::none_of (tracks.begin(), tracks.end(), [] (const TrackInfo& t) { return t.armed; }))
+        return juce::Result::fail ("Arm a track to record");
+
+    const auto loop = getLoopRange();
+
+    if (isLooping() && loop.end - loop.start < minLoopRecordingSeconds)
+        return juce::Result::fail ("To record in a loop, make the loop at least "
+                                   + juce::String (minLoopRecordingSeconds) + " seconds long");
+
+    if (! isRecording())
+        impl->transport().record (false);
+
+    return juce::Result::ok();
 }
 
 void ApplicationModel::returnToStart()
 {
+    // A recording ends through stop(), which makes it one undo step.
+    if (isRecording())
+        stop();
+
     impl->edit().getTransport().setPosition (te::TimePosition());
 }
 
 bool ApplicationModel::isPlaying() const
 {
     return impl->edit().getTransport().isPlaying();
+}
+
+bool ApplicationModel::isRecording() const
+{
+    return impl->edit().getTransport().isRecording();
+}
+
+// The loop lives in transport state, which sends no modelChanged() by itself.
+// Fixed while recording: the engine cuts a loop recording into takes by the
+// loop it finds when the recording stops.
+void ApplicationModel::setLooping (bool shouldLoop)
+{
+    if (isRecording())
+        return;
+
+    impl->transport().looping = shouldLoop;
+    impl->notifyChanged();
+}
+
+bool ApplicationModel::isLooping() const
+{
+    return impl->transport().looping;
+}
+
+bool ApplicationModel::setLoopRange (double startSeconds, double endSeconds)
+{
+    const auto start = std::max (0.0, startSeconds);
+
+    if (endSeconds <= start || isRecording())
+        return false;
+
+    impl->transport().setLoopRange ({ te::TimePosition::fromSeconds (start), te::TimePosition::fromSeconds (endSeconds) });
+    impl->notifyChanged();
+    return true;
+}
+
+TimeRangeSeconds ApplicationModel::getLoopRange() const
+{
+    const auto range = impl->transport().getLoopRange();
+    return { range.getStart().inSeconds(), range.getEnd().inSeconds() };
 }
 
 double ApplicationModel::getTransportPositionSeconds() const
@@ -491,6 +724,8 @@ double ApplicationModel::getTransportPositionSeconds() const
 std::vector<TrackInfo> ApplicationModel::getTracks() const
 {
     std::vector<TrackInfo> tracks;
+    const auto inputs = impl->audioInputs();
+
     for (auto* t : te::getAudioTracks (impl->edit()))
     {
         TrackInfo info;
@@ -499,6 +734,12 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         info.selected = impl->selectionManager.isSelected (t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
+
+        if (auto* input = impl->inputOf (*t, inputs))
+        {
+            info.input = input->getInputDevice().getName();
+            info.armed = input->isRecordingEnabled (t->itemID);
+        }
 
         if (auto* volume = t->getVolumePlugin())
         {
@@ -518,7 +759,9 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
                                         pos.getOffset().inSeconds(),
                                         wave->getMaximumLength().inSeconds(),
                                         wave->getOriginalFile(),
-                                        impl->selectionManager.isSelected (wave) });
+                                        impl->selectionManager.isSelected (wave),
+                                        Impl::takesOf (*wave).getNumChildren(),
+                                        impl->currentTakeOf (*wave) });
             }
         }
 
@@ -536,6 +779,52 @@ std::unique_ptr<ClipWaveform> ApplicationModel::createWaveform (const juce::Stri
             std::make_unique<ClipWaveform::Impl> (clip->edit.engine, clip->getPlaybackFile().getFile(), repaintTarget));
 
     return nullptr;
+}
+
+std::vector<RecordingInfo> ApplicationModel::getRecordings() const
+{
+    std::vector<RecordingInfo> recordings;
+
+    if (! isRecording())
+        return recordings;
+
+    // Unlooped: while loop recording, the recording runs on through every pass.
+    auto* context = impl->edit().getCurrentPlaybackContext();
+
+    if (context == nullptr)
+        return recordings;
+
+    const auto now = context->getUnloopedPosition().inSeconds();
+    const auto loop = getLoopRange();
+
+    for (auto* t : te::getAudioTracks (impl->edit()))
+    {
+        if (auto* input = impl->inputOf (*t); input != nullptr && input->isRecording (t->itemID))
+        {
+            const auto start = input->getPunchInTime (t->itemID).inSeconds();
+            auto length = now - start;
+
+            // A loop recording's later passes become takes over the same range.
+            if (isLooping())
+                length = std::min (length, loop.end - start);
+
+            recordings.push_back ({ t->itemID.toString(), start, std::max (0.0, length) });
+        }
+    }
+
+    return recordings;
+}
+
+std::unique_ptr<ClipWaveform> ApplicationModel::createRecordingWaveform (const juce::String& trackId) const
+{
+    auto* track = impl->findTrack (trackId);
+    auto* input = track != nullptr ? impl->inputOf (*track) : nullptr;
+
+    if (input == nullptr || ! input->isRecording (track->itemID))
+        return nullptr;
+
+    auto thumbnail = impl->edit().engine.getRecordingThumbnailManager().getThumbnailFor (input->getRecordingFile (track->itemID));
+    return std::make_unique<ClipWaveform> (std::make_unique<ClipWaveform::Impl> (std::move (thumbnail)));
 }
 
 void ApplicationModel::addListener (Listener* l)      { impl->listeners.add (l); }

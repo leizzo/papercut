@@ -30,6 +30,8 @@ namespace
         ApplicationCommandEntry { 0x3002, "transport.play",          "Transport", 0,                              0 },
         ApplicationCommandEntry { 0x3003, "transport.stop",          "Transport", 0,                              0 },
         ApplicationCommandEntry { 0x3004, "transport.returnToStart", "Transport", juce::KeyPress::homeKey,        0 },
+        ApplicationCommandEntry { 0x3005, "transport.record",        "Transport", 'R',                            0 },
+        ApplicationCommandEntry { 0x3006, "transport.toggleLoop",    "Transport", 'L',                            0 },
 
         ApplicationCommandEntry { 0x4001, "dev.reloadLayout",        "Developer", 'L',                            cmd | alt },
         ApplicationCommandEntry { 0x4002, "dev.reloadTheme",         "Developer", 'T',                            cmd | alt },
