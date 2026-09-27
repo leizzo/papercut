@@ -1,0 +1,6 @@
+[submodule "external/tracktion_engine"]
+	path = external/tracktion_engine
+	url = https://github.com/Tracktion/tracktion_engine.git
+[submodule "external/gin"]
+	path = external/gin
+	url = https://github.com/FigBug/Gin.git

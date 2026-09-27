@@ -1,0 +1,50 @@
+#pragma once
+
+#include <juce_data_structures/juce_data_structures.h>
+
+namespace papercut
+{
+
+/** Zoom and scroll for the Arrangement, and the single owner of the
+    time <-> x conversion (ADR-0004). The values live in a UI State subtree,
+    not in this object, so every view built over the same subtree agrees and
+    rebuilt components pick up where the old ones left off.
+
+    x is measured from the left edge of the timeline area.
+*/
+class ArrangementViewState
+{
+public:
+    static constexpr double minPixelsPerSecond = 5.0;
+    static constexpr double maxPixelsPerSecond = 2000.0;
+    static constexpr double defaultPixelsPerSecond = 100.0;
+
+    explicit ArrangementViewState (juce::ValueTree uiState);
+
+    double getPixelsPerSecond() const;
+    double getScrollSeconds() const;
+    int getScrollY() const;
+
+    void setPixelsPerSecond (double);
+    void setScrollSeconds (double);
+    void setScrollY (int);
+
+    /** Zooms by factor while keeping the time under anchorX fixed on screen. */
+    void zoomAround (double factor, float anchorX);
+
+    float timeToX (double seconds) const;
+    double xToTime (float x) const;
+
+    /** Top of a track row, and the row under a y, in lane coordinates
+        (vertical scroll applied). yToRow may return a row that doesn't exist. */
+    int rowToY (int row, int rowHeight) const;
+    int yToRow (int y, int rowHeight) const;
+
+    /** Listen here for zoom/scroll changes. */
+    juce::ValueTree& getState() noexcept    { return state; }
+
+private:
+    juce::ValueTree state;
+};
+
+} // namespace papercut

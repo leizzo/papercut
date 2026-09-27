@@ -1,0 +1,56 @@
+#pragma once
+
+#include "Playhead.h"
+#include "TimelineHeader.h"
+#include "TrackLanes.h"
+#include "TrackList.h"
+#include "UI/State/ArrangementViewState.h"
+#include "UI/Theme/ThemeManager.h"
+
+namespace papercut
+{
+
+class UIStateStore;
+
+/** The hand-coded Arrangement: ruler, track headers, lanes with clips, and
+    the playhead, all positioned through one ArrangementViewState.
+
+    Mouse wheel scrolls (vertical, and horizontal with shift or a trackpad);
+    cmd/ctrl + wheel zooms around the pointer.
+*/
+class ArrangementView : public juce::Component,
+                        private ApplicationModel::Listener,
+                        private ThemeManager::Listener,
+                        private juce::ValueTree::Listener
+{
+public:
+    static constexpr const char* componentId = "arrangement";
+
+    ArrangementView (ApplicationModel&, ThemeManager&, UIStateStore&);
+    ~ArrangementView() override;
+
+    void resized() override;
+    void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    void mouseMagnify (const juce::MouseEvent&, float scaleFactor) override;
+
+private:
+    ApplicationModel& model;
+    ThemeManager& themeManager;
+    ArrangementViewState view;
+
+    TimelineHeader timeline { themeManager, view };
+    TrackList trackList { themeManager, view };
+    TrackLanes lanes { model, themeManager, view };
+    Playhead playhead { model, themeManager, view };
+    std::vector<TrackInfo> tracks;
+
+    void refresh();
+    void clampVerticalScroll();
+    void selectRow (int row);
+
+    void modelChanged() override        { refresh(); }
+    void themeChanged() override        { repaint(); }
+    void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
+};
+
+} // namespace papercut

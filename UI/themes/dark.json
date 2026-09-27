@@ -1,0 +1,34 @@
+{
+  "colors": {
+    "background": "#171717",
+    "panel": "#222222",
+    "text": "#eeeeee",
+    "mutedText": "#888888",
+    "accent": "#7c5cff",
+    "laneA": "#1c1c1c",
+    "laneB": "#202020",
+    "trackHeader": "#262626",
+    "trackHeaderSelected": "#3a3160",
+    "clip": "#3d5a80",
+    "clipText": "#f0f0f0",
+    "waveform": "#e0e8f0cc",
+    "ruler": "#9a9a9a",
+    "playhead": "#ff5a5a",
+    "error": "#ff6b6b"
+  },
+  "style": {
+    "cornerRadius": 5,
+    "fontSize": 14
+  },
+  "metrics": {
+    "transportHeight": 44,
+    "statusBarHeight": 24,
+    "timelineHeight": 26,
+    "trackHeight": 80,
+    "trackHeaderWidth": 180,
+    "clipHeaderHeight": 16,
+    "inset": 2,
+    "textPadding": 6,
+    "playheadWidth": 2
+  }
+}
