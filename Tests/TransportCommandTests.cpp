@@ -30,10 +30,26 @@ struct TransportCommandTests : juce::UnitTest
             expect (! f.model.isPlaying());
         }
 
+        beginTest ("transport.setPosition places the playhead, and transport.play starts there");
+        {
+            Fixture f;
+            expect (f.invoke ("transport.setPosition", transportPositionArgs (3.5)));
+            expectWithinAbsoluteError (f.model.getTransportPositionSeconds(), 3.5, 0.001);
+
+            expect (f.invoke ("transport.setPosition", transportPositionArgs (-1.0)));
+            expectWithinAbsoluteError (f.model.getTransportPositionSeconds(), 0.0, 0.001);
+
+            expect (f.invoke ("transport.setPosition", transportPositionArgs (3.5)));
+            expect (f.invoke ("transport.play"));
+            expect (f.model.isPlaying());
+            expectGreaterThan (f.model.getTransportPositionSeconds(), 3.0);
+        }
+
         beginTest ("Transport Commands never create undo steps");
         {
             Fixture f;
             f.invoke ("track.add");
+            f.invoke ("transport.setPosition", transportPositionArgs (1.0));
 
             for (auto id : { "transport.play", "transport.stop", "transport.togglePlay",
                              "transport.togglePlay", "transport.returnToStart" })

@@ -12,7 +12,7 @@ namespace
     {
         const juce::Identifier clipId ("clipId"), start ("start"), end ("end"), trackId ("trackId"),
                                value ("value"), continuesGesture ("continuesGesture"), input ("input"),
-                               take ("take");
+                               take ("take"), position ("position");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -294,6 +294,18 @@ namespace
         ReturnToStartCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.returnToStart", "Return to Start", m, h) {}
         void execute (const juce::var&) override   { model.returnToStart(); }
     };
+
+    /** A click on the timeline ruler. */
+    struct SetPositionCommand : ModelCommand
+    {
+        SetPositionCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.setPosition", "Set Playhead", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::position].isDouble())
+                model.setTransportPosition (args[ArgKeys::position]);
+        }
+    };
 }
 
 void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, AppCommandHost& host)
@@ -330,6 +342,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<StopCommand> (model, host));
     registry.add (std::make_unique<TogglePlayCommand> (model, host, registry));
     registry.add (std::make_unique<ReturnToStartCommand> (model, host));
+    registry.add (std::make_unique<SetPositionCommand> (model, host));
     registry.add (std::make_unique<RecordCommand> (model, host));
     registry.add (std::make_unique<ToggleLoopCommand> (model, host));
     registry.add (std::make_unique<SetLoopRangeCommand> (model, host));
@@ -393,6 +406,13 @@ juce::var loopRangeArgs (double startSeconds, double endSeconds)
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::start, startSeconds);
     args->setProperty (ArgKeys::end, endSeconds);
+    return args;
+}
+
+juce::var transportPositionArgs (double seconds)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::position, seconds);
     return args;
 }
 

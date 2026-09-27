@@ -670,6 +670,15 @@ void ApplicationModel::returnToStart()
     impl->edit().getTransport().setPosition (te::TimePosition());
 }
 
+bool ApplicationModel::setTransportPosition (double seconds)
+{
+    if (isRecording())
+        return false;
+
+    impl->edit().getTransport().setPosition (te::TimePosition::fromSeconds (std::max (0.0, seconds)));
+    return true;
+}
+
 bool ApplicationModel::isPlaying() const
 {
     return impl->edit().getTransport().isPlaying();

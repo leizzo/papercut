@@ -11,8 +11,10 @@ class ArrangementViewState;
 class CommandRegistry;
 class ThemeManager;
 
-/** The time ruler above the lanes. It shows the loop range, bright while
-    looping; dragging along it sets a new loop (transport.setLoopRange, on release). */
+/** The time ruler above the lanes. A click moves the playhead
+    (transport.setPosition); play starts from there. Dragging along it sets a
+    new loop (transport.setLoopRange, on release). The loop is drawn in the
+    ruler, bright while looping. */
 class TimelineHeader : public juce::Component
 {
 public:

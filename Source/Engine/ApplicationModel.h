@@ -184,6 +184,11 @@ public:
 
     /** Ends a recording in progress first, as stop() does. */
     void returnToStart();
+
+    /** Moves the playhead; play starts from here. Clamped at 0.
+        Does nothing, and returns false, while recording. */
+    bool setTransportPosition (double seconds);
+
     bool isPlaying() const;
     bool isRecording() const;
     double getTransportPositionSeconds() const;

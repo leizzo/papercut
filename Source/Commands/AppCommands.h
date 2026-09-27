@@ -36,6 +36,7 @@ struct AppCommandHost
     clip.add     clip.move     clip.resize   clip.split   clip.setTake
     edit.undo    edit.redo
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
+    transport.setPosition
     transport.record  transport.toggleLoop  transport.setLoopRange
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
@@ -67,5 +68,8 @@ juce::var clipTakeArgs (const juce::String& clipId, int takeIndex);
 
 /** Arguments for transport.setLoopRange, which also turns looping on. */
 juce::var loopRangeArgs (double startSeconds, double endSeconds);
+
+/** Arguments for transport.setPosition: where the playhead moves, in seconds. */
+juce::var transportPositionArgs (double seconds);
 
 } // namespace papercut

@@ -8,6 +8,9 @@ namespace papercut
 
 namespace
 {
+    /** Movement below this stays a click (move the playhead), not a loop drag. */
+    constexpr int loopDragThresholdPixels = 4;
+
     /** The smallest "nice" tick interval that keeps labels apart. */
     double tickIntervalFor (double pixelsPerSecond, float minPixels)
     {
@@ -81,6 +84,9 @@ void TimelineHeader::mouseDown (const juce::MouseEvent& e)
 
 void TimelineHeader::mouseDrag (const juce::MouseEvent& e)
 {
+    if (e.getDistanceFromDragStart() < loopDragThresholdPixels)
+        return;
+
     const auto now = std::max (0.0, view.xToTime ((float) e.x));
     draggedLoop = TimeRangeSeconds { std::min (dragStartSeconds, now), std::max (dragStartSeconds, now) };
     repaint();
@@ -90,6 +96,8 @@ void TimelineHeader::mouseUp (const juce::MouseEvent&)
 {
     if (auto loop = std::exchange (draggedLoop, std::nullopt))
         commands.invoke ("transport.setLoopRange", loopRangeArgs (loop->start, loop->end));
+    else
+        commands.invoke ("transport.setPosition", transportPositionArgs (dragStartSeconds));
 
     repaint();
 }
