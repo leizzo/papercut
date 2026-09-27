@@ -14,13 +14,15 @@ class ProjectManager;
 /** Audio or MIDI. A track holds clips of its own kind (brief §5). */
 enum class TrackKind { audio, midi };
 
-/** One note of a MIDI clip, for the Arrangement's compact preview.
-    Times are within the clip, after its offset. */
+/** One note of a MIDI clip. Times are within the clip, from its start. */
 struct MidiNoteInfo
 {
     int pitch = 0;              ///< 0..127
     double startSeconds = 0;    ///< from the clip's start
     double lengthSeconds = 0;
+    juce::String id;
+    int velocity = 0;           ///< 1..127
+    bool selected = false;
 };
 
 /** Read-only snapshot of a clip, for views. */
@@ -76,13 +78,16 @@ struct TimeRangeSeconds
     state of its own. Nothing above this layer sees a Tracktion header.
 
     Undoable (Engine Undo): adding/removing tracks (audio and MIDI), track volume
-    and pan, and inserting, moving, resizing and splitting clips, switching a
-    clip's take, and each recording — one undo step per call that changes
-    something. A clip only moves onto a track of its own kind. Not undoable:
-    transport (including the loop), selection, mute, solo, track input
-    and arming (the engine keeps mute, solo and inputs out of its UndoManager). The track and clip
-    operations return false, recording no undo step, when they would change
-    nothing (unknown clip or track, same value or position, empty range).
+    and pan, inserting, moving, resizing and splitting clips, switching a
+    clip's take, each recording, and adding, deleting, moving, resizing,
+    changing the velocity of, and quantizing MIDI notes — one undo step per
+    call that changes something. A continued velocity gesture joins the previous
+    step, the way a fader drag does. A clip only moves onto a track of its own
+    kind. Not undoable: transport (including the loop), selection (clips and
+    notes), mute, solo, track input and arming (the engine keeps mute, solo and
+    inputs out of its UndoManager). The track, clip and note operations return
+    false, recording no undo step, when they would change nothing (unknown clip
+    or note, same value or position, empty range, unknown quantize grid).
 */
 class ApplicationModel
 {
@@ -151,6 +156,10 @@ public:
     /** The engine's fader range; minVolumeDb is silence. */
     static constexpr double minVolumeDb = -100.0, maxVolumeDb = 6.0;
 
+    /** MIDI velocity written by note.add when a gesture doesn't choose one. */
+    static constexpr int defaultNoteVelocity = 100;
+    static constexpr int minNoteVelocity = 1, maxNoteVelocity = 127;
+
     /** Inserts the file as a clip at the end of the selected audio track, or the
         selected clip's track, or the first audio track — creating one if the Edit
         has none. Fails, changing nothing, when that track is a MIDI track. */
@@ -181,6 +190,28 @@ public:
     bool setClipTake (const juce::String& clipId, int takeIndex);
 
     //==============================================================================
+    // MIDI notes. Times are seconds from the clip's start. The new note is selected.
+    bool addNote (const juce::String& clipId, double startSeconds, double lengthSeconds, int pitch, int velocity);
+
+    /** Removes every selected note, whichever clip it is on. */
+    bool deleteSelectedNotes();
+
+    /** Moves the named notes by the same amount. Pitch stays inside 0..127 and
+        no note starts before the clip, and the whole group keeps its shape. */
+    bool moveNotes (const juce::String& clipId, const juce::StringArray& noteIds, double deltaSeconds, int deltaPitch);
+
+    /** Sets one note's edges, in seconds from the clip's start. */
+    bool resizeNote (const juce::String& clipId, const juce::String& noteId, double startSeconds, double endSeconds);
+
+    /** Sets the velocity of the clip's selected notes. continuesGesture joins
+        this write to the previous velocity change on the same clip. */
+    bool setNoteVelocity (const juce::String& clipId, int velocity, bool continuesGesture = false);
+
+    /** Snaps note starts onto a grid of "1/4", "1/8" or "1/16", keeping each
+        note's length. Selected notes in the clip, or every note when none are selected. */
+    bool quantizeNotes (const juce::String& clipId, const juce::String& grid);
+
+    //==============================================================================
     // Engine Undo (a selected clip stays selected if it survives)
     bool undo();
     bool redo();
@@ -192,6 +223,11 @@ public:
     void selectTrack (const juce::String& trackId);
     void selectClip (const juce::String& clipId);
     juce::String getSelectedClipId() const;
+
+    /** Replaces the note selection. Never an undo step. Ids that don't match a
+        note simply aren't shown selected. */
+    void selectNotes (const juce::StringArray& noteIds);
+    bool hasSelectedNotes() const;
 
     //==============================================================================
     // Transport (never undoable)
@@ -230,6 +266,13 @@ public:
     //==============================================================================
     // Queries
     std::vector<TrackInfo> getTracks() const;
+
+    /** Edit-timeline conversions, for the Piano Roll's beat grid. */
+    double secondsToBeats (double seconds) const;
+    double beatsToSeconds (double beats) const;
+
+    /** Time-signature numerator at a timeline position: how many quarter-notes in a bar. */
+    int getBeatsPerBar (double seconds) const;
 
     /** Creates a background-generated waveform for the clip; repaintTarget is
         repainted as data arrives. Returns nullptr for an unknown clip. */

@@ -11,7 +11,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     : services (std::move (s)),
       commandManager (cm),
       layouts (services.layoutSource, factory, services.uiState),
-      arrangement (services.model, services.commands, services.themeManager, services.uiState)
+      arrangement (services.model, services.commands, services.themeManager, services.uiState),
+      pianoRoll (services.model, services.commands, services.themeManager, services.uiState)
 {
     // Every Command a layout may name must be registered before layouts build.
     registerPrimitives (factory, services.commands, services.themeManager);
@@ -23,8 +24,12 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     layouts.addHost (transportHost);
     layouts.addHost (statusBarHost);
 
+    arrangement.onMidiClipOpened = [this] (const juce::String& id) { pianoRoll.openClip (id); };
+    pianoRoll.onOpenStateChanged = [this] { resized(); };
+
     addAndMakeVisible (transportHost);
     addAndMakeVisible (arrangement);
+    addAndMakeVisible (pianoRoll);
     addAndMakeVisible (statusBarHost);
 
     services.model.addListener (this);
@@ -52,7 +57,12 @@ void MainComponent::resized()
     auto r = getLocalBounds();
     transportHost.setBounds (r.removeFromTop (metrics.transportHeight));
     statusBarHost.setBounds (r.removeFromBottom (metrics.statusBarHeight));
+
+    const auto editingNotes = pianoRoll.isOpen();
+    arrangement.setVisible (! editingNotes);
+    pianoRoll.setVisible (editingNotes);
     arrangement.setBounds (r);
+    pianoRoll.setBounds (r);
 }
 
 void MainComponent::updateStatusBar()

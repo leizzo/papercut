@@ -24,6 +24,11 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& commands
     // Clicking a track header or an empty lane selects the track (engine
     // selection; never undoable, never through the UndoManager).
     trackList.onRowClicked = lanes.onRowClicked = [this] (int row) { selectRow (row); };
+    lanes.onMidiClipOpened = [this] (const juce::String& id)
+    {
+        if (onMidiClipOpened)
+            onMidiClipOpened (id);
+    };
 
     model.addListener (this);
     themeManager.addListener (this);

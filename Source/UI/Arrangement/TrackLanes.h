@@ -18,7 +18,7 @@ class CommandRegistry;
     Clip gestures: clicking a clip selects it; dragging its body moves it (across
     lanes too), dragging an edge resizes it. The drag is previewed here and
     committed on release as one clip.move / clip.resize Command. Right-clicking
-    a clip offers its takes (clip.setTake).
+    a clip offers its takes (clip.setTake). Double-clicking a MIDI clip opens it.
 
     While recording, each recording is drawn in its lane with its waveform
     growing, polled from the model at ~30 Hz like the Playhead.
@@ -44,6 +44,9 @@ public:
 
     /** Called with the row index under a click on an empty lane (may be out of range). */
     std::function<void (int row)> onRowClicked;
+
+    /** Double-click on a MIDI clip. */
+    std::function<void (const juce::String& clipId)> onMidiClipOpened;
 
 private:
     enum class DragMode { move, resizeStart, resizeEnd };

@@ -3,6 +3,7 @@
 #include "Commands/CommandRegistry.h"
 #include "UI/Arrangement/ArrangementView.h"
 #include "UI/Layout/LayoutManager.h"
+#include "UI/PianoRoll/PianoRollView.h"
 
 namespace papercut
 {
@@ -10,8 +11,9 @@ namespace papercut
 class LayoutSource;
 
 /** The MainWindow's content: JSON-driven Transport and StatusBar around the
-    hand-coded Arrangement. Also the ApplicationCommandTarget that routes menus
-    and keyboard shortcuts into the Command registry (ADR-0006). */
+    hand-coded Arrangement, or the Piano Roll when a MIDI clip is open. Also the
+    ApplicationCommandTarget that routes menus and keyboard shortcuts into the
+    Command registry (ADR-0006). */
 class MainComponent : public juce::Component,
                       public juce::ApplicationCommandTarget,
                       private ApplicationModel::Listener,
@@ -50,6 +52,7 @@ private:
     LayoutHost transportHost { "transport", "layouts/transport.json" };
     LayoutHost statusBarHost { "statusbar", "layouts/statusbar.json" };
     ArrangementView arrangement;
+    PianoRollView pianoRoll;
 
     void updateStatusBar();
 

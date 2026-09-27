@@ -12,7 +12,10 @@ namespace
     {
         const juce::Identifier clipId ("clipId"), start ("start"), end ("end"), trackId ("trackId"),
                                value ("value"), continuesGesture ("continuesGesture"), input ("input"),
-                               take ("take"), position ("position");
+                               take ("take"), position ("position"),
+                               pitch ("pitch"), length ("length"), velocity ("velocity"), grid ("grid"),
+                               noteId ("noteId"), noteIds ("noteIds"),
+                               deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -237,6 +240,93 @@ namespace
     };
 
     //==============================================================================
+    struct AddNoteCommand : ModelCommand
+    {
+        AddNoteCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.add", "Add Note", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            auto pitch = args[ArgKeys::pitch];
+            auto velocity = args[ArgKeys::velocity];
+
+            if (! args[ArgKeys::start].isDouble() || ! args[ArgKeys::length].isDouble()
+                || ! (pitch.isInt() || pitch.isDouble())
+                || ! (velocity.isVoid() || velocity.isInt() || velocity.isDouble()))
+                return;
+
+            const int vel = velocity.isVoid() ? ApplicationModel::defaultNoteVelocity : (int) velocity;
+            model.addNote (args[ArgKeys::clipId].toString(), args[ArgKeys::start], args[ArgKeys::length], (int) pitch, vel);
+        }
+    };
+
+    struct DeleteNotesCommand : ModelCommand
+    {
+        DeleteNotesCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.delete", "Delete Notes", m, h) {}
+        void execute (const juce::var&) override   { model.deleteSelectedNotes(); }
+        bool isEnabled() const override            { return model.hasSelectedNotes(); }
+    };
+
+    /** A drag of one or more notes in the Piano Roll. */
+    struct MoveNotesCommand : ModelCommand
+    {
+        MoveNotesCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.move", "Move Notes", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (! args[ArgKeys::deltaSeconds].isDouble()
+                || ! (args[ArgKeys::deltaPitch].isInt() || args[ArgKeys::deltaPitch].isDouble()))
+                return;
+
+            juce::StringArray ids;
+
+            if (auto* list = args[ArgKeys::noteIds].getArray())
+                for (auto& id : *list)
+                    ids.add (id.toString());
+
+            model.moveNotes (args[ArgKeys::clipId].toString(), ids, args[ArgKeys::deltaSeconds], (int) args[ArgKeys::deltaPitch]);
+        }
+    };
+
+    /** A drag on a note's edge in the Piano Roll. */
+    struct ResizeNoteCommand : ModelCommand
+    {
+        ResizeNoteCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.resize", "Resize Note", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::start].isDouble() && args[ArgKeys::end].isDouble())
+                model.resizeNote (args[ArgKeys::clipId].toString(), args[ArgKeys::noteId].toString(),
+                                  args[ArgKeys::start], args[ArgKeys::end]);
+        }
+    };
+
+    /** A drag in the velocity lane. */
+    struct SetNoteVelocityCommand : ModelCommand
+    {
+        SetNoteVelocityCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.setVelocity", "Set Note Velocity", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::velocity].isInt() || args[ArgKeys::velocity].isDouble())
+                model.setNoteVelocity (args[ArgKeys::clipId].toString(), (int) args[ArgKeys::velocity],
+                                       args[ArgKeys::continuesGesture]);
+        }
+    };
+
+    struct QuantizeNotesCommand : ModelCommand
+    {
+        QuantizeNotesCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.quantize", "Quantize Notes", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            auto grid = args[ArgKeys::grid].toString();
+
+            if (grid.isNotEmpty())
+                model.quantizeNotes (args[ArgKeys::clipId].toString(), grid);
+        }
+    };
+
+    //==============================================================================
     struct UndoCommand : ModelCommand
     {
         UndoCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("edit.undo", "Undo", m, h) {}
@@ -348,6 +438,12 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<ResizeClipCommand> (model, host));
     registry.add (std::make_unique<SplitClipCommand> (model, host));
     registry.add (std::make_unique<SetClipTakeCommand> (model, host));
+    registry.add (std::make_unique<AddNoteCommand> (model, host));
+    registry.add (std::make_unique<DeleteNotesCommand> (model, host));
+    registry.add (std::make_unique<MoveNotesCommand> (model, host));
+    registry.add (std::make_unique<ResizeNoteCommand> (model, host));
+    registry.add (std::make_unique<SetNoteVelocityCommand> (model, host));
+    registry.add (std::make_unique<QuantizeNotesCommand> (model, host));
 
     registry.add (std::make_unique<UndoCommand> (model, host));
     registry.add (std::make_unique<RedoCommand> (model, host));
@@ -427,6 +523,59 @@ juce::var transportPositionArgs (double seconds)
 {
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::position, seconds);
+    return args;
+}
+
+juce::var noteAddArgs (const juce::String& clipId, double startSeconds, double lengthSeconds, int pitch, int velocity)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::start, startSeconds);
+    args->setProperty (ArgKeys::length, lengthSeconds);
+    args->setProperty (ArgKeys::pitch, pitch);
+    args->setProperty (ArgKeys::velocity, velocity);
+    return args;
+}
+
+juce::var noteMoveArgs (const juce::String& clipId, const juce::StringArray& noteIds, double deltaSeconds, int deltaPitch)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    juce::Array<juce::var> ids;
+
+    for (auto& id : noteIds)
+        ids.add (id);
+
+    args->setProperty (ArgKeys::noteIds, juce::var (ids));
+    args->setProperty (ArgKeys::deltaSeconds, deltaSeconds);
+    args->setProperty (ArgKeys::deltaPitch, deltaPitch);
+    return args;
+}
+
+juce::var noteResizeArgs (const juce::String& clipId, const juce::String& noteId, double startSeconds, double endSeconds)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::noteId, noteId);
+    args->setProperty (ArgKeys::start, startSeconds);
+    args->setProperty (ArgKeys::end, endSeconds);
+    return args;
+}
+
+juce::var noteVelocityArgs (const juce::String& clipId, int velocity, bool continuesGesture)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::velocity, velocity);
+    args->setProperty (ArgKeys::continuesGesture, continuesGesture);
+    return args;
+}
+
+juce::var noteQuantizeArgs (const juce::String& clipId, const juce::String& grid)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::grid, grid);
     return args;
 }
 

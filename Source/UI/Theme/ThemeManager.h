@@ -16,6 +16,7 @@ struct Theme
                  loop,        ///< the loop range on the ruler
                  clip, clipSelected, clipText, waveform,
                  midiClip, midiClipSelected, midiNote,
+                 pianoWhite, pianoBlack, noteSelected, gridLine, velocity,
                  ruler, playhead, error;
     float cornerRadius = 0;
     float fontSize = 0;
@@ -37,6 +38,13 @@ struct LayoutMetrics
     int trackControlHeight = 0;      ///< one row of track header controls
     int trackButtonWidth = 0;        ///< mute and solo buttons
     int midiNoteHeight = 0;          ///< compact note preview inside a MIDI clip
+    int pianoKeyWidth = 0;           ///< piano roll keyboard
+    int pianoKeyHeight = 0;          ///< one semitone row in the piano roll
+    int pianoBlackKeyWidth = 0;      ///< black keys, shorter than a white key
+    int pianoScrollMargin = 0;       ///< key rows kept above middle C on open
+    int velocityLaneHeight = 0;      ///< piano roll velocity lane
+    int gridEighthPixels = 0;        ///< pixels per beat before the grid shows 1/8
+    int gridSixteenthPixels = 0;     ///< pixels per beat before the grid shows 1/16
 };
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys

@@ -41,7 +41,8 @@ public:
     int yToRow (int y, int rowHeight) const;
 
     /** Listen here for zoom/scroll changes. */
-    juce::ValueTree& getState() noexcept    { return state; }
+    juce::ValueTree& getState() noexcept             { return state; }
+    const juce::ValueTree& getState() const noexcept { return state; }
 
 private:
     juce::ValueTree state;

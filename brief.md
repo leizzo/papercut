@@ -1081,9 +1081,9 @@ Plugin parameter IDs should be connected to the automation system.
 
 * [x] MIDI Track
 * [x] MIDI Clip
-* [ ] Piano Roll
-* [ ] Note Editing
-* [ ] Quantize
+* [x] Piano Roll
+* [x] Note Editing
+* [x] Quantize
 
 ## Phase 6 — Plugins
 

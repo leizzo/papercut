@@ -4,6 +4,8 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
+#include <cmath>
+
 namespace te = tracktion;
 
 namespace papercut
@@ -30,6 +32,11 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
 
     /** App-specific, on the track's ValueTree (ADR-0001). Absent means audio. */
     static const juce::Identifier trackKindProperty;
+
+    /** App-specific, on a MIDI note's ValueTree, so a note can be named across undo. */
+    static const juce::Identifier noteIdProperty;
+
+    juce::StringArray selectedNoteIds;
 
     bool isMidiTrack (const te::Track& track) const
     {
@@ -62,6 +69,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         editState = {};
         selectionManager.deselectAll();
         selectionManager.edit = nullptr;
+        selectedNoteIds.clear();
     }
 
     //==============================================================================
@@ -242,16 +250,57 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         return selected.isEmpty() ? nullptr : selected.getFirst();
     }
 
+    juce::String noteId (const te::MidiNote& note) const
+    {
+        return note.state[noteIdProperty].toString();
+    }
+
+    te::MidiNote* findNote (te::MidiClip& clip, const juce::String& id) const
+    {
+        if (id.isEmpty())
+            return nullptr;
+
+        for (auto* note : clip.getSequence().getNotes())
+            if (noteId (*note) == id)
+                return note;
+
+        return nullptr;
+    }
+
+    /** A note's beat is measured from the clip's content, not the Edit start. */
+    double noteBeatForLocalSeconds (const te::MidiClip& clip, double localSeconds) const
+    {
+        const auto editTime = clip.getPosition().getStart() + te::TimeDuration::fromSeconds (localSeconds);
+        const auto editBeats = edit().tempoSequence.toBeats (editTime).inBeats();
+        return editBeats - clip.getContentStartBeat().inBeats() + clip.getLoopStartBeats().inBeats();
+    }
+
+    double localSecondsForNoteBeat (const te::MidiClip& clip, double noteBeat) const
+    {
+        const auto editBeats = noteBeat - clip.getLoopStartBeats().inBeats() + clip.getContentStartBeat().inBeats();
+        const auto editTime = edit().tempoSequence.toTime (te::BeatPosition::fromBeats (editBeats));
+        return (editTime - clip.getPosition().getStart()).inSeconds();
+    }
+
+    juce::Array<te::MidiNote*> selectedNotes (te::MidiClip& clip) const
+    {
+        juce::Array<te::MidiNote*> found;
+
+        for (auto* note : clip.getSequence().getNotes())
+            if (auto id = noteId (*note); id.isNotEmpty() && selectedNoteIds.contains (id))
+                found.add (note);
+
+        return found;
+    }
+
     ClipInfo midiClipInfo (const te::MidiClip& clip) const
     {
         const auto pos = clip.getPosition();
-        const auto clipStart = pos.getStart();
-        const auto clipEnd = pos.getEnd();
 
         ClipInfo info;
         info.id = clip.itemID.toString();
         info.name = clip.getName();
-        info.startSeconds = clipStart.inSeconds();
+        info.startSeconds = pos.getStart().inSeconds();
         info.lengthSeconds = pos.getLength().inSeconds();
         info.sourceOffsetSeconds = pos.getOffset().inSeconds();
         // MidiClip::getMaximumLength is the Edit's maximum end, and it isn't const.
@@ -261,16 +310,20 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
 
         for (auto* note : clip.getSequence().getNotes())
         {
-            const auto range = note->getEditTimeRange (clip);
-            const auto start = std::max (range.getStart(), clipStart);
-            const auto end = std::min (range.getEnd(), clipEnd);
+            const auto start = localSecondsForNoteBeat (clip, note->getStartBeat().inBeats());
+            const auto end = localSecondsForNoteBeat (clip, note->getEndBeat().inBeats());
 
             if (end <= start)
                 continue;
 
-            info.notes.push_back ({ note->getNoteNumber(),
-                                    (start - clipStart).inSeconds(),
-                                    (end - start).inSeconds() });
+            MidiNoteInfo n;
+            n.pitch = note->getNoteNumber();
+            n.startSeconds = start;
+            n.lengthSeconds = end - start;
+            n.id = noteId (*note);
+            n.velocity = note->getVelocity();
+            n.selected = n.id.isNotEmpty() && selectedNoteIds.contains (n.id);
+            info.notes.push_back (std::move (n));
         }
 
         return info;
@@ -393,6 +446,7 @@ juce::String ApplicationModel::getProjectName() const   { return impl->projectMa
 
 //==============================================================================
 const juce::Identifier ApplicationModel::Impl::trackKindProperty { "papercutKind" };
+const juce::Identifier ApplicationModel::Impl::noteIdProperty { "papercutNoteId" };
 
 void ApplicationModel::addAudioTrack()
 {
@@ -697,6 +751,252 @@ bool ApplicationModel::setClipTake (const juce::String& clipId, int takeIndex)
 }
 
 //==============================================================================
+namespace
+{
+    /** A quarter, eighth or sixteenth note, in quarter-note beats. 0 if the name isn't one of those. */
+    double quantizeGridBeats (const juce::String& grid)
+    {
+        if (grid == "1/4")   return 1.0;
+        if (grid == "1/8")   return 0.5;
+        if (grid == "1/16")  return 0.25;
+        return 0.0;
+    }
+}
+
+bool ApplicationModel::addNote (const juce::String& clipId, double startSeconds, double lengthSeconds, int pitch, int velocity)
+{
+    auto* clip = dynamic_cast<te::MidiClip*> (impl->findClip (clipId));
+
+    if (clip == nullptr || startSeconds < 0.0 || lengthSeconds <= 0.0
+        || ! juce::isPositiveAndBelow (pitch, 128)
+        || velocity < minNoteVelocity || velocity > maxNoteVelocity)
+        return false;
+
+    const auto startBeat = impl->noteBeatForLocalSeconds (*clip, startSeconds);
+    const auto lengthBeats = impl->noteBeatForLocalSeconds (*clip, startSeconds + lengthSeconds) - startBeat;
+
+    if (lengthBeats <= 1.0e-9)
+        return false;
+
+    impl->beginUndoStep ("Add Note");
+    auto* note = clip->getSequence().addNote (pitch, te::BeatPosition::fromBeats (startBeat),
+                                              te::BeatDuration::fromBeats (lengthBeats),
+                                              velocity, 0, &impl->undoManager());
+
+    if (note == nullptr)
+        return false;
+
+    const auto id = juce::Uuid().toString();
+    note->state.setProperty (Impl::noteIdProperty, id, &impl->undoManager());
+    impl->selectedNoteIds.clear();
+    impl->selectedNoteIds.add (id);
+    return true;
+}
+
+bool ApplicationModel::deleteSelectedNotes()
+{
+    struct Target
+    {
+        te::MidiClip* clip;
+        juce::String id;
+    };
+
+    std::vector<Target> targets;
+
+    for (auto* track : te::getAudioTracks (impl->edit()))
+        for (auto* clip : track->getClips())
+            if (auto* midi = dynamic_cast<te::MidiClip*> (clip))
+                for (auto* note : impl->selectedNotes (*midi))
+                    targets.push_back ({ midi, impl->noteId (*note) });
+
+    if (targets.empty())
+        return false;
+
+    impl->beginUndoStep ("Delete Notes");
+
+    for (auto& target : targets)
+        if (auto* note = impl->findNote (*target.clip, target.id))
+            target.clip->getSequence().removeNote (*note, &impl->undoManager());
+
+    return true;
+}
+
+bool ApplicationModel::moveNotes (const juce::String& clipId, const juce::StringArray& noteIds,
+                                  double deltaSeconds, int deltaPitch)
+{
+    auto* clip = dynamic_cast<te::MidiClip*> (impl->findClip (clipId));
+
+    if (clip == nullptr || noteIds.isEmpty())
+        return false;
+
+    struct Item
+    {
+        te::MidiNote* note;
+        double startSeconds;
+        int pitch;
+        double lengthBeats;
+    };
+
+    std::vector<Item> items;
+
+    for (auto& id : noteIds)
+        if (auto* note = impl->findNote (*clip, id))
+            items.push_back ({ note, impl->localSecondsForNoteBeat (*clip, note->getStartBeat().inBeats()),
+                               note->getNoteNumber(), note->getLengthBeats().inBeats() });
+
+    if (items.empty())
+        return false;
+
+    auto earliest = items.front().startSeconds;
+    auto lowest = items.front().pitch;
+    auto highest = items.front().pitch;
+
+    for (auto& item : items)
+    {
+        earliest = std::min (earliest, item.startSeconds);
+        lowest = std::min (lowest, item.pitch);
+        highest = std::max (highest, item.pitch);
+    }
+
+    // One delta for the whole group, so a chord doesn't squash against the edges.
+    deltaPitch = juce::jlimit (-lowest, 127 - highest, deltaPitch);
+
+    if (earliest + deltaSeconds < 0.0)
+        deltaSeconds = -earliest;
+
+    if (deltaPitch == 0 && std::abs (deltaSeconds) < 1.0e-9)
+        return false;
+
+    impl->beginUndoStep ("Move Notes");
+
+    for (auto& item : items)
+    {
+        if (deltaPitch != 0)
+            item.note->setNoteNumber (item.pitch + deltaPitch, &impl->undoManager());
+
+        const auto newStart = impl->noteBeatForLocalSeconds (*clip, item.startSeconds + deltaSeconds);
+        item.note->setStartAndLength (te::BeatPosition::fromBeats (newStart),
+                                      te::BeatDuration::fromBeats (item.lengthBeats),
+                                      &impl->undoManager());
+    }
+
+    return true;
+}
+
+bool ApplicationModel::resizeNote (const juce::String& clipId, const juce::String& noteId,
+                                   double startSeconds, double endSeconds)
+{
+    auto* clip = dynamic_cast<te::MidiClip*> (impl->findClip (clipId));
+    auto* note = clip != nullptr ? impl->findNote (*clip, noteId) : nullptr;
+
+    if (note == nullptr || endSeconds <= startSeconds)
+        return false;
+
+    startSeconds = std::max (0.0, startSeconds);
+
+    if (endSeconds <= startSeconds)
+        return false;
+
+    const auto newStart = impl->noteBeatForLocalSeconds (*clip, startSeconds);
+    const auto newLength = impl->noteBeatForLocalSeconds (*clip, endSeconds) - newStart;
+
+    if (newLength <= 1.0e-9
+        || (std::abs (newStart - note->getStartBeat().inBeats()) < 1.0e-9
+            && std::abs (newLength - note->getLengthBeats().inBeats()) < 1.0e-9))
+        return false;
+
+    impl->beginUndoStep ("Resize Note");
+    note->setStartAndLength (te::BeatPosition::fromBeats (newStart),
+                             te::BeatDuration::fromBeats (newLength),
+                             &impl->undoManager());
+    return true;
+}
+
+bool ApplicationModel::setNoteVelocity (const juce::String& clipId, int velocity, bool continuesGesture)
+{
+    auto* clip = dynamic_cast<te::MidiClip*> (impl->findClip (clipId));
+
+    if (clip == nullptr || velocity < minNoteVelocity || velocity > maxNoteVelocity)
+        return false;
+
+    auto notes = impl->selectedNotes (*clip);
+    bool changes = false;
+
+    for (auto* note : notes)
+        if (note->getVelocity() != velocity)
+            changes = true;
+
+    if (! changes)
+        return false;
+
+    impl->beginGestureStep ("Set Velocity", "Set Velocity:" + clipId, continuesGesture);
+
+    for (auto* note : notes)
+        note->setVelocity (velocity, &impl->undoManager());
+
+    return true;
+}
+
+bool ApplicationModel::quantizeNotes (const juce::String& clipId, const juce::String& grid)
+{
+    auto* clip = dynamic_cast<te::MidiClip*> (impl->findClip (clipId));
+    const auto step = quantizeGridBeats (grid);
+
+    if (clip == nullptr || step <= 0.0)
+        return false;
+
+    // Ids of deleted notes stay so undo can restore the highlight. A selection
+    // that names no living note in this clip is "none selected": quantize them all.
+    auto notes = impl->selectedNotes (*clip);
+
+    if (notes.isEmpty())
+        for (auto* note : clip->getSequence().getNotes())
+            notes.add (note);
+
+    if (notes.isEmpty())
+        return false;
+
+    const auto contentStart = clip->getContentStartBeat().inBeats();
+    const auto loopStart = clip->getLoopStartBeats().inBeats();
+
+    struct Change
+    {
+        te::MidiNote* note;
+        double beat;
+    };
+
+    std::vector<Change> changes;
+
+    for (auto* note : notes)
+    {
+        const auto beat = note->getStartBeat().inBeats();
+        // The piano roll's lines are Edit beats, not beats inside the clip.
+        const auto editBeat = beat - loopStart + contentStart;
+        auto snapped = std::round (editBeat / step) * step - contentStart + loopStart;
+
+        if (snapped < 0.0)
+            snapped = std::ceil ((contentStart - loopStart) / step - 1.0e-9) * step - contentStart + loopStart;
+
+        snapped = std::max (0.0, snapped);
+
+        if (std::abs (snapped - beat) > 1.0e-6)
+            changes.push_back ({ note, snapped });
+    }
+
+    if (changes.empty())
+        return false;
+
+    impl->beginUndoStep ("Quantize Notes");
+
+    for (auto& change : changes)
+        change.note->setStartAndLength (te::BeatPosition::fromBeats (change.beat),
+                                        change.note->getLengthBeats(),
+                                        &impl->undoManager());
+
+    return true;
+}
+
+//==============================================================================
 bool ApplicationModel::undo()
 {
     impl->openGestureKey = {};
@@ -737,6 +1037,25 @@ juce::String ApplicationModel::getSelectedClipId() const
 {
     auto* clip = impl->selectedClip();
     return clip != nullptr ? clip->itemID.toString() : juce::String();
+}
+
+void ApplicationModel::selectNotes (const juce::StringArray& noteIds)
+{
+    if (impl->selectedNoteIds == noteIds)
+        return;
+
+    impl->selectedNoteIds = noteIds;
+    impl->notifyChanged();
+}
+
+bool ApplicationModel::hasSelectedNotes() const
+{
+    for (auto* track : te::getAudioTracks (impl->edit()))
+        for (auto* clip : track->getClips())
+            if (auto* midi = dynamic_cast<te::MidiClip*> (clip); midi != nullptr && ! impl->selectedNotes (*midi).isEmpty())
+                return true;
+
+    return false;
 }
 
 //==============================================================================
@@ -848,6 +1167,21 @@ double ApplicationModel::getTransportPositionSeconds() const
 }
 
 //==============================================================================
+double ApplicationModel::secondsToBeats (double seconds) const
+{
+    return impl->edit().tempoSequence.toBeats (te::TimePosition::fromSeconds (std::max (0.0, seconds))).inBeats();
+}
+
+double ApplicationModel::beatsToSeconds (double beats) const
+{
+    return impl->edit().tempoSequence.toTime (te::BeatPosition::fromBeats (std::max (0.0, beats))).inSeconds();
+}
+
+int ApplicationModel::getBeatsPerBar (double seconds) const
+{
+    return std::max (1, (int) impl->edit().tempoSequence.getTimeSigAt (te::TimePosition::fromSeconds (std::max (0.0, seconds))).numerator);
+}
+
 std::vector<TrackInfo> ApplicationModel::getTracks() const
 {
     std::vector<TrackInfo> tracks;

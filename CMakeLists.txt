@@ -137,6 +137,12 @@ add_library(papercut_ui STATIC
     Source/UI/Arrangement/TrackLanes.cpp
     Source/UI/Arrangement/ClipComponent.cpp
     Source/UI/Arrangement/Playhead.cpp
+    Source/UI/PianoRoll/NoteComponent.cpp
+    Source/UI/PianoRoll/PianoKeyboard.cpp
+    Source/UI/PianoRoll/BeatRuler.cpp
+    Source/UI/PianoRoll/NoteGrid.cpp
+    Source/UI/PianoRoll/VelocityEditor.cpp
+    Source/UI/PianoRoll/PianoRollView.cpp
     Source/UI/MainWindow/MainComponent.cpp
     Source/UI/MainWindow/MainWindow.cpp)
 papercut_use_engine_without_tracktion(papercut_ui)
@@ -180,6 +186,7 @@ target_sources(PapercutTests PRIVATE
     Tests/RecordingTests.cpp
     Tests/RenderTests.cpp
     Tests/MidiTrackTests.cpp
+    Tests/NoteEditingTests.cpp
     Tests/ComponentFactoryTests.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the

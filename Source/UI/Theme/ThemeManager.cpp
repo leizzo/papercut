@@ -148,6 +148,8 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "recording", &Theme::recording }, { "loop", &Theme::loop },
         { "clip", &Theme::clip }, { "clipSelected", &Theme::clipSelected }, { "clipText", &Theme::clipText }, { "waveform", &Theme::waveform },
         { "midiClip", &Theme::midiClip }, { "midiClipSelected", &Theme::midiClipSelected }, { "midiNote", &Theme::midiNote },
+        { "pianoWhite", &Theme::pianoWhite }, { "pianoBlack", &Theme::pianoBlack },
+        { "noteSelected", &Theme::noteSelected }, { "gridLine", &Theme::gridLine }, { "velocity", &Theme::velocity },
         { "ruler", &Theme::ruler }, { "playhead", &Theme::playhead }, { "error", &Theme::error },
     };
 
@@ -160,6 +162,10 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "playheadWidth", &LayoutMetrics::playheadWidth }, { "clipResizeHandleWidth", &LayoutMetrics::clipResizeHandleWidth },
         { "trackControlHeight", &LayoutMetrics::trackControlHeight }, { "trackButtonWidth", &LayoutMetrics::trackButtonWidth },
         { "midiNoteHeight", &LayoutMetrics::midiNoteHeight },
+        { "pianoKeyWidth", &LayoutMetrics::pianoKeyWidth }, { "pianoKeyHeight", &LayoutMetrics::pianoKeyHeight },
+        { "pianoBlackKeyWidth", &LayoutMetrics::pianoBlackKeyWidth }, { "pianoScrollMargin", &LayoutMetrics::pianoScrollMargin },
+        { "velocityLaneHeight", &LayoutMetrics::velocityLaneHeight },
+        { "gridEighthPixels", &LayoutMetrics::gridEighthPixels }, { "gridSixteenthPixels", &LayoutMetrics::gridSixteenthPixels },
     };
 
     Theme newTheme;

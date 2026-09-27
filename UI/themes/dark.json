@@ -21,6 +21,11 @@
     "midiClip": "#2e6b52",
     "midiClipSelected": "#3d8a68",
     "midiNote": "#e7f6efcc",
+    "pianoWhite": "#e6e6e6",
+    "pianoBlack": "#2c2c2c",
+    "noteSelected": "#ffe08a",
+    "gridLine": "#ffffff22",
+    "velocity": "#9be7c4",
     "ruler": "#9a9a9a",
     "playhead": "#ff5a5a",
     "error": "#ff6b6b"
@@ -42,6 +47,13 @@
     "clipResizeHandleWidth": 6,
     "trackControlHeight": 20,
     "trackButtonWidth": 24,
-    "midiNoteHeight": 3
+    "midiNoteHeight": 3,
+    "pianoKeyWidth": 76,
+    "pianoKeyHeight": 16,
+    "pianoBlackKeyWidth": 50,
+    "pianoScrollMargin": 4,
+    "velocityLaneHeight": 80,
+    "gridEighthPixels": 48,
+    "gridSixteenthPixels": 90
   }
 }

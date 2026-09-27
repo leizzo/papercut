@@ -30,6 +30,9 @@ public:
     ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&);
     ~ArrangementView() override;
 
+    /** Double-click on a MIDI clip. */
+    std::function<void (const juce::String& clipId)> onMidiClipOpened;
+
     void resized() override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     void mouseMagnify (const juce::MouseEvent&, float scaleFactor) override;

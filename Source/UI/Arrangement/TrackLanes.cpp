@@ -227,6 +227,16 @@ void TrackLanes::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
+        if (e.getNumberOfClicks() == 2 && info.kind == TrackKind::midi)
+        {
+            model.selectClip (info.id);
+
+            if (onMidiClipOpened)
+                onMidiClipOpened (info.id);
+
+            return;
+        }
+
         info.selected = true;
         drag = Drag { dragModeAt (*clip, e.getPosition()), info, info, rowOf (info.id), view.xToTime ((float) e.x) };
         model.selectClip (info.id);

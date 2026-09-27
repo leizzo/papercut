@@ -27,6 +27,7 @@ namespace
         ApplicationCommandEntry { 0x2006, "clip.split",              "Edit",      'E',                            cmd },
         ApplicationCommandEntry { 0x2007, "track.addMidi",           "Edit",      'T',                            cmd | shift },
         ApplicationCommandEntry { 0x2008, "clip.addMidi",            "Edit",      'I',                            cmd | shift },
+        ApplicationCommandEntry { 0x2009, "note.delete",             "Edit",      juce::KeyPress::backspaceKey,   0 },
 
         ApplicationCommandEntry { 0x3001, "transport.togglePlay",    "Transport", juce::KeyPress::spaceKey,       0 },
         ApplicationCommandEntry { 0x3002, "transport.play",          "Transport", 0,                              0 },
