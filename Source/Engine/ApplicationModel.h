@@ -19,7 +19,9 @@ struct ClipInfo
     double startSeconds = 0;
     double lengthSeconds = 0;
     double sourceOffsetSeconds = 0;   ///< where in the source file the clip starts
+    double sourceLengthSeconds = 0;   ///< how long the source audio lasts on the timeline
     juce::File file;
+    bool selected = false;
 };
 
 /** Read-only snapshot of an audio track, for views. */
@@ -36,8 +38,11 @@ struct TrackInfo
     Exposes app-level operations and read-only snapshots; owns no track or clip
     state of its own. Nothing above this layer sees a Tracktion header.
 
-    Undoable (Engine Undo): adding/removing tracks and inserting clips — one undo
-    step per call. Never undoable: transport, selection.
+    Undoable (Engine Undo): adding/removing tracks and inserting, moving, resizing
+    and splitting clips — one undo step per call that changes something. Never
+    undoable: transport, selection. The clip operations return false, recording
+    no undo step, when they would change nothing (unknown clip or track, same
+    position, empty range).
 */
 class ApplicationModel
 {
@@ -71,12 +76,27 @@ public:
         Returns false if there is no track to remove. */
     bool removeTrack();
 
-    /** Inserts the file as a clip at the end of the selected track (or the first
-        track, creating one if the Edit has none). */
+    /** Inserts the file as a clip at the end of the selected track, or the
+        selected clip's track (or the first track, creating one if the Edit has none). */
     juce::Result insertAudioClip (const juce::File&);
 
+    /** Moves a clip to start at startSeconds (clamped to the Edit start), onto
+        the track trackId if given. */
+    bool moveClip (const juce::String& clipId, double startSeconds, const juce::String& trackId = {});
+
+    /** Sets a clip's edges, clamped to its source audio. The audio stays where it
+        is on the timeline: trimming the start advances the source offset. */
+    bool resizeClip (const juce::String& clipId, double startSeconds, double endSeconds);
+
+    /** Cuts a clip in two at timeSeconds; see canSplitClip. The left part keeps
+        the clip's ID (and its selection). */
+    bool splitClip (const juce::String& clipId, double timeSeconds);
+
+    /** Whether timeSeconds lies far enough inside the clip for a cut. */
+    bool canSplitClip (const juce::String& clipId, double timeSeconds) const;
+
     //==============================================================================
-    // Engine Undo
+    // Engine Undo (a selected clip stays selected if it survives)
     bool undo();
     bool redo();
     bool canUndo() const;
@@ -85,6 +105,8 @@ public:
     //==============================================================================
     // Selection (engine SelectionManager; never undoable)
     void selectTrack (const juce::String& trackId);
+    void selectClip (const juce::String& clipId);
+    juce::String getSelectedClipId() const;
 
     //==============================================================================
     // Transport (never undoable)

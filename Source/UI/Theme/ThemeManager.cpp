@@ -106,7 +106,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "mutedText", &Theme::mutedText }, { "accent", &Theme::accent },
         { "laneA", &Theme::laneA }, { "laneB", &Theme::laneB },
         { "trackHeader", &Theme::trackHeader }, { "trackHeaderSelected", &Theme::trackHeaderSelected },
-        { "clip", &Theme::clip }, { "clipText", &Theme::clipText }, { "waveform", &Theme::waveform },
+        { "clip", &Theme::clip }, { "clipSelected", &Theme::clipSelected }, { "clipText", &Theme::clipText }, { "waveform", &Theme::waveform },
         { "ruler", &Theme::ruler }, { "playhead", &Theme::playhead }, { "error", &Theme::error },
     };
 
@@ -116,7 +116,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "timelineHeight", &LayoutMetrics::timelineHeight }, { "trackHeight", &LayoutMetrics::trackHeight },
         { "trackHeaderWidth", &LayoutMetrics::trackHeaderWidth }, { "clipHeaderHeight", &LayoutMetrics::clipHeaderHeight },
         { "inset", &LayoutMetrics::inset }, { "textPadding", &LayoutMetrics::textPadding },
-        { "playheadWidth", &LayoutMetrics::playheadWidth },
+        { "playheadWidth", &LayoutMetrics::playheadWidth }, { "clipResizeHandleWidth", &LayoutMetrics::clipResizeHandleWidth },
     };
 
     Theme newTheme;

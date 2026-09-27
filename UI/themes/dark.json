@@ -10,6 +10,7 @@
     "trackHeader": "#262626",
     "trackHeaderSelected": "#3a3160",
     "clip": "#3d5a80",
+    "clipSelected": "#5a7fb0",
     "clipText": "#f0f0f0",
     "waveform": "#e0e8f0cc",
     "ruler": "#9a9a9a",
@@ -29,6 +30,7 @@
     "clipHeaderHeight": 16,
     "inset": 2,
     "textPadding": 6,
-    "playheadWidth": 2
+    "playheadWidth": 2,
+    "clipResizeHandleWidth": 6
   }
 }

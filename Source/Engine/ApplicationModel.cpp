@@ -75,10 +75,42 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         return nullptr;
     }
 
+    te::WaveAudioClip* selectedClip() const
+    {
+        auto selected = selectionManager.getItemsOfType<te::WaveAudioClip>();
+        return selected.isEmpty() ? nullptr : selected.getFirst();
+    }
+
     te::AudioTrack* selectedTrack() const
     {
         auto selected = selectionManager.getItemsOfType<te::AudioTrack>();
         return selected.isEmpty() ? nullptr : selected.getFirst();
+    }
+
+    /** Where a new clip goes: the selected track, or the selected clip's track. */
+    te::AudioTrack* insertionTrack() const
+    {
+        if (auto* track = selectedTrack())
+            return track;
+
+        auto* clip = selectedClip();
+        return clip != nullptr ? dynamic_cast<te::AudioTrack*> (clip->getTrack()) : nullptr;
+    }
+
+    /** Runs fn, then re-selects the clip that was selected before if fn replaced
+        its object: re-parenting a clip, or undoing that, rebuilds it from its state. */
+    template <typename Fn>
+    auto keepingClipSelection (Fn&& fn)
+    {
+        auto* before = selectedClip();
+        const auto id = before != nullptr ? before->itemID.toString() : juce::String();
+        auto result = fn();
+
+        if (id.isNotEmpty() && selectedClip() == nullptr)
+            if (auto* clip = findClip (id))
+                selectionManager.selectOnly (clip);
+
+        return result;
     }
 
     //==============================================================================
@@ -184,7 +216,7 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
 
     impl->undoManager().beginNewTransaction ("Insert Clip");
 
-    auto* track = impl->selectedTrack();
+    auto* track = impl->insertionTrack();
 
     if (track == nullptr)
     {
@@ -215,15 +247,87 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     return juce::Result::ok();
 }
 
+bool ApplicationModel::moveClip (const juce::String& clipId, double startSeconds, const juce::String& trackId)
+{
+    auto* clip = impl->findClip (clipId);
+    auto* track = trackId.isEmpty() ? (clip != nullptr ? clip->getClipTrack() : nullptr)
+                                    : impl->findTrack (trackId);
+
+    if (clip == nullptr || track == nullptr)
+        return false;
+
+    const auto start = te::TimePosition::fromSeconds (std::max (0.0, startSeconds));
+    const bool changesTrack = track != clip->getClipTrack();
+
+    if (! changesTrack && start == clip->getPosition().getStart())
+        return false;
+
+    return impl->keepingClipSelection ([&]
+    {
+        impl->undoManager().beginNewTransaction ("Move Clip");
+
+        if (changesTrack)
+            clip->moveTo (*track);
+
+        // Re-parenting may rebuild the clip object; look it up again by ID.
+        if (auto* moved = impl->findClip (clipId))
+            moved->setStart (start, false, true);
+
+        return true;
+    });
+}
+
+bool ApplicationModel::resizeClip (const juce::String& clipId, double startSeconds, double endSeconds)
+{
+    auto* clip = impl->findClip (clipId);
+
+    if (clip == nullptr)
+        return false;
+
+    const auto pos = clip->getPosition();
+    const auto sourceStart = pos.getStart() - pos.getOffset();
+    const auto sourceEnd = sourceStart + clip->getMaximumLength();
+
+    const auto start = std::max ({ te::TimePosition::fromSeconds (startSeconds), sourceStart, te::TimePosition() });
+    const auto end = std::min (te::TimePosition::fromSeconds (endSeconds), sourceEnd);
+
+    if (end <= start || (start == pos.getStart() && end == pos.getEnd()))
+        return false;
+
+    impl->undoManager().beginNewTransaction ("Resize Clip");
+    clip->setPosition ({ { start, end }, pos.getOffset() + (start - pos.getStart()) });
+    return true;
+}
+
+bool ApplicationModel::canSplitClip (const juce::String& clipId, double timeSeconds) const
+{
+    // The engine won't cut within a millisecond of either edge.
+    auto* clip = impl->findClip (clipId);
+    return clip != nullptr && clip->getPosition().time.reduced (te::TimeDuration::fromSeconds (0.001)).contains (te::TimePosition::fromSeconds (timeSeconds));
+}
+
+bool ApplicationModel::splitClip (const juce::String& clipId, double timeSeconds)
+{
+    if (! canSplitClip (clipId, timeSeconds))
+        return false;
+
+    return impl->keepingClipSelection ([&]
+    {
+        impl->undoManager().beginNewTransaction ("Split Clip");
+        auto* clip = impl->findClip (clipId);
+        return clip->getClipTrack()->splitClip (*clip, te::TimePosition::fromSeconds (timeSeconds)) != nullptr;
+    });
+}
+
 //==============================================================================
 bool ApplicationModel::undo()
 {
-    return impl->undoManager().undo();
+    return impl->keepingClipSelection ([this] { return impl->undoManager().undo(); });
 }
 
 bool ApplicationModel::redo()
 {
-    return impl->undoManager().redo();
+    return impl->keepingClipSelection ([this] { return impl->undoManager().redo(); });
 }
 
 bool ApplicationModel::canUndo() const   { return impl->undoManager().canUndo(); }
@@ -236,6 +340,20 @@ void ApplicationModel::selectTrack (const juce::String& trackId)
         impl->selectionManager.selectOnly (track);
     else
         impl->selectionManager.deselectAll();
+}
+
+void ApplicationModel::selectClip (const juce::String& clipId)
+{
+    if (auto* clip = impl->findClip (clipId))
+        impl->selectionManager.selectOnly (clip);
+    else
+        impl->selectionManager.deselectAll();
+}
+
+juce::String ApplicationModel::getSelectedClipId() const
+{
+    auto* clip = impl->selectedClip();
+    return clip != nullptr ? clip->itemID.toString() : juce::String();
 }
 
 //==============================================================================
@@ -268,7 +386,6 @@ double ApplicationModel::getTransportPositionSeconds() const
 std::vector<TrackInfo> ApplicationModel::getTracks() const
 {
     std::vector<TrackInfo> tracks;
-
     for (auto* t : te::getAudioTracks (impl->edit()))
     {
         TrackInfo info { t->itemID.toString(), t->getName(), impl->selectionManager.isSelected (t), {} };
@@ -283,7 +400,9 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
                                         pos.getStart().inSeconds(),
                                         pos.getLength().inSeconds(),
                                         pos.getOffset().inSeconds(),
-                                        wave->getOriginalFile() });
+                                        wave->getMaximumLength().inSeconds(),
+                                        wave->getOriginalFile(),
+                                        impl->selectionManager.isSelected (wave) });
             }
         }
 

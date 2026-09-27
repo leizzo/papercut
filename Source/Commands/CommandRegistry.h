@@ -23,7 +23,9 @@ public:
     const juce::String& getId() const noexcept     { return id; }
     const juce::String& getName() const noexcept   { return name; }
 
-    virtual void execute() = 0;
+    /** args carries what a gesture decided (e.g. which clip, where to); Commands
+        invoked from menus, shortcuts and JSON buttons receive a void var. */
+    virtual void execute (const juce::var& args) = 0;
 
     /** Whether invoking now would do anything (menus grey out disabled Commands). */
     virtual bool isEnabled() const   { return true; }
@@ -43,7 +45,7 @@ public:
     void add (std::unique_ptr<Command>);
 
     /** Executes the Command with this ID. Returns false (and asserts) for an unknown ID. */
-    bool invoke (const juce::String& commandId);
+    bool invoke (const juce::String& commandId, const juce::var& args = {});
 
     const Command* find (const juce::String& commandId) const;
     bool contains (const juce::String& commandId) const    { return find (commandId) != nullptr; }

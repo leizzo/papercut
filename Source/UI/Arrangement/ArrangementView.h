@@ -10,13 +10,14 @@
 namespace papercut
 {
 
+class CommandRegistry;
 class UIStateStore;
 
 /** The hand-coded Arrangement: ruler, track headers, lanes with clips, and
     the playhead, all positioned through one ArrangementViewState.
 
     Mouse wheel scrolls (vertical, and horizontal with shift or a trackpad);
-    cmd/ctrl + wheel zooms around the pointer.
+    cmd/ctrl + wheel zooms around the pointer. Clip gestures live in TrackLanes.
 */
 class ArrangementView : public juce::Component,
                         private ApplicationModel::Listener,
@@ -26,7 +27,7 @@ class ArrangementView : public juce::Component,
 public:
     static constexpr const char* componentId = "arrangement";
 
-    ArrangementView (ApplicationModel&, ThemeManager&, UIStateStore&);
+    ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&);
     ~ArrangementView() override;
 
     void resized() override;
@@ -40,7 +41,7 @@ private:
 
     TimelineHeader timeline { themeManager, view };
     TrackList trackList { themeManager, view };
-    TrackLanes lanes { model, themeManager, view };
+    TrackLanes lanes;
     Playhead playhead { model, themeManager, view };
     std::vector<TrackInfo> tracks;
 

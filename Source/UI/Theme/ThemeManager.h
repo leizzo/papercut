@@ -12,7 +12,7 @@ struct Theme
 {
     juce::Colour background, panel, text, mutedText, accent,
                  laneA, laneB, trackHeader, trackHeaderSelected,
-                 clip, clipText, waveform, ruler, playhead, error;
+                 clip, clipSelected, clipText, waveform, ruler, playhead, error;
     float cornerRadius = 0;
     float fontSize = 0;
 };
@@ -29,6 +29,7 @@ struct LayoutMetrics
     int inset = 0;          ///< gap between adjacent boxes (track rows, clips)
     int textPadding = 0;    ///< space between a box edge and its text
     int playheadWidth = 0;
+    int clipResizeHandleWidth = 0;   ///< grab zone at each clip edge
 };
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys

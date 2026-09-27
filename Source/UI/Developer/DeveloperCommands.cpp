@@ -12,7 +12,7 @@ namespace
     {
         explicit ReloadLayoutCommand (LayoutManager& lm) : Command ("dev.reloadLayout", "Reload Layout"), layouts (lm) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             auto rebuilt = layouts.reloadChanged();
             DBG ("Reload Layout rebuilt: " << (rebuilt.isEmpty() ? juce::String ("nothing") : rebuilt.joinIntoString (", ")));
@@ -26,7 +26,7 @@ namespace
         ReloadThemeCommand (ThemeManager& tm, std::function<void (const juce::String&)> onError)
             : Command ("dev.reloadTheme", "Reload Theme"), themes (tm), reportError (std::move (onError)) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             if (auto r = themes.reloadTheme(); r.failed() && reportError)
                 reportError (r.getErrorMessage());

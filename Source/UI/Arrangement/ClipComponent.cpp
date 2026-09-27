@@ -28,7 +28,7 @@ void ClipComponent::paint (juce::Graphics& g)
     auto& metrics = themeManager.getMetrics();
     auto bounds = getLocalBounds();
 
-    g.setColour (theme.clip);
+    g.setColour (clip.selected ? theme.clipSelected : theme.clip);
     g.fillRoundedRectangle (bounds.toFloat(), theme.cornerRadius);
 
     auto header = bounds.removeFromTop (metrics.clipHeaderHeight);

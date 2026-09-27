@@ -11,7 +11,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     : services (std::move (s)),
       commandManager (cm),
       layouts (services.layoutSource, factory, services.uiState),
-      arrangement (services.model, services.themeManager, services.uiState)
+      arrangement (services.model, services.commands, services.themeManager, services.uiState)
 {
     // Every Command a layout may name must be registered before layouts build.
     registerPrimitives (factory, services.commands, services.themeManager);

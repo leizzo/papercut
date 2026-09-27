@@ -30,10 +30,18 @@ struct AppCommandHost
 /** Registers every model-facing Command:
 
     project.new  project.open  project.save  project.saveAs
-    track.add    track.remove  clip.add
+    track.add    track.remove
+    clip.add     clip.move     clip.resize   clip.split
     edit.undo    edit.redo
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
+
+/** Arguments for clip.move: the clip, its new start, and optionally the track to
+    move it to. Invoked with anything else, clip.move does nothing. */
+juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId = {});
+
+/** Arguments for clip.resize: the clip and its new edges. */
+juce::var clipResizeArgs (const juce::String& clipId, double startSeconds, double endSeconds);
 
 } // namespace papercut

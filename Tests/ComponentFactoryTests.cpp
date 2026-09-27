@@ -24,7 +24,7 @@ struct ComponentFactoryTests : juce::UnitTest
         struct Probe : Command
         {
             explicit Probe (int& n) : Command ("test.probe", "Probe"), count (n) {}
-            void execute() override   { ++count; }
+            void execute (const juce::var&) override   { ++count; }
             int& count;
         };
 

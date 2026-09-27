@@ -7,6 +7,12 @@ namespace papercut
 
 namespace
 {
+    /** Keys of the args built by clipMoveArgs / clipResizeArgs. */
+    namespace ArgKeys
+    {
+        const juce::Identifier clipId ("clipId"), start ("start"), end ("end"), trackId ("trackId");
+    }
+
     /** Base for Commands that act on the Application Model. */
     class ModelCommand : public Command
     {
@@ -30,7 +36,7 @@ namespace
     {
         NewProjectCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("project.new", "New Project", m, h) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             model.newProject();
             host.restoreUIState ({});
@@ -41,7 +47,7 @@ namespace
     {
         OpenProjectCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("project.open", "Open Project...", m, h) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             host.chooseProjectToOpen ([this] (const juce::File& folder)
             {
@@ -60,7 +66,7 @@ namespace
     {
         SaveProjectAsCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("project.saveAs", "Save Project As...", m, h) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             host.chooseProjectSaveLocation ([this] (const juce::File& folder)
             {
@@ -74,10 +80,10 @@ namespace
         SaveProjectCommand (ApplicationModel& m, AppCommandHost& h, SaveProjectAsCommand& sa)
             : ModelCommand ("project.save", "Save Project", m, h), saveAs (sa) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             if (model.isProjectUntitled())
-                saveAs.execute();
+                saveAs.execute ({});
             else
                 report (model.saveProject (host.captureUIState()));
         }
@@ -89,22 +95,62 @@ namespace
     struct AddTrackCommand : ModelCommand
     {
         AddTrackCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.add", "Add Audio Track", m, h) {}
-        void execute() override   { model.addAudioTrack(); }
+        void execute (const juce::var&) override   { model.addAudioTrack(); }
     };
 
     struct RemoveTrackCommand : ModelCommand
     {
         RemoveTrackCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.remove", "Remove Track", m, h) {}
-        void execute() override   { model.removeTrack(); }
+        void execute (const juce::var&) override   { model.removeTrack(); }
     };
 
     struct AddClipCommand : ModelCommand
     {
         AddClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.add", "Add Audio Clip...", m, h) {}
 
-        void execute() override
+        void execute (const juce::var&) override
         {
             host.chooseAudioFile ([this] (const juce::File& f) { report (model.insertAudioClip (f)); });
+        }
+    };
+
+    /** A drag in the Arrangement. */
+    struct MoveClipCommand : ModelCommand
+    {
+        MoveClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.move", "Move Clip", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::start].isDouble())
+                model.moveClip (args[ArgKeys::clipId], args[ArgKeys::start], args[ArgKeys::trackId]);
+        }
+    };
+
+    /** A drag on a clip's edge in the Arrangement. */
+    struct ResizeClipCommand : ModelCommand
+    {
+        ResizeClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.resize", "Resize Clip", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::start].isDouble() && args[ArgKeys::end].isDouble())
+                model.resizeClip (args[ArgKeys::clipId], args[ArgKeys::start], args[ArgKeys::end]);
+        }
+    };
+
+    /** Cuts the selected clip at the playhead. */
+    struct SplitClipCommand : ModelCommand
+    {
+        SplitClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.split", "Split Clip at Playhead", m, h) {}
+
+        void execute (const juce::var&) override
+        {
+            model.splitClip (model.getSelectedClipId(), model.getTransportPositionSeconds());
+        }
+
+        bool isEnabled() const override
+        {
+            return model.canSplitClip (model.getSelectedClipId(), model.getTransportPositionSeconds());
         }
     };
 
@@ -112,14 +158,14 @@ namespace
     struct UndoCommand : ModelCommand
     {
         UndoCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("edit.undo", "Undo", m, h) {}
-        void execute() override           { model.undo(); }
+        void execute (const juce::var&) override           { model.undo(); }
         bool isEnabled() const override   { return model.canUndo(); }
     };
 
     struct RedoCommand : ModelCommand
     {
         RedoCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("edit.redo", "Redo", m, h) {}
-        void execute() override           { model.redo(); }
+        void execute (const juce::var&) override           { model.redo(); }
         bool isEnabled() const override   { return model.canRedo(); }
     };
 
@@ -127,13 +173,13 @@ namespace
     struct PlayCommand : ModelCommand
     {
         PlayCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.play", "Play", m, h) {}
-        void execute() override   { model.play(); }
+        void execute (const juce::var&) override   { model.play(); }
     };
 
     struct StopCommand : ModelCommand
     {
         StopCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.stop", "Stop", m, h) {}
-        void execute() override   { model.stop(); }
+        void execute (const juce::var&) override   { model.stop(); }
     };
 
     /** The spacebar: dispatches to transport.play or transport.stop, so both
@@ -143,7 +189,7 @@ namespace
         TogglePlayCommand (ApplicationModel& m, AppCommandHost& h, CommandRegistry& r)
             : ModelCommand ("transport.togglePlay", "Play/Stop", m, h), registry (r) {}
 
-        void execute() override   { registry.invoke (model.isPlaying() ? "transport.stop" : "transport.play"); }
+        void execute (const juce::var&) override   { registry.invoke (model.isPlaying() ? "transport.stop" : "transport.play"); }
 
         CommandRegistry& registry;
     };
@@ -151,7 +197,7 @@ namespace
     struct ReturnToStartCommand : ModelCommand
     {
         ReturnToStartCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.returnToStart", "Return to Start", m, h) {}
-        void execute() override   { model.returnToStart(); }
+        void execute (const juce::var&) override   { model.returnToStart(); }
     };
 }
 
@@ -168,6 +214,9 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<AddTrackCommand> (model, host));
     registry.add (std::make_unique<RemoveTrackCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
+    registry.add (std::make_unique<MoveClipCommand> (model, host));
+    registry.add (std::make_unique<ResizeClipCommand> (model, host));
+    registry.add (std::make_unique<SplitClipCommand> (model, host));
 
     registry.add (std::make_unique<UndoCommand> (model, host));
     registry.add (std::make_unique<RedoCommand> (model, host));
@@ -176,6 +225,24 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<StopCommand> (model, host));
     registry.add (std::make_unique<TogglePlayCommand> (model, host, registry));
     registry.add (std::make_unique<ReturnToStartCommand> (model, host));
+}
+
+juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::start, startSeconds);
+    args->setProperty (ArgKeys::trackId, trackId);
+    return args;
+}
+
+juce::var clipResizeArgs (const juce::String& clipId, double startSeconds, double endSeconds)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    args->setProperty (ArgKeys::start, startSeconds);
+    args->setProperty (ArgKeys::end, endSeconds);
+    return args;
 }
 
 } // namespace papercut

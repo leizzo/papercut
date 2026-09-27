@@ -37,7 +37,7 @@ struct Fixture
     juce::TemporaryFile scratch { juce::String() };
     juce::File scratchDir() const   { return scratch.getFile(); }
 
-    bool invoke (const char* commandId)   { return commands.invoke (commandId); }
+    bool invoke (const char* commandId, const juce::var& args = {})   { return commands.invoke (commandId, args); }
     int numTracks() const                 { return (int) model.getTracks().size(); }
 };
 

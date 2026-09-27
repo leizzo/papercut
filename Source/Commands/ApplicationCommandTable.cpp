@@ -24,6 +24,7 @@ namespace
         ApplicationCommandEntry { 0x2003, "track.add",               "Edit",      'T',                            cmd },
         ApplicationCommandEntry { 0x2004, "track.remove",            "Edit",      juce::KeyPress::backspaceKey,   cmd },
         ApplicationCommandEntry { 0x2005, "clip.add",                "Edit",      'I',                            cmd },
+        ApplicationCommandEntry { 0x2006, "clip.split",              "Edit",      'E',                            cmd },
 
         ApplicationCommandEntry { 0x3001, "transport.togglePlay",    "Transport", juce::KeyPress::spaceKey,       0 },
         ApplicationCommandEntry { 0x3002, "transport.play",          "Transport", 0,                              0 },

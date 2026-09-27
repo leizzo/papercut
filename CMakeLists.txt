@@ -173,6 +173,7 @@ target_sources(PapercutTests PRIVATE
     Tests/TrackCommandTests.cpp
     Tests/TransportCommandTests.cpp
     Tests/ClipCommandTests.cpp
+    Tests/ClipEditingTests.cpp
     Tests/RenderTests.cpp
     Tests/ComponentFactoryTests.cpp)
 

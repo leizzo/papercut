@@ -11,11 +11,11 @@ void CommandRegistry::add (std::unique_ptr<Command> command)
     jassert (inserted);   // two Commands registered under one ID
 }
 
-bool CommandRegistry::invoke (const juce::String& commandId)
+bool CommandRegistry::invoke (const juce::String& commandId, const juce::var& args)
 {
     if (auto it = commands.find (commandId); it != commands.end())
     {
-        it->second->execute();
+        it->second->execute (args);
         return true;
     }
 

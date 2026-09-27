@@ -10,8 +10,9 @@ namespace
     constexpr double zoomPerWheelUnit = 4.0;
 }
 
-ArrangementView::ArrangementView (ApplicationModel& m, ThemeManager& tm, UIStateStore& uiState)
-    : model (m), themeManager (tm), view (uiState.getState (componentId))
+ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& commands, ThemeManager& tm, UIStateStore& uiState)
+    : model (m), themeManager (tm), view (uiState.getState (componentId)),
+      lanes (model, commands, themeManager, view)
 {
     setComponentID (componentId);
 
