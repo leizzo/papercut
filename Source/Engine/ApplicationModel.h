@@ -222,6 +222,7 @@ public:
     // Selection (engine SelectionManager; never undoable)
     void selectTrack (const juce::String& trackId);
     void selectClip (const juce::String& clipId);
+    juce::String getSelectedTrackId() const;
     juce::String getSelectedClipId() const;
 
     /** Replaces the note selection. Never an undo step. Ids that don't match a

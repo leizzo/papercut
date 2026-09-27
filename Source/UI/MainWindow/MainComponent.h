@@ -1,9 +1,18 @@
 #pragma once
 
 #include "Commands/CommandRegistry.h"
+#include "Engine/Automation.h"
+#include "Engine/Shaper.h"
 #include "UI/Arrangement/ArrangementView.h"
 #include "UI/Layout/LayoutManager.h"
+#include "UI/Mixer/MixerView.h"
 #include "UI/PianoRoll/PianoRollView.h"
+#include "UI/Plugins/InsertStrip.h"
+#include "UI/Plugins/PluginBrowser.h"
+#include "UI/Plugins/PluginEditorWindow.h"
+#include "UI/Developer/DeveloperOverlay.h"
+#include "UI/Developer/LayoutWatcher.h"
+#include "UI/Session/SessionView.h"
 
 namespace papercut
 {
@@ -29,6 +38,11 @@ public:
         const LayoutSource& layoutSource;
         juce::String audioDeviceDescription;
         std::function<void (const juce::String&)> reportError;
+        PluginRack& plugins;
+        Mixer& mixer;
+        Session& session;
+        Automation& automation;
+        Shaper& shaper;
     };
 
     MainComponent (Services, juce::ApplicationCommandManager&);
@@ -53,8 +67,18 @@ private:
     LayoutHost statusBarHost { "statusbar", "layouts/statusbar.json" };
     ArrangementView arrangement;
     PianoRollView pianoRoll;
+    PluginBrowser pluginBrowser;
+    InsertStrip insertStrip;
+    juce::TextButton editPluginButton { "Edit" };
+    SessionView sessionView;
+    MixerView mixerView;
+    DeveloperOverlay developerOverlay;
+    std::unique_ptr<LayoutWatcher> layoutWatch;
+    std::unique_ptr<LayoutWatcher> themeWatch;
+    std::unique_ptr<PluginEditorWindow> pluginEditor;
 
     void updateStatusBar();
+    void mouseDown (const juce::MouseEvent&) override;
 
     void modelChanged() override;
     void themeChanged() override;

@@ -41,7 +41,13 @@ add_library(papercut_engine STATIC
     Source/Engine/EngineManager.cpp
     Source/Engine/ProjectManager.cpp
     Source/Engine/ApplicationModel.cpp
-    Source/Engine/ClipWaveform.cpp)
+    Source/Engine/ClipWaveform.cpp
+    Source/Engine/Production.cpp
+    Source/Engine/PluginRack.cpp
+    Source/Engine/Mixer.cpp
+    Source/Engine/Session.cpp
+    Source/Engine/Automation.cpp
+    Source/Engine/Shaper.cpp)
 
 target_compile_definitions(papercut_engine PUBLIC
     JUCE_STANDALONE_APPLICATION=1
@@ -49,8 +55,9 @@ target_compile_definitions(papercut_engine PUBLIC
     JUCE_MODAL_LOOPS_PERMITTED=1
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=0
-    JUCE_PLUGINHOST_AU=0
-    JUCE_PLUGINHOST_VST3=0
+    # Phase 6 hosts VST3 everywhere and AU on macOS (brief §24).
+    JUCE_PLUGINHOST_AU=$<IF:$<BOOL:$<PLATFORM_ID:Darwin>>,1,0>
+    JUCE_PLUGINHOST_VST3=1
     # Tempo-tagged loops (e.g. ACID WAVs) are time-stretched to the Edit tempo;
     # without a stretcher their clips are silent and have no waveform.
     # Signalsmith Stretch ships with Tracktion (MIT, header-only).
@@ -108,7 +115,8 @@ juce_add_binary_data(papercut_resources
     SOURCES
         UI/layouts/transport.json
         UI/layouts/statusbar.json
-        UI/themes/dark.json)
+        UI/themes/dark.json
+        UI/themes/light.json)
 
 set_target_properties(papercut_resources PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -118,7 +126,11 @@ set_target_properties(papercut_resources PROPERTIES POSITION_INDEPENDENT_CODE ON
 add_library(papercut_commands STATIC
     Source/Commands/CommandRegistry.cpp
     Source/Commands/AppCommands.cpp
-    Source/Commands/ApplicationCommandTable.cpp)
+    Source/Commands/ApplicationCommandTable.cpp
+    Source/Commands/PluginCommands.cpp
+    Source/Commands/MixerCommands.cpp
+    Source/Commands/SessionCommands.cpp
+    Source/Commands/AutomationCommands.cpp)
 papercut_use_engine_without_tracktion(papercut_commands)
 
 add_library(papercut_ui STATIC
@@ -130,6 +142,21 @@ add_library(papercut_ui STATIC
     Source/UI/Layout/Primitives.cpp
     Source/UI/Layout/LayoutManager.cpp
     Source/UI/Developer/DeveloperCommands.cpp
+    Source/UI/Developer/Inspector.cpp
+    Source/UI/Developer/DeveloperOverlay.cpp
+    Source/UI/Developer/LayoutWatcher.cpp
+    Source/Commands/ProductionCommands.cpp
+    Source/UI/Plugins/PluginBrowser.cpp
+    Source/UI/Plugins/InsertStrip.cpp
+    Source/UI/Plugins/PluginEditorWindow.cpp
+    Source/UI/Mixer/ChannelStrip.cpp
+    Source/UI/Mixer/MasterStrip.cpp
+    Source/UI/Mixer/MixerView.cpp
+    Source/UI/Session/SceneHeader.cpp
+    Source/UI/Session/SlotComponent.cpp
+    Source/UI/Session/SessionView.cpp
+    Source/UI/Arrangement/AutomationLane.cpp
+    Source/UI/Arrangement/ShaperPanel.cpp
     Source/UI/Arrangement/ArrangementView.cpp
     Source/UI/Arrangement/TimelineHeader.cpp
     Source/UI/Arrangement/TrackList.cpp
@@ -146,7 +173,7 @@ add_library(papercut_ui STATIC
     Source/UI/MainWindow/MainComponent.cpp
     Source/UI/MainWindow/MainWindow.cpp)
 papercut_use_engine_without_tracktion(papercut_ui)
-target_link_libraries(papercut_ui PUBLIC papercut_commands PRIVATE papercut_resources)
+target_link_libraries(papercut_ui PUBLIC papercut_commands PRIVATE papercut_resources gin)
 target_compile_definitions(papercut_ui PRIVATE
     $<$<CONFIG:Debug>:PAPERCUT_DEV_UI_DIR="${CMAKE_CURRENT_SOURCE_DIR}/UI">)
 
@@ -187,7 +214,13 @@ target_sources(PapercutTests PRIVATE
     Tests/RenderTests.cpp
     Tests/MidiTrackTests.cpp
     Tests/NoteEditingTests.cpp
-    Tests/ComponentFactoryTests.cpp)
+    Tests/ComponentFactoryTests.cpp
+    Tests/ProductionTests.cpp
+    Tests/PluginRackTests.cpp
+    Tests/MixerTests.cpp
+    Tests/SessionTests.cpp
+    Tests/AutomationTests.cpp
+    Tests/ShaperTests.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the
 # full include path, Tracktion included.

@@ -1,7 +1,18 @@
 #include "Commands/AppCommands.h"
+#include "Commands/AutomationCommands.h"
+#include "Commands/MixerCommands.h"
+#include "Commands/PluginCommands.h"
+#include "Commands/ProductionCommands.h"
+#include "Commands/SessionCommands.h"
 #include "Engine/ApplicationModel.h"
+#include "Engine/Automation.h"
 #include "Engine/EngineManager.h"
+#include "Engine/Mixer.h"
+#include "Engine/PluginRack.h"
+#include "Engine/Production.h"
 #include "Engine/ProjectManager.h"
+#include "Engine/Session.h"
+#include "Engine/Shaper.h"
 #include "UI/Layout/LayoutSource.h"
 #include "UI/MainWindow/MainWindow.h"
 #include "UI/State/UIStateStore.h"
@@ -32,14 +43,25 @@ public:
         engine = std::make_unique<EngineManager> (getApplicationName(), EngineManager::AudioDevice::initialise);
         projects = std::make_unique<ProjectManager> (*engine);
         model = std::make_unique<ApplicationModel> (*projects);
+        production = std::make_unique<Production> (*projects);
+        plugins = std::make_unique<PluginRack> (*projects);
+        mixer = std::make_unique<Mixer> (*projects);
+        session = std::make_unique<Session> (*projects);
+        automation = std::make_unique<Automation> (*projects);
+        shaper = std::make_unique<Shaper> (*projects);
 
         wireCommandHost();
         registerAppCommands (commands, *model, commandHost);
+        registerProductionCommands (commands, *production, *model, theme, commandHost);
+        registerPluginCommands (commands, *plugins, commandHost);
+        registerMixerCommands (commands, *mixer, commandHost);
+        registerSessionCommands (commands, *session, commandHost);
+        registerAutomationCommands (commands, *automation, *shaper, commandHost);
 
         mainWindow = std::make_unique<MainWindow> (getApplicationName(),
             MainComponent::Services { *model, commands, theme, uiState, layoutSource,
                                       engine->describeActiveAudioDevice(),
-                                      reportError });
+                                      reportError, *plugins, *mixer, *session, *automation, *shaper });
     }
 
     void shutdown() override
@@ -51,6 +73,12 @@ public:
             model->stop();
 
         model.reset();
+        shaper.reset();
+        automation.reset();
+        session.reset();
+        mixer.reset();
+        plugins.reset();
+        production.reset();
         projects.reset();
         engine.reset();
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
@@ -66,6 +94,12 @@ private:
     std::unique_ptr<EngineManager> engine;
     std::unique_ptr<ProjectManager> projects;
     std::unique_ptr<ApplicationModel> model;
+    std::unique_ptr<Production> production;
+    std::unique_ptr<PluginRack> plugins;
+    std::unique_ptr<Mixer> mixer;
+    std::unique_ptr<Session> session;
+    std::unique_ptr<Automation> automation;
+    std::unique_ptr<Shaper> shaper;
 
     CommandRegistry commands;
     AppCommandHost commandHost;

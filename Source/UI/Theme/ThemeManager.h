@@ -70,8 +70,12 @@ public:
     juce::Result load();
 
     /** Re-reads the Theme only and notifies listeners. On failure, the current
-        Theme is kept. */
+        Theme is kept. Geometry is left as load() set it. */
     juce::Result reloadTheme();
+
+    /** Stores themeFile and calls reloadTheme(). Colours change; Layout Metrics
+        stay at the values from the last load(). */
+    juce::Result useTheme (juce::String themeFile);
 
     const Theme& getTheme() const noexcept                  { return theme; }
     const LayoutMetrics& getMetrics() const noexcept        { return metrics; }
@@ -87,7 +91,7 @@ public:
 
 private:
     const LayoutSource& source;
-    const juce::String themeFile;
+    juce::String themeFile;
     Theme theme;
     LayoutMetrics metrics;
     std::unique_ptr<juce::LookAndFeel_V4> lookAndFeel;

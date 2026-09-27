@@ -80,3 +80,43 @@ _Avoid_: C++ hot reload — explicitly out of scope
 
 **Vertical Slice**:
 The first milestone chain: engine → audio device → empty Edit → audio track → WAV clip → waveform → transport → play/stop.
+
+### Plugins
+
+**Plugin Catalogue**:
+The scanned list of plug-ins the user can insert: name, manufacturer, format, path, category. Scanning runs off the UI thread. Built-in engine plug-ins are in the catalogue without a disk scan.
+_Avoid_: plugin database (the on-disk cache is an implementation detail)
+
+**Insert**:
+One plug-in on a track's insert chain, ahead of that track's volume plug-in. A MIDI track has one instrument: inserting an instrument replaces the built-in synth and the track stays a MIDI track (ADR-0011).
+
+### Mixer
+
+**Return**:
+An audio track whose insert chain starts with an aux return. Sends on other tracks route to it by bus number.
+
+**Bus**:
+A submix folder track. Tracks inside it sum through the folder before the master.
+
+**Master**:
+The Edit's master track. Its volume and pan are the master fader, separate from any track fader.
+
+### Automation
+
+**Parameter Lane**:
+The breakpoint curve of one parameter (volume, pan, a send, or a plug-in parameter) drawn against time on the Arrangement.
+
+**Shaper**:
+A modulator on a track that drives one parameter, in the manner of a ShaperBox. Two modes. **Loop**: a drawn shape repeats every N beats, locked to the transport. **Audio trigger**: the track's own audio opens an envelope (attack, hold, release) that moves the same kind of parameter. A Shaper is a modifier on the track, not a second automation curve.
+_Avoid_: LFO (that is the engine type used for Loop, not the user-facing name)
+
+### Session
+
+**Scene**:
+One row of clip slots across tracks. Launching a Scene launches every occupied slot in that row.
+
+**Slot Clip**:
+A clip that lives in a track's slot, not on the Arrangement timeline. Launching it plays the slot; the Arrangement clips on that track are silent while a slot is playing.
+
+**Record into Arrangement**:
+Captures the currently playing slot clips onto the Arrangement as ordinary clips, from the playhead.

@@ -120,14 +120,31 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         state by itself (the engine expects changes through the parameter). Only
         stale parameters are touched: re-reading writes the state back, and a
         write after an undo would clear the redo history. */
+    void syncAttached (te::AutomatableParameter* parameter, const juce::CachedValue<float>* value)
+    {
+        if (parameter != nullptr && value != nullptr && parameter->getCurrentValue() != value->get())
+            parameter->updateFromAttachedValue();
+    }
+
     void syncVolumeParametersFromState()
     {
         for (auto* t : te::getAudioTracks (edit()))
+        {
             if (auto* plugin = t->getVolumePlugin())
-                for (auto [parameter, value] : { std::pair (plugin->volParam.get(), &plugin->volume),
-                                                 std::pair (plugin->panParam.get(), &plugin->pan) })
-                    if (parameter->getCurrentValue() != value->get())
-                        parameter->updateFromAttachedValue();
+            {
+                syncAttached (plugin->volParam.get(), &plugin->volume);
+                syncAttached (plugin->panParam.get(), &plugin->pan);
+            }
+
+            for (auto* send : t->pluginList.getPluginsOfType<te::AuxSendPlugin>())
+                syncAttached (send->gain.get(), &send->gainLevel);
+        }
+
+        if (auto master = edit().getMasterVolumePlugin())
+        {
+            syncAttached (master->volParam.get(), &master->volume);
+            syncAttached (master->panParam.get(), &master->pan);
+        }
     }
 
     //==============================================================================
@@ -1031,6 +1048,18 @@ void ApplicationModel::selectClip (const juce::String& clipId)
         impl->selectionManager.selectOnly (clip);
     else
         impl->selectionManager.deselectAll();
+}
+
+juce::String ApplicationModel::getSelectedTrackId() const
+{
+    if (auto* track = impl->selectedTrack())
+        return track->itemID.toString();
+
+    if (auto* clip = impl->selectedClip())
+        if (auto* owner = dynamic_cast<te::AudioTrack*> (clip->getTrack()))
+            return owner->itemID.toString();
+
+    return {};
 }
 
 juce::String ApplicationModel::getSelectedClipId() const

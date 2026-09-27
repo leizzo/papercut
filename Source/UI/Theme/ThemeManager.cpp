@@ -230,4 +230,18 @@ juce::Result ThemeManager::reloadTheme()
     return juce::Result::ok();
 }
 
+juce::Result ThemeManager::useTheme (juce::String file)
+{
+    auto previous = themeFile;
+    themeFile = std::move (file);
+
+    if (auto r = reloadTheme(); r.failed())
+    {
+        themeFile = std::move (previous);
+        return r;
+    }
+
+    return juce::Result::ok();
+}
+
 } // namespace papercut

@@ -38,6 +38,21 @@ namespace
 
         ApplicationCommandEntry { 0x4001, "dev.reloadLayout",        "Developer", 'L',                            cmd | alt },
         ApplicationCommandEntry { 0x4002, "dev.reloadTheme",         "Developer", 'T',                            cmd | alt },
+
+        ApplicationCommandEntry { 0x5001, "track.freeze",            "Track",     'F',                            cmd | shift },
+        ApplicationCommandEntry { 0x5002, "track.unfreeze",          "Track",     'F',                            cmd | alt },
+        ApplicationCommandEntry { 0x5003, "track.bounce",            "Track",     'B',                            cmd },
+        ApplicationCommandEntry { 0x5004, "file.exportMix",          "File",      'E',                            cmd | shift },
+        ApplicationCommandEntry { 0x5005, "project.autosave",        "File",      'S',                            cmd | alt },
+        ApplicationCommandEntry { 0x5006, "project.recover",         "File",      0,                              0 },
+        ApplicationCommandEntry { 0x5007, "project.saveTemplate",    "File",      0,                              0 },
+        ApplicationCommandEntry { 0x5008, "project.newFromTemplate", "File",      0,                              0 },
+        ApplicationCommandEntry { 0x5009, "theme.use",               "View",      0,                              0 },
+
+        ApplicationCommandEntry { 0x6001, "plugin.scan",             "Plugins",   'P',                            cmd | shift },
+        ApplicationCommandEntry { 0x6002, "mixer.addReturn",         "Mixer",     0,                              0 },
+        ApplicationCommandEntry { 0x6003, "session.stopAll",         "Session",   0,                              0 },
+        ApplicationCommandEntry { 0x6004, "session.recordToArrangement", "Session", 0,                           0 },
     };
 }
 

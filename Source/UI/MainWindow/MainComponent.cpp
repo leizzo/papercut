@@ -11,8 +11,14 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     : services (std::move (s)),
       commandManager (cm),
       layouts (services.layoutSource, factory, services.uiState),
-      arrangement (services.model, services.commands, services.themeManager, services.uiState),
-      pianoRoll (services.model, services.commands, services.themeManager, services.uiState)
+      arrangement (services.model, services.commands, services.themeManager, services.uiState,
+                   services.automation, services.shaper),
+      pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
+      pluginBrowser (services.commands, services.plugins, services.model, services.themeManager),
+      insertStrip (services.commands, services.plugins, services.model, services.themeManager),
+      sessionView (services.model, services.session, services.commands, services.themeManager),
+      mixerView (services.model, services.mixer, services.commands, services.themeManager),
+      developerOverlay (services.themeManager)
 {
     // Every Command a layout may name must be registered before layouts build.
     registerPrimitives (factory, services.commands, services.themeManager);
@@ -27,13 +33,37 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     arrangement.onMidiClipOpened = [this] (const juce::String& id) { pianoRoll.openClip (id); };
     pianoRoll.onOpenStateChanged = [this] { resized(); };
 
+    editPluginButton.onClick = [this]
+    {
+        if (auto id = insertStrip.getSelectedPluginId(); id.isNotEmpty())
+            pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
+    };
+
     addAndMakeVisible (transportHost);
+    addAndMakeVisible (pluginBrowser);
+    addAndMakeVisible (insertStrip);
+    addAndMakeVisible (editPluginButton);
     addAndMakeVisible (arrangement);
+    addAndMakeVisible (sessionView);
     addAndMakeVisible (pianoRoll);
+    addAndMakeVisible (mixerView);
+    addAndMakeVisible (developerOverlay);
     addAndMakeVisible (statusBarHost);
+
+    developerOverlay.setVisible (services.layoutSource.isDevMode());
+    addMouseListener (this, true);
+
+    if (auto dir = services.layoutSource.getDevDirectory(); dir != juce::File())
+    {
+        layoutWatch = std::make_unique<LayoutWatcher> (dir.getChildFile ("layouts"));
+        themeWatch = std::make_unique<LayoutWatcher> (dir.getChildFile ("themes"));
+        layoutWatch->onJsonUpdated = [this] (const juce::File&) { services.commands.invoke ("dev.reloadLayout"); };
+        themeWatch->onJsonUpdated = [this] (const juce::File&) { services.commands.invoke ("dev.reloadTheme"); };
+    }
 
     services.model.addListener (this);
     services.themeManager.addListener (this);
+    themeChanged();
 }
 
 MainComponent::~MainComponent()
@@ -58,11 +88,30 @@ void MainComponent::resized()
     transportHost.setBounds (r.removeFromTop (metrics.transportHeight));
     statusBarHost.setBounds (r.removeFromBottom (metrics.statusBarHeight));
 
+    if (developerOverlay.isVisible())
+        developerOverlay.setBounds (r.removeFromBottom (metrics.trackControlHeight * 5));
+
+    const auto mixerHeight = metrics.trackHeight * 3;
+    const auto sessionHeight = metrics.trackHeight * 2 + metrics.trackControlHeight;
+    mixerView.setBounds (r.removeFromBottom (mixerHeight));
+
+    auto left = r.removeFromLeft (metrics.trackHeaderWidth);
+    editPluginButton.setBounds (left.removeFromBottom (metrics.trackControlHeight));
+    insertStrip.setBounds (left.removeFromBottom (metrics.trackHeight));
+    pluginBrowser.setBounds (left);
+
     const auto editingNotes = pianoRoll.isOpen();
     arrangement.setVisible (! editingNotes);
+    sessionView.setVisible (! editingNotes);
     pianoRoll.setVisible (editingNotes);
-    arrangement.setBounds (r);
-    pianoRoll.setBounds (r);
+
+    if (editingNotes)
+        pianoRoll.setBounds (r);
+    else
+    {
+        sessionView.setBounds (r.removeFromBottom (sessionHeight));
+        arrangement.setBounds (r);
+    }
 }
 
 void MainComponent::updateStatusBar()
@@ -76,6 +125,17 @@ void MainComponent::updateStatusBar()
     setText ("status.project", "Project: " + services.model.getProjectName());
     setText ("status.device", services.audioDeviceDescription);
     setText ("status.mode", services.layoutSource.isDevMode() ? "Dev UI: source tree" : juce::String());
+
+    if (developerOverlay.isVisible())
+        developerOverlay.setStatusText (services.model.getProjectName()
+                                        + "   " + juce::String (services.model.getTracks().size()) + " tracks"
+                                        + "   " + juce::String (services.model.getTransportPositionSeconds(), 2) + " s");
+}
+
+void MainComponent::mouseDown (const juce::MouseEvent& e)
+{
+    if (developerOverlay.isVisible() && e.mods.isAltDown() && e.eventComponent != nullptr)
+        developerOverlay.getInspector().setInspected (e.eventComponent);
 }
 
 void MainComponent::modelChanged()
@@ -86,6 +146,10 @@ void MainComponent::modelChanged()
 
 void MainComponent::themeChanged()
 {
+    auto& theme = services.themeManager.getTheme();
+    editPluginButton.setColour (juce::TextButton::buttonColourId, theme.trackHeader);
+    editPluginButton.setColour (juce::TextButton::textColourOffId, theme.text);
+
     if (auto* top = getTopLevelComponent())
         top->sendLookAndFeelChange();
 

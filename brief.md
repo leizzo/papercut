@@ -1039,15 +1039,15 @@ Plugin parameter IDs should be connected to the automation system.
 
 ## Phase 1 — Audio Engine
 
-* [ ] JUCE application
-* [ ] Audio device
-* [ ] Tracktion Engine
-* [ ] EngineManager
-* [ ] Empty Edit
-* [ ] Transport
-* [ ] Play
-* [ ] Stop
-* [ ] Master output
+* [x] JUCE application
+* [x] Audio device
+* [x] Tracktion Engine
+* [x] EngineManager
+* [x] Empty Edit
+* [x] Transport
+* [x] Play
+* [x] Stop
+* [x] Master output
 
 ## Phase 2 — Tracks
 
@@ -1061,14 +1061,14 @@ Plugin parameter IDs should be connected to the automation system.
 
 ## Phase 3 — Timeline
 
-* [ ] Timeline
-* [ ] Zoom
-* [ ] Scroll
-* [ ] Audio Clip
-* [ ] Drag
-* [ ] Resize
-* [ ] Split
-* [ ] Selection
+* [x] Timeline
+* [x] Zoom
+* [x] Scroll
+* [x] Audio Clip
+* [x] Drag
+* [x] Resize
+* [x] Split
+* [x] Selection
 
 ## Phase 4 — Recording
 
@@ -1087,47 +1087,48 @@ Plugin parameter IDs should be connected to the automation system.
 
 ## Phase 6 — Plugins
 
-* [ ] Plugin Scanner
-* [ ] VST3
-* [ ] Plugin Browser
-* [ ] Plugin Editor
-* [ ] Insert Chain
+* [x] Plugin Scanner
+* [x] VST3
+* [x] Plugin Browser
+* [x] Plugin Editor
+* [x] Insert Chain
 
 ## Phase 7 — Mixer
 
-* [ ] Inserts
-* [ ] Sends
-* [ ] Returns
-* [ ] Buses
-* [ ] Master
+* [x] Inserts
+* [x] Sends
+* [x] Returns
+* [x] Buses
+* [x] Master
 
 ## Phase 8 — Automation
 
-* [ ] Track Automation
-* [ ] Plugin Automation
-* [ ] Parameter Lanes
+* [x] Track Automation
+* [x] Plugin Automation
+* [x] Parameter Lanes
+* [x] Shaper (loop and audio trigger)
 
 ## Phase 9 — Session View
 
-* [ ] Clips
-* [ ] Scenes
-* [ ] Launch
-* [ ] Recording Into Arrangement
+* [x] Clips
+* [x] Scenes
+* [x] Launch
+* [x] Recording Into Arrangement
 
 ## Phase 10 — Production Features
 
-* [ ] Undo/Redo
-* [ ] Autosave
-* [ ] Crash Recovery
-* [ ] Freeze
-* [ ] Bounce
-* [ ] Export
-* [ ] Templates
-* [ ] Keyboard Shortcuts
-* [ ] Themes
-* [ ] Developer Mode
-* [ ] UI Inspector
-* [ ] Runtime Layout Reload
+* [x] Undo/Redo
+* [x] Autosave
+* [x] Crash Recovery
+* [x] Freeze
+* [x] Bounce
+* [x] Export
+* [x] Templates
+* [x] Keyboard Shortcuts
+* [x] Themes
+* [x] Developer Mode
+* [x] UI Inspector
+* [x] Runtime Layout Reload
 
 ---
 
