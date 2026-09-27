@@ -42,7 +42,7 @@
 20. [Data model](#20-data-model)
 21. [Error, empty & edge states](#21-error-empty--edge-states)
 22. [Release plan](#22-release-plan)
-23. [Open questions](#23-open-questions)
+23. [Resolved questions](#23-resolved-questions)
 24. [Appendix — screen inventory](#24-appendix--screen-inventory)
 
 ---
@@ -376,12 +376,12 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 | 3 | Track chain | `SectionHeader` (tag **RACKS**), `TrackChain Link` | Read-only summary of racks; opens device view. |
 | — | Flow arrow | icon | `arrow-down` separator between chain and inserts. |
 | 4 | Mixer inserts | `SectionHeader` (tag **POST**), `InsertSlot` ×4 | Filled slot: power LED + name. Empty slot remains visible as drop target. |
-| 5 | Sends | `Send Row` per return | See §10.4. |
+| 5 | Sends | `Send Row` per return | See §10.4. Shows 2 send rows; with more than 2 returns the sends section scrolls horizontally. |
 | 6 | Channel pan | `Knob/Bipolar` + channel **Ø** button | Arc from 12 o'clock; value `C`, `L20`, `R30` (mono). |
 | 7 | Fader & meter | readouts + `Fader` + `Meter/Stereo` | Gain readout, peak readout (red when > −1.5 dBFS), dB scale +6…−∞. |
 | 8 | Track buttons | `TrackBtn` ×3 | M / S / ● (returns: M / S only). |
 
-**Return strips**: same, without sends and arm; colour `$return-a` / `$return-b`.
+**Return strips**: same, without sends and arm; colour `$return-a`…`$return-d`. A project has **at most 4 returns (A–D)**.
 
 **Master strip**: head (audio-lines icon, "1/2"), Track chain (Master Rack), Mixer inserts (Console EQ, Bus Comp, Limiter with GR readout), **Loudness** panel (LUFS-I big readout 26 mono lime; Short-term, Momentary, True Peak (orange when > −1 dBTP), Range LU; **correlation bar** −1…+1), fader + wide meter, **Mono / Dim / Cue** buttons.
 
@@ -397,15 +397,15 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 
 Compact, one block per return:
 
-- **Line 1**: return badge (A / B, 14 px, return colour; grey when level = 0), level bar (72 px), value (`40%` / `off`).
-- **Line 2**: **PRE / POST** mini segmented (PRE active = `$state-pre` fill), **send pan** (tiny track with centre tick + marker + mono value), **Ø** polarity toggle (active = `$state-polarity` fill).
+- **Line 1**: return badge (A–D, 14 px, return colour; grey when level = 0), level bar (72 px), value (`40%` / `off`).
+- **Line 2**: **FX / PRE / POST** mini segmented (Pre-FX / Pre-Fader / Post-Fader; FX and PRE active = `$state-pre` fill), **send pan** (tiny track with centre tick + marker + mono value), **Ø** polarity toggle (active = `$state-polarity` fill).
 
 **Interactions [Proposed]**
 
 | Gesture | Result |
 |---|---|
 | Drag horizontally on level bar | Change send level; `Shift` fine; double-click = −∞ ↔ last value. |
-| Click PRE / POST | Toggle Pre-Fader / Post-Fader (Pre-FX only in popover). |
+| Click FX / PRE / POST | Set tap to Pre-FX / Pre-Fader / Post-Fader. |
 | Drag on send pan | Pan −50…+50 (L50…R50); double-click = centre. |
 | Click Ø | Toggle send polarity. |
 | Click badge or row background | Open **Send editor popover** anchored right of the row. |
@@ -428,7 +428,7 @@ Behaviour: opens on click, closes on ✕ / `Esc` / click outside; only one popov
 
 ### 10.6 Inserts behaviour [Proposed]
 
-- Click empty slot → plug-in picker (effects only). Drag from browser → load.
+- Mixer inserts hold **effects only**; instruments and MIDI effects are rejected. Click empty slot → plug-in picker (effects only). Drag from browser → load.
 - Click filled slot → open plug-in window; power LED click = bypass; drag = reorder within strip; `Alt`+drag = copy to another strip.
 - Right-click: Replace, Bypass, Remove, Save preset, Move to track chain (converts to device in rack chain — confirmation dialog).
 - Up to 8 inserts; section shows 4 rows and grows / scrolls when > 4.
@@ -467,7 +467,7 @@ Switching mode is done in the Folder inspector (§11.4). Switching Folder+Bus �
 | Drag track onto folder header | Move into folder (drop indicator line in folder colour). |
 | Drag track out past the tree guide | Move out of folder. |
 | Click chevron / `Alt`+click | Toggle folder / toggle all folders. |
-| Mute / solo folder | Applies to all children (children show inherited state with 50 % tinted buttons). |
+| Mute / solo folder | Applies to all children's audio. Children's M / S buttons stay **independent**: they show only their own state (no inherited tint). |
 | Clicking folder lane span | Selects all child clips in that range. |
 | Nesting | Folders **MAY** nest up to 4 levels; each level indents 14 px. |
 
@@ -475,7 +475,7 @@ Switching mode is done in the Folder inspector (§11.4). Switching Folder+Bus �
 
 - **Routing sidebar** (210): tree `Master → buses → tracks` with connector icons, counts, muted children dimmed, collapsed groups marked `▸`, selected bus highlighted. Legend explains the two modes. Button **New bus from selection**.
 - **Group band** above each folder's strips: 28 high, folder-colour tint, 2 px top border in folder colour, chevron, icon, name, count, mode badge.
-- **Compact strips** (86): head, output route chip (`→ Drum Bus` coloured), sends (A/B bars), pan, fader, M/S/●.
+- **Compact strips** (86): head, output route chip (`→ Drum Bus` coloured), sends (A–D bars), pan, fader, M/S/●. They leave out insert slots and full send options; the strips area scrolls horizontally when strips do not fit.
 - **Bus strip** (104): tinted background + outline in folder colour, `git-merge` icon, input chip `← 4 tracks` (or `← 4 hidden` + colour dots of children when collapsed), output, bus inserts, sends, pan, wider meter, M/S.
 - Toolbar flow indicator: `Tracks › Folder bus › Returns › Master`.
 
@@ -539,6 +539,8 @@ Switching mode is done in the Folder inspector (§11.4). Switching Folder+Bus �
 
 ### 12.6 Recording modes [Proposed]
 
+Default mode when Automation Arm is turned on: **Touch**.
+
 | Mode | While playing with Automation Arm on |
 |---|---|
 | Read | Plays back, never writes. |
@@ -600,7 +602,7 @@ Switching mode is done in the Folder inspector (§11.4). Switching Folder+Bus �
 | Mode | Meaning |
 |---|---|
 | **Absolute** | Envelope sets the parameter value directly (overrides device knob). |
-| **Modulation** | Envelope offsets the current value (−100 %…+100 % of range) and follows the knob/automation. |
+| **Modulation** | Envelope **multiplies** the current value (knob or arrangement automation): `value = base × (1 + m)`, `m` in −100 %…+100 %, clamped to the parameter range. |
 | **Linked** | Envelope length = clip loop; stretches with clip. |
 | **Unlinked** | Envelope has its own start + loop length; loops independently (polymetric modulation). |
 
@@ -680,7 +682,7 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 | | `playhead` | `#C6F135` | Playhead |
 | Metering | `meter-low` / `-mid` / `-high` | `#5FBF6B` / `#E8C53D` / `#F0503C` | Meter ramp |
 | Track palette | `clip-drums` `clip-bass` `clip-chords` `clip-pads` `clip-arp` `clip-vocal` `clip-fx` | `#E8A33D` `#E0564F` `#9B6DD6` `#5B8DEF` `#4FC4D9` `#D96BA0` `#5FBF6B` | Track identity |
-| Returns | `return-a` / `return-b` | `#8E97AD` / `#AD9A8E` | Return identity |
+| Returns | `return-a` / `return-b` / `return-c` / `return-d` | `#8E97AD` / `#AD9A8E` / `#9A9AA2` / `#9A9AA2` | Return identity (C and D use the default `text-secondary` grey until designed) |
 
 ### 15.2 Typography
 
@@ -951,16 +953,18 @@ Each milestone ships behind a feature flag with usability test gates (§2.3).
 
 ---
 
-## 23. Open questions
+## 23. Resolved questions
 
-1. Should **Pre-FX** send tap be exposed in the compact send row or only in the popover? (Currently popover only.)
-2. Maximum number of returns (A–L?) and how the strip scales beyond 2 sends — collapsible sends section or horizontal scroll?
-3. Should folder **Mute/Solo** be inherited visually on children (tinted) or independent?
-4. Compact strips in **Mixer · Folders & Buses** omit full send options and insert slots — confirm acceptable or switch to a two-row layout / horizontal scroll.
-5. Default automation mode on Automation Arm: Touch or Latch?
-6. Should clip envelopes in **Modulation** mode stack with arrangement automation (additive) or multiply?
-7. Do mixer inserts allow instruments/MIDI effects? (Proposed: no — effects only.)
-8. Light theme timeline (tokens ready, not scheduled).
+Answered in #16 (2026-09-28).
+
+1. **Pre-FX** send tap is in the compact send row (FX / PRE / POST), not only in the popover (§10.4).
+2. At most **4 returns (A–D)**. Past 2 sends, the sends section scrolls horizontally (§10.2).
+3. Folder **Mute/Solo** is **independent** on children: no inherited tint (§11.2).
+4. Compact strips in **Mixer · Folders & Buses** keep leaving out inserts and full send options; the strips area scrolls horizontally (§11.3).
+5. Default automation mode on Automation Arm: **Touch** (§12.6).
+6. Clip envelopes in **Modulation** mode **multiply** with arrangement automation (§13.3).
+7. Mixer inserts hold **effects only**, no instruments or MIDI effects (§10.6).
+8. Light theme: deferred; not designed yet.
 
 ---
 
