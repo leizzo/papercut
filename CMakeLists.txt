@@ -144,6 +144,11 @@ add_library(papercut_ui STATIC
     Source/UI/State/ArrangementViewState.cpp
     Source/UI/Theme/ThemeManager.cpp
     Source/UI/Theme/Interaction.cpp
+    Source/UI/Controls/ValueFormat.cpp
+    Source/UI/Controls/ContinuousValue.cpp
+    Source/UI/Controls/ContinuousControl.cpp
+    Source/UI/Controls/Controls.cpp
+    Source/UI/Controls/Icons.cpp
     Source/UI/Layout/LayoutSource.cpp
     Source/UI/Layout/ComponentFactory.cpp
     Source/UI/Layout/Primitives.cpp
@@ -228,7 +233,8 @@ target_sources(PapercutTests PRIVATE
     Tests/SessionTests.cpp
     Tests/AutomationTests.cpp
     Tests/ShaperTests.cpp
-    Tests/ThemeTests.cpp)
+    Tests/ThemeTests.cpp
+    Tests/ControlTests.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the
 # full include path, Tracktion included.

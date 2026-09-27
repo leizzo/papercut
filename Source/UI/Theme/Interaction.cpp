@@ -32,7 +32,7 @@ StateColours stateColours (const Theme& theme, const ControlState& state, juce::
 void paintFocusRing (juce::Graphics& g, const Theme& theme, juce::Rectangle<float> bounds, float cornerRadius)
 {
     g.setColour (theme.focusRing);
-    g.drawRoundedRectangle (bounds.expanded (1.0f), cornerRadius + 1.0f, 2.0f);
+    g.drawRoundedRectangle (bounds.reduced (1.0f), juce::jmax (0.0f, cornerRadius - 1.0f), 2.0f);
 }
 
 juce::MouseCursor notAllowedCursor()

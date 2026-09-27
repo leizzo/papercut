@@ -54,6 +54,40 @@ namespace
         juce::Font getComboBoxFont (juce::ComboBox&) override             { return themeManager.font (themeManager.getTheme().body); }
         juce::Font getLabelFont (juce::Label&) override                   { return themeManager.font (themeManager.getTheme().body); }
 
+        /** `Select`: a bg-slot well with a dim chevron (PRD §15.4). */
+        void drawComboBox (juce::Graphics& g, int width, int height, bool, int, int, int, int, juce::ComboBox& box) override
+        {
+            auto& t = themeManager.getTheme();
+            const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height);
+
+            g.setColour (t.bgSlot);
+            g.fillRoundedRectangle (bounds, t.radiusMd);
+            g.setColour (box.isMouseOver (true) ? t.border : t.borderSoft);
+            g.drawRoundedRectangle (bounds.reduced (0.5f), t.radiusMd, 1.0f);
+
+            const auto chevron = juce::Rectangle<float> ((float) width - 8.0f - 11.0f, 0.0f, 11.0f, (float) height)
+                                     .withSizeKeepingCentre (8.0f, 4.0f);
+            juce::Path p;
+            p.startNewSubPath (chevron.getTopLeft());
+            p.lineTo (chevron.getCentreX(), chevron.getBottom());
+            p.lineTo (chevron.getTopRight());
+            g.setColour (t.textDim);
+            g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+            if (box.hasKeyboardFocus (true))
+            {
+                g.setColour (t.focusRing);
+                g.drawRoundedRectangle (bounds.reduced (1.0f), t.radiusMd, 2.0f);
+            }
+        }
+
+        void positionComboBoxText (juce::ComboBox& box, juce::Label& label) override
+        {
+            label.setBounds (juce::Rectangle<int> (8, 0, juce::jmax (0, box.getWidth() - 8 - 11 - 8), box.getHeight()));
+            label.setBorderSize ({});
+            label.setFont (getComboBoxFont (box));
+        }
+
         void drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour& background,
                                    bool highlighted, bool down) override
         {

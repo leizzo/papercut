@@ -30,7 +30,7 @@ struct StateColours
 StateColours stateColours (const Theme&, const ControlState&, juce::Colour base, juce::Colour onColour,
                            juce::Colour text, bool primary = false);
 
-/** The 2 px focus ring outside bounds. Draw it whenever the state is focused: it is never removed. */
+/** The 2 px focus ring just inside bounds. Draw it whenever the state is focused: it is never removed. */
 void paintFocusRing (juce::Graphics&, const Theme&, juce::Rectangle<float> bounds, float cornerRadius);
 
 /** A circle with a slash: disabled controls and invalid drop targets. */
