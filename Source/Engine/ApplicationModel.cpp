@@ -206,6 +206,12 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
 
     // Absolute, so a Save As into another folder cannot break the reference.
     clip->getSourceFileReference().setToFile (file, te::SourceFileReference::PathStyle::alwaysAbsolute, false);
+
+    // Tempo-tagged loops (e.g. ACID WAVs) play from a time-stretched proxy. The
+    // engine only starts rendering it when a playback graph is built, i.e. on
+    // Play, and stops the transport when it lands. Start it now so the clip is
+    // ready (waveform and audio) by the time the user presses Play.
+    clip->beginRenderingNewProxyIfNeeded();
     return juce::Result::ok();
 }
 

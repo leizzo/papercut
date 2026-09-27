@@ -5,7 +5,7 @@
 namespace papercut::test
 {
 
-juce::File writeSineWav (const juce::File& file, double seconds, int numChannels)
+juce::File writeSineWav (const juce::File& file, double seconds, int numChannels, double acidTempo)
 {
     constexpr double sampleRate = 44100.0;
     const auto numSamples = (int) (seconds * sampleRate);
@@ -19,12 +19,25 @@ juce::File writeSineWav (const juce::File& file, double seconds, int numChannels
     file.getParentDirectory().createDirectory();
     file.deleteFile();
 
+    std::unordered_map<juce::String, juce::String> metadata;
+
+    if (acidTempo > 0)
+    {
+        using W = juce::WavAudioFormat;
+        metadata = { { W::acidOneShot, "0" }, { W::acidRootSet, "0" }, { W::acidStretch, "1" },
+                     { W::acidDiskBased, "0" }, { W::acidizerFlag, "0" }, { W::acidRootNote, "60" },
+                     { W::acidBeats, juce::String (juce::roundToInt (seconds * acidTempo / 60.0)) },
+                     { W::acidNumerator, "4" }, { W::acidDenominator, "4" },
+                     { W::acidTempo, juce::String (acidTempo) } };
+    }
+
     juce::WavAudioFormat wav;
     std::unique_ptr<juce::OutputStream> out (file.createOutputStream().release());
     auto writer = wav.createWriterFor (out,
                                        juce::AudioFormatWriterOptions().withSampleRate (sampleRate)
                                                                        .withNumChannels (numChannels)
-                                                                       .withBitsPerSample (16));
+                                                                       .withBitsPerSample (16)
+                                                                       .withMetadataValues (metadata));
     jassert (writer != nullptr);
     writer->writeFromAudioSampleBuffer (buffer, 0, numSamples);
     return file;

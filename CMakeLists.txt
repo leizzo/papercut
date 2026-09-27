@@ -50,7 +50,11 @@ target_compile_definitions(papercut_engine PUBLIC
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=0
     JUCE_PLUGINHOST_AU=0
-    JUCE_PLUGINHOST_VST3=0)
+    JUCE_PLUGINHOST_VST3=0
+    # Tempo-tagged loops (e.g. ACID WAVs) are time-stretched to the Edit tempo;
+    # without a stretcher their clips are silent and have no waveform.
+    # Signalsmith Stretch ships with Tracktion (MIT, header-only).
+    TRACKTION_ENABLE_TIMESTRETCH_SIGNALSMITH=1)
 
 target_link_libraries(papercut_engine
     PRIVATE
@@ -182,3 +186,4 @@ target_link_libraries(PapercutTests PRIVATE
     juce::juce_recommended_warning_flags)
 
 add_test(NAME PapercutTests COMMAND PapercutTests)
+

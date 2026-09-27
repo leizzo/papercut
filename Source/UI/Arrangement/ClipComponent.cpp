@@ -57,7 +57,7 @@ void ClipComponent::paint (juce::Graphics& g)
     if (waveform->isGenerating())
     {
         g.setColour (theme.clipText);
-        g.drawText ("Reading waveform " + juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%",
+        g.drawText ("Preparing audio " + juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%",
                     visible.reduced (metrics.textPadding), juce::Justification::centredLeft, true);
     }
 }

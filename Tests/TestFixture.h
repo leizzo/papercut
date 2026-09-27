@@ -11,8 +11,9 @@ namespace papercut::test
 /** The run's single headless EngineManager (no audio device). */
 EngineManager& getEngineManager();
 
-/** Writes a sine-wave WAV file and returns it. */
-juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2);
+/** Writes a sine-wave WAV file and returns it. A non-zero acidTempo adds an
+    ACID loop chunk, as tempo-tagged sample-library loops carry. */
+juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2, double acidTempo = 0);
 
 /** A fresh untitled Project with the Command registry wired exactly as the app
     wires it, except that file choosers and UI State are plain fields. */

@@ -18,7 +18,8 @@ public:
     explicit ClipWaveform (std::unique_ptr<Impl>);
     ~ClipWaveform();
 
-    /** True while the background thread is still producing peak data. */
+    /** True while the clip's audio (a time-stretched proxy) or its peak data
+        is still being produced on a background thread. */
     bool isGenerating() const;
 
     /** 0..1 while generating; 1 when complete. */

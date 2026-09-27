@@ -9,12 +9,14 @@ ClipWaveform::~ClipWaveform() = default;
 
 bool ClipWaveform::isGenerating() const
 {
-    return ! impl->thumbnail.isFullyLoaded();
+    // A time-stretched clip's audio doesn't exist until its proxy is rendered.
+    return impl->thumbnail.isGeneratingProxy() || ! impl->thumbnail.isFullyLoaded();
 }
 
 double ClipWaveform::getProgress() const
 {
-    return impl->thumbnail.getProportionComplete();
+    return impl->thumbnail.isGeneratingProxy() ? impl->thumbnail.getProxyProgress()
+                                               : impl->thumbnail.getProportionComplete();
 }
 
 void ClipWaveform::draw (juce::Graphics& g, juce::Rectangle<int> area,
