@@ -40,7 +40,7 @@ private:
     ArrangementViewState view;
 
     TimelineHeader timeline { themeManager, view };
-    TrackList trackList { themeManager, view };
+    TrackList trackList;
     TrackLanes lanes;
     Playhead playhead { model, themeManager, view };
     std::vector<TrackInfo> tracks;
@@ -50,7 +50,7 @@ private:
     void selectRow (int row);
 
     void modelChanged() override        { refresh(); }
-    void themeChanged() override        { repaint(); }
+    void themeChanged() override        { trackList.applyTheme(); repaint(); }
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
 };
 

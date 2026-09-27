@@ -9,6 +9,8 @@
     "laneB": "#202020",
     "trackHeader": "#262626",
     "trackHeaderSelected": "#3a3160",
+    "mute": "#c9a227",
+    "solo": "#3f9bd6",
     "clip": "#3d5a80",
     "clipSelected": "#5a7fb0",
     "clipText": "#f0f0f0",
@@ -31,6 +33,8 @@
     "inset": 2,
     "textPadding": 6,
     "playheadWidth": 2,
-    "clipResizeHandleWidth": 6
+    "clipResizeHandleWidth": 6,
+    "trackControlHeight": 20,
+    "trackButtonWidth": 24
   }
 }

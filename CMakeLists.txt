@@ -133,6 +133,7 @@ add_library(papercut_ui STATIC
     Source/UI/Arrangement/ArrangementView.cpp
     Source/UI/Arrangement/TimelineHeader.cpp
     Source/UI/Arrangement/TrackList.cpp
+    Source/UI/Arrangement/TrackHeader.cpp
     Source/UI/Arrangement/TrackLanes.cpp
     Source/UI/Arrangement/ClipComponent.cpp
     Source/UI/Arrangement/Playhead.cpp
@@ -171,6 +172,7 @@ target_sources(PapercutTests PRIVATE
     Tests/EngineManagerTests.cpp
     Tests/ProjectTests.cpp
     Tests/TrackCommandTests.cpp
+    Tests/TrackChannelTests.cpp
     Tests/TransportCommandTests.cpp
     Tests/ClipCommandTests.cpp
     Tests/ClipEditingTests.cpp

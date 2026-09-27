@@ -11,7 +11,7 @@ class LayoutSource;
 struct Theme
 {
     juce::Colour background, panel, text, mutedText, accent,
-                 laneA, laneB, trackHeader, trackHeaderSelected,
+                 laneA, laneB, trackHeader, trackHeaderSelected, mute, solo,
                  clip, clipSelected, clipText, waveform, ruler, playhead, error;
     float cornerRadius = 0;
     float fontSize = 0;
@@ -30,6 +30,8 @@ struct LayoutMetrics
     int textPadding = 0;    ///< space between a box edge and its text
     int playheadWidth = 0;
     int clipResizeHandleWidth = 0;   ///< grab zone at each clip edge
+    int trackControlHeight = 0;      ///< one row of track header controls
+    int trackButtonWidth = 0;        ///< mute and solo buttons
 };
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys

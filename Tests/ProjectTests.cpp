@@ -26,6 +26,10 @@ struct ProjectTests : juce::UnitTest
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("media/tone.wav"), 1.25);
             f.model.selectTrack (f.model.getTracks()[1].id);
             f.invoke ("clip.add");
+            f.invoke ("track.setVolume", trackVolumeArgs (f.model.getTracks()[0].id, -6.0));
+            f.invoke ("track.setPan", trackPanArgs (f.model.getTracks()[0].id, -0.25));
+            f.invoke ("track.toggleMute", trackArgs (f.model.getTracks()[0].id));
+            f.invoke ("track.toggleSolo", trackArgs (f.model.getTracks()[1].id));
 
             f.projectSaveLocation = f.scratchDir().getChildFile ("My Project");
             f.invoke ("project.saveAs");
@@ -48,6 +52,10 @@ struct ProjectTests : juce::UnitTest
             expectEquals ((int) loaded[1].clips.size(), 1);
             expect (loaded[1].clips[0].file == f.audioFileToChoose);
             expectWithinAbsoluteError (loaded[1].clips[0].lengthSeconds, 1.25, 1e-3);
+            expectWithinAbsoluteError (loaded[0].volumeDb, -6.0, 1e-3);
+            expectWithinAbsoluteError (loaded[0].pan, -0.25, 1e-6);
+            expect (loaded[0].muted && ! loaded[0].solo);
+            expect (loaded[1].solo && ! loaded[1].muted);
             expect (! reopened.model.canUndo());
         }
 

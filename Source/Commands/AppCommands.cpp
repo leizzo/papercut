@@ -7,10 +7,11 @@ namespace papercut
 
 namespace
 {
-    /** Keys of the args built by clipMoveArgs / clipResizeArgs. */
+    /** Keys of the args built by the *Args functions below. */
     namespace ArgKeys
     {
-        const juce::Identifier clipId ("clipId"), start ("start"), end ("end"), trackId ("trackId");
+        const juce::Identifier clipId ("clipId"), start ("start"), end ("end"), trackId ("trackId"),
+                               value ("value"), continuesGesture ("continuesGesture");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -102,6 +103,51 @@ namespace
     {
         RemoveTrackCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.remove", "Remove Track", m, h) {}
         void execute (const juce::var&) override   { model.removeTrack(); }
+    };
+
+    /** A track header fader: one undo step per drag (see trackVolumeArgs). */
+    struct SetTrackVolumeCommand : ModelCommand
+    {
+        SetTrackVolumeCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.setVolume", "Set Track Volume", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::value].isDouble())
+                model.setTrackVolume (args[ArgKeys::trackId], args[ArgKeys::value], args[ArgKeys::continuesGesture]);
+        }
+    };
+
+    struct SetTrackPanCommand : ModelCommand
+    {
+        SetTrackPanCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.setPan", "Set Track Pan", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (args[ArgKeys::value].isDouble())
+                model.setTrackPan (args[ArgKeys::trackId], args[ArgKeys::value], args[ArgKeys::continuesGesture]);
+        }
+    };
+
+    /** Flips mute or solo on the track in trackArgs. */
+    struct ToggleTrackFlagCommand : ModelCommand
+    {
+        using Getter = bool (*) (const TrackInfo&);
+        using Setter = bool (ApplicationModel::*) (const juce::String&, bool);
+
+        ToggleTrackFlagCommand (juce::String id, juce::String name, ApplicationModel& m, AppCommandHost& h, Getter g, Setter s)
+            : ModelCommand (std::move (id), std::move (name), m, h), get (g), set (s) {}
+
+        void execute (const juce::var& args) override
+        {
+            const auto trackId = args[ArgKeys::trackId].toString();
+
+            for (auto& track : model.getTracks())
+                if (track.id == trackId)
+                    (model.*set) (trackId, ! get (track));
+        }
+
+        Getter get;
+        Setter set;
     };
 
     struct AddClipCommand : ModelCommand
@@ -213,6 +259,12 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
 
     registry.add (std::make_unique<AddTrackCommand> (model, host));
     registry.add (std::make_unique<RemoveTrackCommand> (model, host));
+    registry.add (std::make_unique<SetTrackVolumeCommand> (model, host));
+    registry.add (std::make_unique<SetTrackPanCommand> (model, host));
+    registry.add (std::make_unique<ToggleTrackFlagCommand> ("track.toggleMute", "Mute Track", model, host,
+                                                            [] (const TrackInfo& t) { return t.muted; }, &ApplicationModel::setTrackMuted));
+    registry.add (std::make_unique<ToggleTrackFlagCommand> ("track.toggleSolo", "Solo Track", model, host,
+                                                            [] (const TrackInfo& t) { return t.solo; }, &ApplicationModel::setTrackSolo));
     registry.add (std::make_unique<AddClipCommand> (model, host));
     registry.add (std::make_unique<MoveClipCommand> (model, host));
     registry.add (std::make_unique<ResizeClipCommand> (model, host));
@@ -225,6 +277,26 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<StopCommand> (model, host));
     registry.add (std::make_unique<TogglePlayCommand> (model, host, registry));
     registry.add (std::make_unique<ReturnToStartCommand> (model, host));
+}
+
+juce::var trackArgs (const juce::String& trackId)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::trackId, trackId);
+    return args;
+}
+
+juce::var trackVolumeArgs (const juce::String& trackId, double db, bool continuesGesture)
+{
+    auto args = trackArgs (trackId);
+    args.getDynamicObject()->setProperty (ArgKeys::value, db);
+    args.getDynamicObject()->setProperty (ArgKeys::continuesGesture, continuesGesture);
+    return args;
+}
+
+juce::var trackPanArgs (const juce::String& trackId, double pan, bool continuesGesture)
+{
+    return trackVolumeArgs (trackId, pan, continuesGesture);   // same shape
 }
 
 juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId)

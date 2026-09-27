@@ -28,7 +28,7 @@ JUCE's menu/keyboard-shortcut command ID. Always spelled in full.
 _Avoid_: Command
 
 **Engine Undo**:
-Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, insert/move/resize clip). Not undoable: transport, selection, zoom, scroll.
+Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, track volume and pan, insert/move/resize/split clip); a continuous gesture such as a fader drag is one undo step. Not undoable: transport, selection, zoom, scroll, mute, solo.
 
 ### Presentation
 

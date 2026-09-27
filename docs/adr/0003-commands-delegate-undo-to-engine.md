@@ -4,4 +4,4 @@
 
 **Considered options:** (b) No Command classes, UI calls the model directly — rejected because retrofitting a choke point after the UI has grown is painful. (c) Custom per-command undo stack per brief §6 — rejected as duplicating engine machinery.
 
-**Consequences:** The undoable set is exactly the engine's model mutations (add/remove track, insert/move/resize clip). Transport, selection, zoom, and scroll are never undoable and must not go through Commands in a way that touches the UndoManager.
+**Consequences:** The undoable set is exactly the engine's model mutations (add/remove track, insert/move/resize/split clip; track volume and pan per ADR-0009). Transport, selection, zoom, and scroll are never undoable and must not go through Commands in a way that touches the UndoManager.

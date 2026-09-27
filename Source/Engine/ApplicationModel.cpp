@@ -36,6 +36,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         detach();
         auto result = fn();
         attach();
+        openGestureKey = {};
         notifyChanged();
         return result;
     }
@@ -53,6 +54,64 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         editState = {};
         selectionManager.deselectAll();
         selectionManager.edit = nullptr;
+    }
+
+    //==============================================================================
+    /** Starts an Engine Undo step. Every model mutation goes through here. */
+    void beginUndoStep (const juce::String& name)
+    {
+        openGestureKey = {};
+        undoManager().beginNewTransaction (name);
+    }
+
+    /** Starts an undo step for one call of a continuous gesture (a fader drag),
+        or joins the previous call's step if that was the same gesture, keyed
+        e.g. by parameter and track, with nothing undoable since. */
+    void beginGestureStep (const juce::String& name, const juce::String& gestureKey, bool continues)
+    {
+        if (! continues || openGestureKey != gestureKey)
+            beginUndoStep (name);
+
+        openGestureKey = gestureKey;
+    }
+
+    /** Changes a track's volume/pan through the engine's parameter, which records
+        the change in the Edit's UndoManager (consecutive writes within one undo
+        step coalesce). Returns whether the value changed. */
+    template <typename Get, typename Set>
+    bool changeVolumePlugin (const juce::String& trackId, const juce::String& stepName, bool continues, Get get, Set set)
+    {
+        auto* track = findTrack (trackId);
+        auto* plugin = track != nullptr ? track->getVolumePlugin() : nullptr;
+
+        if (plugin == nullptr)
+            return false;
+
+        // Undoing the first change of a default value would remove the property,
+        // leaving nothing for syncVolumeParametersFromState to compare against.
+        for (auto* value : { &plugin->volume, &plugin->pan })
+            if (value->isUsingDefault())
+                plugin->state.setProperty (value->getPropertyID(), value->get(), nullptr);
+
+        // An undo step that ends up empty records nothing.
+        const auto before = get (*plugin);
+        beginGestureStep (stepName, stepName + ":" + trackId, continues);
+        set (*plugin);
+        return get (*plugin) != before;
+    }
+
+    /** Undo and redo restore plugin state, but a parameter never re-reads its
+        state by itself (the engine expects changes through the parameter). Only
+        stale parameters are touched: re-reading writes the state back, and a
+        write after an undo would clear the redo history. */
+    void syncVolumeParametersFromState()
+    {
+        for (auto* t : te::getAudioTracks (edit()))
+            if (auto* plugin = t->getVolumePlugin())
+                for (auto [parameter, value] : { std::pair (plugin->volParam.get(), &plugin->volume),
+                                                 std::pair (plugin->panParam.get(), &plugin->pan) })
+                    if (parameter->getCurrentValue() != value->get())
+                        parameter->updateFromAttachedValue();
     }
 
     //==============================================================================
@@ -117,6 +176,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     ProjectManager& projectManager;
     te::SelectionManager selectionManager { projectManager.getEdit().engine };
     juce::ValueTree editState;
+    juce::String openGestureKey;   ///< the gesture whose undo step is still open, if any
     juce::ListenerList<ApplicationModel::Listener> listeners;
 
     void notifyChanged()    { triggerAsyncUpdate(); }
@@ -187,7 +247,7 @@ juce::String ApplicationModel::getProjectName() const   { return impl->projectMa
 void ApplicationModel::addAudioTrack()
 {
     auto& edit = impl->edit();
-    impl->undoManager().beginNewTransaction ("Add Track");
+    impl->beginUndoStep ("Add Track");
     edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr);
 }
 
@@ -201,8 +261,47 @@ bool ApplicationModel::removeTrack()
     if (track == nullptr)
         return false;
 
-    impl->undoManager().beginNewTransaction ("Remove Track");
+    impl->beginUndoStep ("Remove Track");
     impl->edit().deleteTrack (track);
+    return true;
+}
+
+bool ApplicationModel::setTrackVolume (const juce::String& trackId, double db, bool continuesGesture)
+{
+    // The engine stores a fader position, not dB.
+    const auto position = te::decibelsToVolumeFaderPosition ((float) juce::jlimit (minVolumeDb, maxVolumeDb, db));
+
+    return impl->changeVolumePlugin (trackId, "Set Volume", continuesGesture,
+                                     [] (te::VolumeAndPanPlugin& p) { return p.getSliderPos(); },
+                                     [&] (te::VolumeAndPanPlugin& p) { p.setSliderPos (position); });
+}
+
+bool ApplicationModel::setTrackPan (const juce::String& trackId, double pan, bool continuesGesture)
+{
+    return impl->changeVolumePlugin (trackId, "Set Pan", continuesGesture,
+                                     [] (te::VolumeAndPanPlugin& p) { return p.getPan(); },
+                                     [&] (te::VolumeAndPanPlugin& p) { p.setPan ((float) juce::jlimit (-1.0, 1.0, pan)); });
+}
+
+bool ApplicationModel::setTrackMuted (const juce::String& trackId, bool muted)
+{
+    auto* track = impl->findTrack (trackId);
+
+    if (track == nullptr || track->isMuted (false) == muted)
+        return false;
+
+    track->setMute (muted);
+    return true;
+}
+
+bool ApplicationModel::setTrackSolo (const juce::String& trackId, bool solo)
+{
+    auto* track = impl->findTrack (trackId);
+
+    if (track == nullptr || track->isSolo (false) == solo)
+        return false;
+
+    track->setSolo (solo);
     return true;
 }
 
@@ -214,7 +313,7 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     if (! audioFile.isValid())
         return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
 
-    impl->undoManager().beginNewTransaction ("Insert Clip");
+    impl->beginUndoStep ("Insert Clip");
 
     auto* track = impl->insertionTrack();
 
@@ -264,7 +363,7 @@ bool ApplicationModel::moveClip (const juce::String& clipId, double startSeconds
 
     return impl->keepingClipSelection ([&]
     {
-        impl->undoManager().beginNewTransaction ("Move Clip");
+        impl->beginUndoStep ("Move Clip");
 
         if (changesTrack)
             clip->moveTo (*track);
@@ -294,7 +393,7 @@ bool ApplicationModel::resizeClip (const juce::String& clipId, double startSecon
     if (end <= start || (start == pos.getStart() && end == pos.getEnd()))
         return false;
 
-    impl->undoManager().beginNewTransaction ("Resize Clip");
+    impl->beginUndoStep ("Resize Clip");
     clip->setPosition ({ { start, end }, pos.getOffset() + (start - pos.getStart()) });
     return true;
 }
@@ -313,7 +412,7 @@ bool ApplicationModel::splitClip (const juce::String& clipId, double timeSeconds
 
     return impl->keepingClipSelection ([&]
     {
-        impl->undoManager().beginNewTransaction ("Split Clip");
+        impl->beginUndoStep ("Split Clip");
         auto* clip = impl->findClip (clipId);
         return clip->getClipTrack()->splitClip (*clip, te::TimePosition::fromSeconds (timeSeconds)) != nullptr;
     });
@@ -322,12 +421,18 @@ bool ApplicationModel::splitClip (const juce::String& clipId, double timeSeconds
 //==============================================================================
 bool ApplicationModel::undo()
 {
-    return impl->keepingClipSelection ([this] { return impl->undoManager().undo(); });
+    impl->openGestureKey = {};
+    const auto undone = impl->keepingClipSelection ([this] { return impl->undoManager().undo(); });
+    impl->syncVolumeParametersFromState();
+    return undone;
 }
 
 bool ApplicationModel::redo()
 {
-    return impl->keepingClipSelection ([this] { return impl->undoManager().redo(); });
+    impl->openGestureKey = {};
+    const auto redone = impl->keepingClipSelection ([this] { return impl->undoManager().redo(); });
+    impl->syncVolumeParametersFromState();
+    return redone;
 }
 
 bool ApplicationModel::canUndo() const   { return impl->undoManager().canUndo(); }
@@ -388,7 +493,18 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
     std::vector<TrackInfo> tracks;
     for (auto* t : te::getAudioTracks (impl->edit()))
     {
-        TrackInfo info { t->itemID.toString(), t->getName(), impl->selectionManager.isSelected (t), {} };
+        TrackInfo info;
+        info.id = t->itemID.toString();
+        info.name = t->getName();
+        info.selected = impl->selectionManager.isSelected (t);
+        info.muted = t->isMuted (false);
+        info.solo = t->isSolo (false);
+
+        if (auto* volume = t->getVolumePlugin())
+        {
+            info.volumeDb = juce::jmax (minVolumeDb, (double) volume->getVolumeDb());
+            info.pan = volume->getPan();
+        }
 
         for (auto* c : t->getClips())
         {

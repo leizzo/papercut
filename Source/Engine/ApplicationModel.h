@@ -30,6 +30,10 @@ struct TrackInfo
     juce::String id;
     juce::String name;
     bool selected = false;
+    double volumeDb = 0;   ///< ApplicationModel::minVolumeDb is silence
+    double pan = 0;        ///< -1 (left) to 1 (right)
+    bool muted = false;
+    bool solo = false;
     std::vector<ClipInfo> clips;
 };
 
@@ -38,11 +42,12 @@ struct TrackInfo
     Exposes app-level operations and read-only snapshots; owns no track or clip
     state of its own. Nothing above this layer sees a Tracktion header.
 
-    Undoable (Engine Undo): adding/removing tracks and inserting, moving, resizing
-    and splitting clips — one undo step per call that changes something. Never
-    undoable: transport, selection. The clip operations return false, recording
-    no undo step, when they would change nothing (unknown clip or track, same
-    position, empty range).
+    Undoable (Engine Undo): adding/removing tracks, track volume and pan, and
+    inserting, moving, resizing and splitting clips — one undo step per call that
+    changes something. Never undoable: transport, selection, mute, solo (the
+    engine keeps the last two out of its UndoManager). The track and clip
+    operations return false, recording no undo step, when they would change
+    nothing (unknown clip or track, same value or position, empty range).
 */
 class ApplicationModel
 {
@@ -75,6 +80,23 @@ public:
     /** Removes the selected track, or the last one if none is selected.
         Returns false if there is no track to remove. */
     bool removeTrack();
+
+    /** Sets a track's volume, clamped to [minVolumeDb, maxVolumeDb].
+
+        With continuesGesture, the change joins the undo step of the previous call
+        if that was a volume change on the same track with nothing undoable in
+        between — so a whole fader drag is one undo step. Otherwise it starts one. */
+    bool setTrackVolume (const juce::String& trackId, double db, bool continuesGesture = false);
+
+    /** Sets a track's pan, clamped to [-1, 1]; continuesGesture as for setTrackVolume. */
+    bool setTrackPan (const juce::String& trackId, double pan, bool continuesGesture = false);
+
+    /** Never undoable. */
+    bool setTrackMuted (const juce::String& trackId, bool muted);
+    bool setTrackSolo (const juce::String& trackId, bool solo);
+
+    /** The engine's fader range; minVolumeDb is silence. */
+    static constexpr double minVolumeDb = -100.0, maxVolumeDb = 6.0;
 
     /** Inserts the file as a clip at the end of the selected track, or the
         selected clip's track (or the first track, creating one if the Edit has none). */

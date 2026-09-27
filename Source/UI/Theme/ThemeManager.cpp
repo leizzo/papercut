@@ -20,6 +20,15 @@ namespace
             setColour (juce::TextButton::textColourOffId, t.text);
             setColour (juce::TextButton::textColourOnId, t.text);
             setColour (juce::ComboBox::outlineColourId, t.mutedText.withAlpha (0.4f));
+            setColour (juce::Slider::backgroundColourId, t.background);
+            setColour (juce::Slider::trackColourId, t.accent);
+            setColour (juce::Slider::thumbColourId, t.text);
+            setColour (juce::Slider::rotarySliderFillColourId, t.accent);
+            setColour (juce::Slider::rotarySliderOutlineColourId, t.background);
+            setColour (juce::BubbleComponent::backgroundColourId, t.panel);
+            setColour (juce::BubbleComponent::outlineColourId, t.mutedText.withAlpha (0.4f));
+            setColour (juce::TooltipWindow::backgroundColourId, t.panel);
+            setColour (juce::TooltipWindow::textColourId, t.text);
             setColour (juce::PopupMenu::backgroundColourId, t.panel);
             setColour (juce::PopupMenu::textColourId, t.text);
             setColour (juce::PopupMenu::highlightedBackgroundColourId, t.accent);
@@ -41,6 +50,35 @@ namespace
             g.fillRoundedRectangle (bounds, radius);
             g.setColour (b.findColour (juce::ComboBox::outlineColourId));
             g.drawRoundedRectangle (bounds, radius, 1.0f);
+        }
+
+        /** Fits any size (V4 insets by a fixed 10 px); a range around zero, like
+            pan, fills from zero rather than from the start. */
+        void drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height, float position,
+                               float startAngle, float endAngle, juce::Slider& slider) override
+        {
+            const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
+            const auto lineWidth = juce::jmax (1.5f, bounds.getWidth() * 0.12f);
+            const auto radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f - lineWidth;
+            const auto centre = bounds.getCentre();
+
+            const auto zero = slider.getMinimum() < 0 && slider.getMaximum() > 0
+                                ? (float) slider.valueToProportionOfLength (0.0) : 0.0f;
+            const auto angleAt = [&] (float proportion) { return startAngle + proportion * (endAngle - startAngle); };
+            const auto stroke = juce::PathStrokeType (lineWidth, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+
+            juce::Path track, fill;
+            track.addCentredArc (centre.x, centre.y, radius, radius, 0, startAngle, endAngle, true);
+            fill.addCentredArc (centre.x, centre.y, radius, radius, 0, angleAt (zero), angleAt (position), true);
+
+            g.setColour (slider.findColour (juce::Slider::rotarySliderOutlineColourId));
+            g.strokePath (track, stroke);
+            g.setColour (slider.findColour (juce::Slider::rotarySliderFillColourId));
+            g.strokePath (fill, stroke);
+
+            const auto thumb = centre.getPointOnCircumference (radius, angleAt (position));
+            g.setColour (slider.findColour (juce::Slider::thumbColourId));
+            g.drawLine ({ centre, thumb }, lineWidth * 0.75f);
         }
 
     private:
@@ -106,6 +144,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "mutedText", &Theme::mutedText }, { "accent", &Theme::accent },
         { "laneA", &Theme::laneA }, { "laneB", &Theme::laneB },
         { "trackHeader", &Theme::trackHeader }, { "trackHeaderSelected", &Theme::trackHeaderSelected },
+        { "mute", &Theme::mute }, { "solo", &Theme::solo },
         { "clip", &Theme::clip }, { "clipSelected", &Theme::clipSelected }, { "clipText", &Theme::clipText }, { "waveform", &Theme::waveform },
         { "ruler", &Theme::ruler }, { "playhead", &Theme::playhead }, { "error", &Theme::error },
     };
@@ -117,6 +156,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "trackHeaderWidth", &LayoutMetrics::trackHeaderWidth }, { "clipHeaderHeight", &LayoutMetrics::clipHeaderHeight },
         { "inset", &LayoutMetrics::inset }, { "textPadding", &LayoutMetrics::textPadding },
         { "playheadWidth", &LayoutMetrics::playheadWidth }, { "clipResizeHandleWidth", &LayoutMetrics::clipResizeHandleWidth },
+        { "trackControlHeight", &LayoutMetrics::trackControlHeight }, { "trackButtonWidth", &LayoutMetrics::trackButtonWidth },
     };
 
     Theme newTheme;

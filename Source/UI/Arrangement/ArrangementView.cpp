@@ -12,6 +12,7 @@ namespace
 
 ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& commands, ThemeManager& tm, UIStateStore& uiState)
     : model (m), themeManager (tm), view (uiState.getState (componentId)),
+      trackList (commands, themeManager, view),
       lanes (model, commands, themeManager, view)
 {
     setComponentID (componentId);
@@ -79,7 +80,7 @@ void ArrangementView::valueTreePropertyChanged (juce::ValueTree&, const juce::Id
     // Zoom or scroll changed: everything re-derives its position from the view state.
     lanes.layoutClips();
     lanes.repaint();
-    trackList.repaint();
+    trackList.layoutHeaders();
     timeline.repaint();
     playhead.update();
 }

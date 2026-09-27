@@ -1051,13 +1051,13 @@ Plugin parameter IDs should be connected to the automation system.
 
 ## Phase 2 — Tracks
 
-* [ ] Audio Track
-* [ ] Add Track
-* [ ] Remove Track
-* [ ] Volume
-* [ ] Pan
-* [ ] Mute
-* [ ] Solo
+* [x] Audio Track
+* [x] Add Track
+* [x] Remove Track
+* [x] Volume
+* [x] Pan
+* [x] Mute
+* [x] Solo
 
 ## Phase 3 — Timeline
 

@@ -5,37 +5,56 @@
 namespace papercut
 {
 
-TrackList::TrackList (ThemeManager& tm, ArrangementViewState& v)
-    : themeManager (tm), view (v)
+TrackList::TrackList (CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
+    : commands (c), themeManager (tm), view (v)
 {
 }
 
 void TrackList::setTracks (const std::vector<TrackInfo>& newTracks)
 {
     tracks = newTracks;
+    std::map<juce::String, std::unique_ptr<TrackHeader>> kept;
+
+    for (auto& track : tracks)
+    {
+        if (auto existing = headers.find (track.id); existing != headers.end())
+        {
+            existing->second->setTrack (track);
+            kept[track.id] = std::move (existing->second);
+        }
+        else
+        {
+            auto header = std::make_unique<TrackHeader> (commands, themeManager, track);
+            addAndMakeVisible (*header);
+            kept[track.id] = std::move (header);
+        }
+    }
+
+    headers = std::move (kept);
+    layoutHeaders();
+}
+
+void TrackList::layoutHeaders()
+{
+    auto& metrics = themeManager.getMetrics();
+
+    for (size_t row = 0; row < tracks.size(); ++row)
+        headers[tracks[row].id]->setBounds (juce::Rectangle<int> (0, view.rowToY ((int) row, metrics.trackHeight),
+                                                                  getWidth(), metrics.trackHeight)
+                                                .reduced (metrics.inset));
+}
+
+void TrackList::applyTheme()
+{
+    for (auto& [id, header] : headers)
+        header->applyTheme();
+
     repaint();
 }
 
 void TrackList::paint (juce::Graphics& g)
 {
-    auto& theme = themeManager.getTheme();
-    auto& metrics = themeManager.getMetrics();
-
-    g.fillAll (theme.panel);
-    g.setFont (themeManager.getFont());
-
-    for (size_t row = 0; row < tracks.size(); ++row)
-    {
-        auto& track = tracks[row];
-        auto r = juce::Rectangle<int> (0, view.rowToY ((int) row, metrics.trackHeight), getWidth(), metrics.trackHeight)
-                     .reduced (metrics.inset);
-
-        g.setColour (track.selected ? theme.trackHeaderSelected : theme.trackHeader);
-        g.fillRoundedRectangle (r.toFloat(), theme.cornerRadius);
-
-        g.setColour (track.selected ? theme.text : theme.mutedText);
-        g.drawText (track.name, r.reduced (metrics.textPadding), juce::Justification::topLeft, true);
-    }
+    g.fillAll (themeManager.getTheme().panel);
 }
 
 void TrackList::mouseDown (const juce::MouseEvent& e)

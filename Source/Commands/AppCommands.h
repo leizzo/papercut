@@ -31,11 +31,23 @@ struct AppCommandHost
 
     project.new  project.open  project.save  project.saveAs
     track.add    track.remove
+    track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
     clip.add     clip.move     clip.resize   clip.split
     edit.undo    edit.redo
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
+
+/** Arguments for track.toggleMute and track.toggleSolo. */
+juce::var trackArgs (const juce::String& trackId);
+
+/** Arguments for track.setVolume. A continuous gesture (a fader drag) passes
+    continuesGesture for every value after its first, making the whole gesture
+    one undo step. */
+juce::var trackVolumeArgs (const juce::String& trackId, double db, bool continuesGesture = false);
+
+/** Arguments for track.setPan (-1 left to 1 right); continuesGesture as for trackVolumeArgs. */
+juce::var trackPanArgs (const juce::String& trackId, double pan, bool continuesGesture = false);
 
 /** Arguments for clip.move: the clip, its new start, and optionally the track to
     move it to. Invoked with anything else, clip.move does nothing. */
