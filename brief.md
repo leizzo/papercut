@@ -768,11 +768,12 @@ UI
 Developer Tools
  └── gin / FileSystemWatcher
 
+Plugin / Synth UI
+ └── gin_plugin
+
 Custom DSP
  └── gin_dsp
 ```
-
-Plugin / Synth UI is built on JUCE, not `gin_plugin` (ADR-0007).
 
 GIN should not be placed between Tracktion Engine and the application's core model.
 
@@ -810,17 +811,13 @@ Initial modules:
 gin
 gin_gui
 gin_svg
-```
-
-`gin_plugin` is not used: it requires `gin_dsp` and `gin_graphics`, and JUCE already covers plugin UI (ADR-0007).
-
-Potential future modules:
-
-```text
+gin_plugin
 gin_dsp
-gin_simd
 gin_graphics
+gin_simd
 ```
+
+`gin_plugin` is in the initial set for plugin and synth UI (ADR-0008). It requires `gin_dsp`, `gin_graphics`, and `gin_simd`, so those are built with it.
 
 Modules that should be deferred initially:
 

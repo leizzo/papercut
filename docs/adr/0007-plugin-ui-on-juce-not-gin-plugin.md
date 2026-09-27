@@ -1,3 +1,5 @@
+Status: superseded by ADR-0008.
+
 # Plugin UI is built on JUCE, not gin_plugin
 
 The brief (§22, §23) listed `gin_plugin` among the initial GIN modules for plugin/synth UI. `gin_plugin` hard-depends on `gin_dsp` and `gin_graphics`, which the brief defers, so adopting it would pull two more GIN modules in ahead of any need. JUCE already provides plugin hosting and editor windows (`AudioProcessorEditor`, `AudioPluginFormatManager`), and Tracktion hosts plugins through JUCE. We decided: **the initial GIN set is `gin`, `gin_gui`, `gin_svg`; plugin-related UI is built on JUCE.**

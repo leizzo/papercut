@@ -21,10 +21,15 @@ set(TE_ADD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/tracktion_engine/modules/juce EXCLUDE_FROM_ALL)
 add_subdirectory(external/tracktion_engine EXCLUDE_FROM_ALL)
 
-# GIN is used for GUI/SVG only. Plugin UI is built on JUCE, not gin_plugin (ADR-0007).
+# Plugin / synth UI uses gin_plugin (ADR-0008). It hard-depends on gin_dsp,
+# gin_graphics, and gin_simd, so those modules are registered with it.
 juce_add_module(external/gin/modules/gin)
+juce_add_module(external/gin/modules/gin_simd)
+juce_add_module(external/gin/modules/gin_dsp)
+juce_add_module(external/gin/modules/gin_graphics)
 juce_add_module(external/gin/modules/gin_gui)
 juce_add_module(external/gin/modules/gin_svg)
+juce_add_module(external/gin/modules/gin_plugin)
 
 # ------------------------------------------------------------------------------
 # papercut_engine: the only target that sees Tracktion headers.
@@ -57,8 +62,12 @@ target_link_libraries(papercut_engine
         juce::juce_audio_utils
         juce::juce_gui_extra
         gin
+        gin_simd
+        gin_dsp
+        gin_graphics
         gin_gui
         gin_svg
+        gin_plugin
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags)
 
