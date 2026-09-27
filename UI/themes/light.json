@@ -1,4 +1,5 @@
 {
+  "extends": "dark.json",
   "colors": {
     "background": "#f6f5f2",
     "panel": "#ffffff",
@@ -33,27 +34,5 @@
   "style": {
     "cornerRadius": 5,
     "fontSize": 14
-  },
-  "metrics": {
-    "transportHeight": 44,
-    "statusBarHeight": 24,
-    "timelineHeight": 26,
-    "trackHeight": 80,
-    "trackHeaderWidth": 180,
-    "clipHeaderHeight": 16,
-    "inset": 2,
-    "textPadding": 6,
-    "playheadWidth": 2,
-    "clipResizeHandleWidth": 6,
-    "trackControlHeight": 20,
-    "trackButtonWidth": 24,
-    "midiNoteHeight": 3,
-    "pianoKeyWidth": 76,
-    "pianoKeyHeight": 16,
-    "pianoBlackKeyWidth": 50,
-    "pianoScrollMargin": 4,
-    "velocityLaneHeight": 80,
-    "gridEighthPixels": 48,
-    "gridSixteenthPixels": 90
   }
 }

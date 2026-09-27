@@ -15,14 +15,24 @@ LayoutSource::LayoutSource()
 
 juce::Result LayoutSource::read (const juce::String& relativePath, juce::String& text) const
 {
+    juce::MemoryBlock data;
+
+    if (auto r = readData (relativePath, data); r.failed())
+        return r;
+
+    text = data.toString();
+    return juce::Result::ok();
+}
+
+juce::Result LayoutSource::readData (const juce::String& relativePath, juce::MemoryBlock& data) const
+{
     if (isDevMode())
     {
         auto file = devDirectory.getChildFile (relativePath);
 
-        if (! file.existsAsFile())
+        if (! file.existsAsFile() || ! file.loadFileAsData (data))
             return juce::Result::fail ("UI file not found: " + file.getFullPathName());
 
-        text = file.loadFileAsString();
         return juce::Result::ok();
     }
 
@@ -35,8 +45,8 @@ juce::Result LayoutSource::read (const juce::String& relativePath, juce::String&
         if (fileName == PapercutResources::getNamedResourceOriginalFilename (name))
         {
             int size = 0;
-            auto* data = PapercutResources::getNamedResource (name, size);
-            text = juce::String::fromUTF8 (data, size);
+            auto* bytes = PapercutResources::getNamedResource (name, size);
+            data.replaceAll (bytes, (size_t) size);
             return juce::Result::ok();
         }
     }

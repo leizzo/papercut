@@ -116,7 +116,13 @@ juce_add_binary_data(papercut_resources
         UI/layouts/transport.json
         UI/layouts/statusbar.json
         UI/themes/dark.json
-        UI/themes/light.json)
+        UI/themes/light.json
+        UI/fonts/Inter-Regular.ttf
+        UI/fonts/Inter-SemiBold.ttf
+        UI/fonts/Inter-Bold.ttf
+        UI/fonts/IBMPlexMono-Regular.ttf
+        UI/fonts/IBMPlexMono-Medium.ttf
+        UI/fonts/IBMPlexMono-SemiBold.ttf)
 
 set_target_properties(papercut_resources PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -137,6 +143,7 @@ add_library(papercut_ui STATIC
     Source/UI/State/UIStateStore.cpp
     Source/UI/State/ArrangementViewState.cpp
     Source/UI/Theme/ThemeManager.cpp
+    Source/UI/Theme/Interaction.cpp
     Source/UI/Layout/LayoutSource.cpp
     Source/UI/Layout/ComponentFactory.cpp
     Source/UI/Layout/Primitives.cpp
@@ -220,7 +227,8 @@ target_sources(PapercutTests PRIVATE
     Tests/MixerTests.cpp
     Tests/SessionTests.cpp
     Tests/AutomationTests.cpp
-    Tests/ShaperTests.cpp)
+    Tests/ShaperTests.cpp
+    Tests/ThemeTests.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the
 # full include path, Tracktion included.
