@@ -234,7 +234,8 @@ target_sources(PapercutTests PRIVATE
     Tests/AutomationTests.cpp
     Tests/ShaperTests.cpp
     Tests/ThemeTests.cpp
-    Tests/ControlTests.cpp)
+    Tests/ControlTests.cpp
+    Tests/DeviceChainTests.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the
 # full include path, Tracktion included.

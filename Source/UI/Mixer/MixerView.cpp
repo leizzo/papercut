@@ -4,8 +4,8 @@
 namespace papercut
 {
 
-MixerView::MixerView (ApplicationModel& m, Mixer& mx, CommandRegistry& c, ThemeManager& tm)
-    : model (m), mixer (mx), commands (c), themeManager (tm), master (c, tm)
+MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegistry& c, ThemeManager& tm)
+    : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm), master (c, tm)
 {
     setComponentID (componentId);
 
@@ -117,7 +117,7 @@ void MixerView::refresh()
     for (auto& track : tracks)
     {
         const auto sends = mixer.getSends (track.id);
-        const auto inserts = mixer.getInserts (track.id);
+        const auto inserts = plugins.getChain (track.id, PluginChain::mixer);
 
         if (auto existing = strips.find (track.id); existing != strips.end())
         {

@@ -74,7 +74,7 @@ void ChannelStrip::SendRow::applyTheme()
 }
 
 ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm, const TrackInfo& info,
-                            const std::vector<SendInfo>& sendList, const std::vector<InsertSummary>& inserts)
+                            const std::vector<SendInfo>& sendList, const std::vector<PluginInfo>& inserts)
     : commands (c), themeManager (tm)
 {
     muteButton.setTooltip ("Mute");
@@ -153,7 +153,7 @@ void ChannelStrip::rebuildSends (const std::vector<SendInfo>& next)
     }
 }
 
-void ChannelStrip::rebuildInserts (const std::vector<InsertSummary>& inserts)
+void ChannelStrip::rebuildInserts (const std::vector<PluginInfo>& inserts)
 {
     auto same = insertLabels.size() == inserts.size();
 
@@ -178,7 +178,7 @@ void ChannelStrip::rebuildInserts (const std::vector<InsertSummary>& inserts)
 }
 
 void ChannelStrip::setState (const TrackInfo& info, const std::vector<SendInfo>& sendList,
-                             const std::vector<InsertSummary>& inserts)
+                             const std::vector<PluginInfo>& inserts)
 {
     track = info;
     sends = sendList;

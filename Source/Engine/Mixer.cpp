@@ -513,43 +513,5 @@ bool Mixer::setMasterPan (double pan, bool continuesGesture)
     return plugin->pan.get() != before;
 }
 
-std::vector<InsertSummary> Mixer::getInserts (const juce::String& trackId) const
-{
-    auto* track = te::findTrackForID (projects.getEdit(), te::EditItemID::fromString (trackId));
-
-    if (track == nullptr)
-        return {};
-
-    te::Plugin* volume = nullptr;
-
-    if (auto* audio = dynamic_cast<te::AudioTrack*> (track))
-        volume = audio->getVolumePlugin();
-    else if (auto* folder = dynamic_cast<te::FolderTrack*> (track))
-        volume = folder->getVolumePlugin();
-
-    // Inserts sit ahead of the volume plug-in. The level meter is after it.
-    // Aux send and return are routing, listed by getSends / getReturns.
-    auto volumeIndex = track->pluginList.size();
-
-    if (volume != nullptr)
-        if (auto index = track->pluginList.indexOf (volume); index >= 0)
-            volumeIndex = index;
-    std::vector<InsertSummary> inserts;
-
-    for (int i = 0; i < volumeIndex; ++i)
-    {
-        auto* plugin = track->pluginList[i];
-
-        if (plugin == nullptr
-            || dynamic_cast<te::AuxSendPlugin*> (plugin) != nullptr
-            || dynamic_cast<te::AuxReturnPlugin*> (plugin) != nullptr
-            || dynamic_cast<te::LevelMeterPlugin*> (plugin) != nullptr)
-            continue;
-
-        inserts.push_back ({ plugin->itemID.toString(), plugin->getName() });
-    }
-
-    return inserts;
-}
 
 } // namespace papercut

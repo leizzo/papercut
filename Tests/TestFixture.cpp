@@ -1,6 +1,7 @@
 #include "TestFixture.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
+#include <tracktion_engine/tracktion_engine.h>
 
 namespace papercut::test
 {
@@ -69,6 +70,38 @@ Fixture::Fixture()
 Fixture::~Fixture()
 {
     scratchDir().deleteRecursively();
+}
+
+float renderPeak (Fixture& f)
+{
+    auto rendered = f.scratchDir().getChildFile ("render.wav");
+    rendered.deleteFile();
+
+    // Not Renderer::renderToFile (Edit&, File): that un-mutes and solo-isolates every track.
+    auto& edit = f.projects.getEdit();
+    tracktion::Renderer::Parameters params (edit);
+    params.destFile = rendered;
+    params.audioFormat = edit.engine.getAudioFileFormatManager().getWavFormat();
+    params.bitDepth = 24;
+    params.sampleRateForAudio = edit.engine.getDeviceManager().getSampleRate();
+    params.blockSizeForAudio = edit.engine.getDeviceManager().getBlockSize();
+    params.time = { tracktion::TimePosition(), edit.getLength() };
+    params.tracksToDo = tracktion::toBitSet (tracktion::getAllTracks (edit));
+    params.usePlugins = params.useMasterPlugins = true;
+
+    if (! tracktion::Renderer::renderToFile ({}, params).existsAsFile())
+        return 0.0f;
+
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (rendered));
+
+    if (reader == nullptr || reader->lengthInSamples == 0)
+        return 0.0f;
+
+    juce::AudioBuffer<float> buffer ((int) reader->numChannels, (int) reader->lengthInSamples);
+    reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, true);
+    return buffer.getMagnitude (0, buffer.getNumSamples());
 }
 
 } // namespace papercut::test

@@ -12,7 +12,12 @@ class ProjectManager;
 
 namespace test { struct PluginRackTests; }
 
-/** One plug-in in the catalogue, or one insert on a track.
+/** A track's two plug-in chains (PRD §4.2). The device chain is the track's
+    sound (instrument, racks, creative effects), edited in the detail view. The
+    mixer inserts are console processing after it, edited in the mixer strip. */
+enum class PluginChain { device, mixer };
+
+/** One plug-in in the catalogue, or one on a track.
 
     In the catalogue, id is empty. Once inserted, id is the plug-in's EditItemID.
     path is a built-in type name or an external plug-in's file / identifier —
@@ -23,6 +28,10 @@ struct PluginInfo
     juce::String id;
     juce::String name, manufacturer, format, path, category;
     bool instrument = false;
+    bool midiEffect = false;
+    PluginChain chain = PluginChain::device;   ///< on a track: which chain it is on
+    bool enabled = true;                        ///< false when bypassed
+    bool missing = false;                       ///< saved in the project but not installed; audio passes through
 };
 
 /** Facade over the current Edit's plug-ins (ADR-0001, ADR-0012).
@@ -31,9 +40,18 @@ struct PluginInfo
     a new or opened Project replaces the Edit. Nothing above this layer includes
     a Tracktion header.
 
-    Inserts sit ahead of the track's volume plug-in. A new insert goes at the end
-    of that chain. On a MIDI track, inserting an instrument removes the built-in
-    synth in the same undo step and leaves papercutKind as "midi" (ADR-0011).
+    A track's plug-ins run in this order, ahead of its volume plug-in (the fader):
+    device chain, mixer inserts, aux sends. A mixer insert carries the
+    papercutChain = "mixer" property on its state; anything else before the
+    fader (aux sends and returns and the level meter aside) is on the device
+    chain, so a project saved before the split opens with its old inserts as
+    the device chain, in the same order, sounding the same. The Pre-FX send tap
+    sits at the boundary: after the device chain, before the mixer inserts.
+
+    A new plug-in goes at the end of its chain. On a MIDI track, inserting an
+    instrument into the device chain removes the built-in synth in the same
+    undo step and leaves papercutKind as "midi" (ADR-0011). Mixer inserts take
+    effects only (no instruments, no MIDI effects), at most maxMixerInserts.
 
     Undo is Engine Undo: Ctrl+Z is edit.undo(). A call that would change nothing
     does not start a transaction.
@@ -54,18 +72,32 @@ public:
     /** Names from the engine format manager (VST3, AudioUnit, ...). */
     juce::StringArray getHostedFormats() const;
 
-    /** typeOrIdentifier is a built-in type name (ReverbPlugin::xmlTypeName, ...)
-        or a catalogue path / identifier. */
-    juce::Result insert (const juce::String& trackId, const juce::String& typeOrIdentifier);
+    static constexpr int maxMixerInserts = 8;
 
+    /** Adds a plug-in at the end of a chain. typeOrIdentifier is a built-in type
+        name (ReverbPlugin::xmlTypeName, ...) or a catalogue path / identifier. */
+    juce::Result insert (const juce::String& trackId, const juce::String& typeOrIdentifier,
+                         PluginChain = PluginChain::device);
+
+    /** Removes a plug-in from either chain. */
     bool remove (const juce::String& trackId, const juce::String& pluginId);
 
-    /** newIndex is among inserts only, not counting the volume plug-in. */
+    /** Moves a plug-in within its own chain; newIndex counts that chain only. */
     bool move (const juce::String& trackId, const juce::String& pluginId, int newIndex);
 
-    /** Inserts on the track, in chain order. Excludes the volume plug-in
-        and anything after it (the level meter). */
-    std::vector<PluginInfo> getInserts (const juce::String& trackId) const;
+    /** Bypasses (or re-enables) a plug-in. One undo step. */
+    bool setBypassed (const juce::String& trackId, const juce::String& pluginId, bool bypassed);
+
+    /** Moves a mixer insert to the end of the track's device chain, one undo step (§10.6). */
+    juce::Result moveToDeviceChain (const juce::String& trackId, const juce::String& pluginId);
+
+    /** Puts a copy of a plug-in on another track's mixer chain at index (clamped). */
+    juce::Result copyInsert (const juce::String& fromTrackId, const juce::String& pluginId,
+                             const juce::String& toTrackId, int index);
+
+    /** One chain of the track, in signal order. Never lists the fader, the
+        level meter, aux sends or aux returns. */
+    std::vector<PluginInfo> getChain (const juce::String& trackId, PluginChain) const;
 
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
     std::unique_ptr<juce::Component> createEditor (const juce::String& pluginId);

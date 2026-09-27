@@ -26,7 +26,7 @@ class MixerView : public juce::Component,
 public:
     static constexpr const char* componentId = "mixer";
 
-    MixerView (ApplicationModel&, Mixer&, CommandRegistry&, ThemeManager&);
+    MixerView (ApplicationModel&, Mixer&, PluginRack&, CommandRegistry&, ThemeManager&);
     ~MixerView() override;
 
     void paint (juce::Graphics&) override;
@@ -35,6 +35,7 @@ public:
 private:
     ApplicationModel& model;
     Mixer& mixer;
+    PluginRack& plugins;
     CommandRegistry& commands;
     ThemeManager& themeManager;
 

@@ -163,15 +163,6 @@ struct MixerTests : juce::UnitTest
             expectWithinAbsoluteError ((double) f.mixer.getMasterLevelDb(), ApplicationModel::minVolumeDb, 1.0e-3);
         }
 
-        beginTest ("getInserts on a fresh audio track is empty");
-        {
-            MixerFixture f;
-            f.invoke ("track.add");
-            expect (f.mixer.getInserts (f.model.getTracks()[0].id).empty());
-        }
-
-        // AuxSendPlugin::setMute writes the gain (and the saved pre-mute gain)
-        // through the UndoManager. It is an undo step, unlike track mute.
         beginTest ("Send mute is one undo step, because the engine records the gain");
         {
             SendFixture f;

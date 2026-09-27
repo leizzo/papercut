@@ -8,7 +8,8 @@ namespace papercut
 
 namespace ArgKeys
 {
-    const juce::Identifier trackId ("trackId"), plugin ("plugin"), pluginId ("pluginId"), index ("index");
+    const juce::Identifier trackId ("trackId"), plugin ("plugin"), pluginId ("pluginId"), index ("index"),
+                           chain ("chain"), bypassed ("bypassed"), toTrackId ("toTrackId");
 }
 
 namespace
@@ -52,11 +53,12 @@ namespace
         {
             const auto id = args[ArgKeys::trackId].toString();
             const auto plugin = args[ArgKeys::plugin].toString();
+            const auto chain = args[ArgKeys::chain].toString() == "mixer" ? PluginChain::mixer : PluginChain::device;
 
             if (id.isEmpty() || plugin.isEmpty())
                 report ("Plug-in insert needs a track and a plug-in");
             else
-                report (rack.insert (id, plugin));
+                report (rack.insert (id, plugin, chain));
         }
     };
 
@@ -92,6 +94,39 @@ namespace
                 report ("Couldn't move the plug-in");
         }
     };
+
+    struct SetBypassedCommand : PluginCommand
+    {
+        SetBypassedCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.setBypassed", "Bypass Plug-in", r, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            rack.setBypassed (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
+                              (bool) args[ArgKeys::bypassed]);
+        }
+    };
+
+    struct MoveToDeviceChainCommand : PluginCommand
+    {
+        MoveToDeviceChainCommand (PluginRack& r, AppCommandHost& h)
+            : PluginCommand ("plugin.moveToDeviceChain", "Move to Track Chain", r, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            report (rack.moveToDeviceChain (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString()));
+        }
+    };
+
+    struct CopyInsertCommand : PluginCommand
+    {
+        CopyInsertCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.copyInsert", "Copy Insert", r, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            report (rack.copyInsert (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
+                                     args[ArgKeys::toTrackId].toString(), (int) args[ArgKeys::index]));
+        }
+    };
 }
 
 void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCommandHost& host)
@@ -100,17 +135,21 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     registry.add (std::make_unique<InsertPluginCommand> (rack, host));
     registry.add (std::make_unique<RemovePluginCommand> (rack, host));
     registry.add (std::make_unique<MovePluginCommand> (rack, host));
+    registry.add (std::make_unique<SetBypassedCommand> (rack, host));
+    registry.add (std::make_unique<MoveToDeviceChainCommand> (rack, host));
+    registry.add (std::make_unique<CopyInsertCommand> (rack, host));
 }
 
-juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin)
+juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin, PluginChain chain)
 {
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::trackId, trackId);
     args->setProperty (ArgKeys::plugin, plugin);
+    args->setProperty (ArgKeys::chain, chain == PluginChain::mixer ? "mixer" : "device");
     return args;
 }
 
-juce::var pluginRemoveArgs (const juce::String& trackId, const juce::String& pluginId)
+juce::var pluginArgs (const juce::String& trackId, const juce::String& pluginId)
 {
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::trackId, trackId);
@@ -120,8 +159,23 @@ juce::var pluginRemoveArgs (const juce::String& trackId, const juce::String& plu
 
 juce::var pluginMoveArgs (const juce::String& trackId, const juce::String& pluginId, int index)
 {
-    auto args = pluginRemoveArgs (trackId, pluginId);
+    auto args = pluginArgs (trackId, pluginId);
     args.getDynamicObject()->setProperty (ArgKeys::index, index);
+    return args;
+}
+
+juce::var pluginBypassArgs (const juce::String& trackId, const juce::String& pluginId, bool bypassed)
+{
+    auto args = pluginArgs (trackId, pluginId);
+    args.getDynamicObject()->setProperty (ArgKeys::bypassed, bypassed);
+    return args;
+}
+
+juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& pluginId,
+                          const juce::String& toTrackId, int index)
+{
+    auto args = pluginMoveArgs (fromTrackId, pluginId, index);
+    args.getDynamicObject()->setProperty (ArgKeys::toTrackId, toTrackId);
     return args;
 }
 

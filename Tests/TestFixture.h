@@ -41,4 +41,8 @@ struct Fixture
     int numTracks() const                 { return (int) model.getTracks().size(); }
 };
 
+/** Renders the whole Edit offline, as it plays (honouring mute and solo), and
+    returns the peak level (0 if nothing rendered). */
+float renderPeak (Fixture&);
+
 } // namespace papercut::test

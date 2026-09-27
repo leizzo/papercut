@@ -1,29 +1,40 @@
 #pragma once
 
 #include "CommandRegistry.h"
+#include "Engine/PluginRack.h"
 
 namespace papercut
 {
 
-class PluginRack;
 struct AppCommandHost;
 
 /** Registers the plug-in Commands:
 
     plugin.scan
-    plugin.insert   args: trackId, plugin (a type name or catalogue path)
-    plugin.remove   args: trackId, pluginId
-    plugin.move     args: trackId, pluginId, index
+    plugin.insert             args: trackId, plugin (a type name or catalogue path), chain ("device" | "mixer")
+    plugin.remove             args: trackId, pluginId
+    plugin.move               args: trackId, pluginId, index (within the plug-in's chain)
+    plugin.setBypassed        args: trackId, pluginId, bypassed
+    plugin.moveToDeviceChain  args: trackId, pluginId (a mixer insert)
+    plugin.copyInsert         args: trackId, pluginId, toTrackId, index (on toTrackId's mixer chain)
 */
 void registerPluginCommands (CommandRegistry&, PluginRack&, AppCommandHost&);
 
-/** Arguments for plugin.insert. */
-juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin);
+/** Arguments for plugin.insert: at the end of that chain of the track. */
+juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin,
+                            PluginChain = PluginChain::device);
 
-/** Arguments for plugin.remove. */
-juce::var pluginRemoveArgs (const juce::String& trackId, const juce::String& pluginId);
+/** Arguments naming one plug-in on a track: plugin.remove, plugin.moveToDeviceChain. */
+juce::var pluginArgs (const juce::String& trackId, const juce::String& pluginId);
 
-/** Arguments for plugin.move. index is among that track's inserts. */
+/** Arguments for plugin.move. index is within the plug-in's own chain. */
 juce::var pluginMoveArgs (const juce::String& trackId, const juce::String& pluginId, int index);
+
+/** Arguments for plugin.setBypassed. */
+juce::var pluginBypassArgs (const juce::String& trackId, const juce::String& pluginId, bool bypassed);
+
+/** Arguments for plugin.copyInsert. */
+juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& pluginId,
+                          const juce::String& toTrackId, int index);
 
 } // namespace papercut

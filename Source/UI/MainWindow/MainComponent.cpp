@@ -17,7 +17,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       pluginBrowser (services.commands, services.plugins, services.model, services.themeManager),
       insertStrip (services.commands, services.plugins, services.model, services.themeManager),
       sessionView (services.model, services.session, services.commands, services.themeManager),
-      mixerView (services.model, services.mixer, services.commands, services.themeManager),
+      mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager),
       developerOverlay (services.themeManager)
 {
     // Every Command a layout may name must be registered before layouts build.

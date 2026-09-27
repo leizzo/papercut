@@ -28,7 +28,7 @@ JUCE's menu/keyboard-shortcut command ID. Always spelled in full.
 _Avoid_: Command
 
 **Engine Undo**:
-Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, including a MIDI track, track volume and pan, insert/move/resize/split clip, including a MIDI clip, switching a clip's Take, each Recording as a whole, and adding, deleting, moving, resizing, changing the velocity of, and quantizing a MIDI clip's notes); a continuous gesture such as a fader drag or a velocity drag is one undo step. A clip only moves onto a track of its own kind. Not undoable: transport (including the Loop), selection (clips and notes), zoom, scroll, mute, solo, a track's Input and arming.
+Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, including a MIDI track, track volume and pan, insert/move/resize/split clip, including a MIDI clip, switching a clip's Take, each Recording as a whole, and adding, deleting, moving, resizing, changing the velocity of, and quantizing a MIDI clip's notes; adding, moving, bypassing, copying and removing a plug-in, and moving a Mixer Insert to the Device Chain); a continuous gesture such as a fader drag or a velocity drag is one undo step. A clip only moves onto a track of its own kind. Not undoable: transport (including the Loop), selection (clips and notes), zoom, scroll, mute, solo, a track's Input and arming.
 
 ### Tracks & Clips
 
@@ -87,13 +87,18 @@ The first milestone chain: engine → audio device → empty Edit → audio trac
 The scanned list of plug-ins the user can insert: name, manufacturer, format, path, category. Scanning runs off the UI thread. Built-in engine plug-ins are in the catalogue without a disk scan.
 _Avoid_: plugin database (the on-disk cache is an implementation detail)
 
-**Insert**:
-One plug-in on a track's insert chain, ahead of that track's volume plug-in. A MIDI track has one instrument: inserting an instrument replaces the built-in synth and the track stays a MIDI track.
+**Device Chain**:
+A track's sound: its instrument (on a MIDI track), racks and creative effects, in order, edited only in the detail view. It runs before the Mixer Inserts. A MIDI track has one instrument, in its Device Chain: adding an instrument replaces the built-in synth and the track stays a MIDI track. A project saved before the split opens with its old inserts as the Device Chain.
+_Avoid_: track chain in code (it is the mixer strip's read-only label for the Device Chain), insert chain
+
+**Mixer Insert**:
+One plug-in in a track's mixer insert slots: console processing (EQ, compression, limiting) after the Device Chain and before the sends and fader, edited in the mixer strip. Effects only, at most 8 per track. The mixer never lists Device Chain plug-ins as Mixer Inserts.
+_Avoid_: insert (unqualified), FX slot
 
 ### Mixer
 
 **Return**:
-An audio track whose insert chain starts with an aux return. Sends on other tracks route to it by bus number.
+An audio track whose plug-ins start with an aux return. Sends on other tracks route to it by bus number.
 
 **Bus**:
 A submix folder track. Tracks inside it sum through the folder before the master.

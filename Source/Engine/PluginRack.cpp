@@ -13,6 +13,32 @@ namespace
     /** Same property ApplicationModel writes (ADR-0011). Absent means an audio track. */
     const juce::Identifier trackKindProperty { "papercutKind" };
 
+    /** On a mixer insert's state: "mixer". Absent: the device chain (so older projects' inserts land there). */
+    const juce::Identifier chainProperty { "papercutChain" };
+    const juce::String mixerChainValue { "mixer" };
+
+    PluginChain chainOf (const te::Plugin& plugin)
+    {
+        return plugin.state[chainProperty].toString() == mixerChainValue ? PluginChain::mixer : PluginChain::device;
+    }
+
+    bool isMidiEffectType (const juce::String& type)
+    {
+        return type == te::MidiModifierPlugin::xmlTypeName || type == te::MidiPatchBayPlugin::xmlTypeName;
+    }
+
+    bool isMidiEffect (te::Plugin& plugin)
+    {
+        if (isMidiEffectType (plugin.getPluginType()))
+            return true;
+
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (&plugin))
+            if (auto* instance = external->getAudioPluginInstance())
+                return instance->isMidiEffect();
+
+        return false;
+    }
+
     //==============================================================================
     /** Built-ins registered in PluginManager::initialise. VCA has no getPluginName(),
         and audio tracks reject it, so it stays out of the catalogue. ReWire is off. */
@@ -28,6 +54,7 @@ namespace
         info.path = desc.fileOrIdentifier;
         info.category = desc.category;
         info.instrument = synth;
+        info.midiEffect = isMidiEffectType (info.path);
         return info;
     }
 
@@ -108,6 +135,10 @@ namespace
             info.category = info.instrument ? "Synth" : "Effect";
         }
 
+        info.midiEffect = isMidiEffect (plugin);
+        info.chain = chainOf (plugin);
+        info.enabled = plugin.isEnabled();
+        info.missing = plugin.isMissing();
         return info;
     }
 
@@ -125,41 +156,107 @@ namespace
         return track.state[trackKindProperty].toString() == "midi";
     }
 
-    /** Index of the track fader: the last volume plug-in. Inserts are everything before it. */
-    int indexBeforeVolume (te::AudioTrack& track)
+    /** Routing, not a chain member: aux sends and returns, and meters. */
+    bool isRouting (te::Plugin& plugin)
+    {
+        return dynamic_cast<te::AuxSendPlugin*> (&plugin) != nullptr
+            || dynamic_cast<te::AuxReturnPlugin*> (&plugin) != nullptr
+            || dynamic_cast<te::LevelMeterPlugin*> (&plugin) != nullptr;
+    }
+
+    /** Index of the track fader: the volume plug-in. The chains are before it. */
+    int faderIndex (te::AudioTrack& track)
     {
         if (auto* volume = track.getVolumePlugin())
-        {
-            const int index = track.pluginList.indexOf (volume);
-
-            if (index >= 0)
+            if (const int index = track.pluginList.indexOf (volume); index >= 0)
                 return index;
-        }
 
         return track.pluginList.size();
     }
 
-    struct InsertChain
+    /** A track's two chains, in signal order. */
+    struct Chains
     {
         te::AudioTrack* track = nullptr;
-        std::vector<te::Plugin::Ptr> inserts;
+        std::vector<te::Plugin::Ptr> device, mixer;
+
+        std::vector<te::Plugin::Ptr>& operator[] (PluginChain c)   { return c == PluginChain::mixer ? mixer : device; }
+
+        te::Plugin::Ptr find (const juce::String& pluginId) const
+        {
+            for (auto* list : { &device, &mixer })
+                for (auto& plugin : *list)
+                    if (plugin->itemID.toString() == pluginId)
+                        return plugin;
+
+            return {};
+        }
+
+        /** Where a plug-in appended to a chain goes in the track's plug-in list:
+            after that chain's last member; for an empty chain, after the device
+            chain (a mixer insert) and before the next send or the fader. */
+        int endIndex (PluginChain chain) const
+        {
+            auto& list = track->pluginList;
+            auto& members = chain == PluginChain::mixer ? mixer : device;
+
+            if (! members.empty())
+                return list.indexOf (members.back().get()) + 1;
+
+            int start = 0;
+
+            if (chain == PluginChain::mixer && ! device.empty())
+                start = list.indexOf (device.back().get()) + 1;
+
+            const int fader = faderIndex (*track);
+
+            for (int i = start; i < fader; ++i)
+            {
+                auto* plugin = list[i];
+
+                if (dynamic_cast<te::AuxSendPlugin*> (plugin) != nullptr
+                    || (chain == PluginChain::device && chainOf (*plugin) == PluginChain::mixer))
+                    return i;
+            }
+
+            return fader;
+        }
+
+        /** Where a plug-in at position index of a chain goes (past the end: endIndex). */
+        int indexFor (PluginChain chain, int index) const
+        {
+            auto& members = chain == PluginChain::mixer ? mixer : device;
+
+            if (juce::isPositiveAndBelow (index, (int) members.size()))
+                return track->pluginList.indexOf (members[(size_t) index].get());
+
+            return endIndex (chain);
+        }
     };
 
-    InsertChain chainFor (te::Edit& edit, const juce::String& trackId)
+    Chains chainsFor (te::Edit& edit, const juce::String& trackId)
     {
-        InsertChain chain;
-        chain.track = findTrack (edit, trackId);
+        Chains chains;
+        chains.track = findTrack (edit, trackId);
 
-        if (chain.track == nullptr)
-            return chain;
+        if (chains.track == nullptr)
+            return chains;
 
-        const int end = indexBeforeVolume (*chain.track);
+        const int end = faderIndex (*chains.track);
 
         for (int i = 0; i < end; ++i)
-            if (auto* plugin = chain.track->pluginList[i])
-                chain.inserts.push_back (plugin);
+            if (auto* plugin = chains.track->pluginList[i]; plugin != nullptr && ! isRouting (*plugin))
+                chains[chainOf (*plugin)].push_back (plugin);
 
-        return chain;
+        return chains;
+    }
+
+    juce::String mixerRefusal (bool instrument, bool midiEffect)
+    {
+        if (instrument || midiEffect)
+            return "Mixer inserts take effects only";
+
+        return {};
     }
 
     bool findExternal (te::Engine& engine, const juce::String& typeOrIdentifier, juce::PluginDescription& out)
@@ -330,7 +427,7 @@ juce::StringArray PluginRack::getHostedFormats() const
     return names;
 }
 
-juce::Result PluginRack::insert (const juce::String& trackId, const juce::String& typeOrIdentifier)
+juce::Result PluginRack::insert (const juce::String& trackId, const juce::String& typeOrIdentifier, PluginChain chain)
 {
     auto& edit = projectManager.getEdit();
     auto* track = findTrack (edit, trackId);
@@ -351,6 +448,21 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     if (! builtIn && ! haveExternal)
         return juce::Result::fail ("Unknown plug-in");
 
+    if (chain == PluginChain::mixer)
+    {
+        if ((int) chainsFor (edit, trackId).mixer.size() >= maxMixerInserts)
+            return juce::Result::fail ("A track holds at most " + juce::String (maxMixerInserts) + " mixer inserts");
+
+        // What the catalogue already knows is refused before anything is created.
+        for (const auto& info : builtInCatalogue())
+            if (info.path == typeOrIdentifier)
+                if (auto refusal = mixerRefusal (info.instrument, info.midiEffect); refusal.isNotEmpty())
+                    return juce::Result::fail (refusal);
+
+        if (haveExternal && external.isInstrument)
+            return juce::Result::fail (mixerRefusal (true, false));
+    }
+
     // Creation writes default parameter state through the Edit undo manager,
     // so it has to land in the same transaction as the insert (and, on a MIDI
     // track, the removal of the built-in synth).
@@ -365,7 +477,14 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     if (! track->canContainPlugin (plugin.get()))
         return juce::Result::fail ("This track can't hold that plug-in");
 
-    if (isMidiTrack (*track) && plugin->isSynth())
+    if (chain == PluginChain::mixer)
+    {
+        if (auto refusal = mixerRefusal (plugin->isSynth(), isMidiEffect (*plugin)); refusal.isNotEmpty())
+            return juce::Result::fail (refusal);
+
+        plugin->state.setProperty (chainProperty, mixerChainValue, &edit.getUndoManager());
+    }
+    else if (isMidiTrack (*track) && plugin->isSynth())
     {
         std::vector<te::Plugin::Ptr> replaced;
 
@@ -377,8 +496,7 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
             existing->deleteFromParent();
     }
 
-    const int index = indexBeforeVolume (*track);
-    track->pluginList.insertPlugin (plugin, index, nullptr);
+    track->pluginList.insertPlugin (plugin, chainsFor (edit, trackId).endIndex (chain), nullptr);
 
     if (track->pluginList.indexOf (plugin.get()) < 0)
         return juce::Result::fail ("Couldn't insert the plug-in");
@@ -389,22 +507,9 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
 bool PluginRack::remove (const juce::String& trackId, const juce::String& pluginId)
 {
     auto& edit = projectManager.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto plugin = chainsFor (edit, trackId).find (pluginId);
 
-    if (track == nullptr || pluginId.isEmpty())
-        return false;
-
-    te::Plugin::Ptr plugin;
-
-    for (auto* candidate : track->pluginList)
-        if (candidate->itemID.toString() == pluginId)
-            plugin = candidate;
-
-    if (plugin == nullptr)
-        return false;
-
-    // The fader and the meter after it are not inserts.
-    if (plugin.get() == track->getVolumePlugin() || plugin.get() == track->getLevelMeterPlugin())
+    if (pluginId.isEmpty() || plugin == nullptr)
         return false;
 
     edit.getUndoManager().beginNewTransaction ("Remove Plug-in");
@@ -415,37 +520,97 @@ bool PluginRack::remove (const juce::String& trackId, const juce::String& plugin
 bool PluginRack::move (const juce::String& trackId, const juce::String& pluginId, int newIndex)
 {
     auto& edit = projectManager.getEdit();
-    auto chain = chainFor (edit, trackId);
+    auto chains = chainsFor (edit, trackId);
+    auto plugin = chains.find (pluginId);
 
-    if (chain.track == nullptr)
+    if (plugin == nullptr)
         return false;
 
-    int from = -1;
+    const auto chain = chainOf (*plugin);
+    auto& members = chains[chain];
+    const auto from = (int) std::distance (members.begin(), std::find (members.begin(), members.end(), plugin));
 
-    for (int i = 0; i < (int) chain.inserts.size(); ++i)
-        if (chain.inserts[(size_t) i]->itemID.toString() == pluginId)
-            from = i;
-
-    if (from < 0 || newIndex < 0 || newIndex >= (int) chain.inserts.size() || newIndex == from)
+    if (newIndex < 0 || newIndex >= (int) members.size() || newIndex == from)
         return false;
 
-    auto plugin = chain.inserts[(size_t) from];
     edit.getUndoManager().beginNewTransaction ("Move Plug-in");
     plugin->removeFromParent();
-    chain.track->pluginList.insertPlugin (plugin, newIndex, nullptr);
-    return chain.track->pluginList.indexOf (plugin.get()) == newIndex;
+
+    auto remaining = chainsFor (edit, trackId);
+    chains.track->pluginList.insertPlugin (plugin, remaining.indexFor (chain, newIndex), nullptr);
+    return chains.track->pluginList.indexOf (plugin.get()) >= 0;
 }
 
-std::vector<PluginInfo> PluginRack::getInserts (const juce::String& trackId) const
+bool PluginRack::setBypassed (const juce::String& trackId, const juce::String& pluginId, bool bypassed)
 {
-    std::vector<PluginInfo> inserts;
-    auto chain = chainFor (projectManager.getEdit(), trackId);
+    auto& edit = projectManager.getEdit();
+    auto plugin = chainsFor (edit, trackId).find (pluginId);
 
-    for (auto& plugin : chain.inserts)
-        if (plugin != nullptr)
-            inserts.push_back (infoFromPlugin (*plugin));
+    if (plugin == nullptr || plugin->isEnabled() == ! bypassed || ! plugin->canBeDisabled())
+        return false;
 
-    return inserts;
+    edit.getUndoManager().beginNewTransaction (bypassed ? "Bypass Plug-in" : "Enable Plug-in");
+    plugin->setEnabled (! bypassed);
+    return true;
+}
+
+juce::Result PluginRack::moveToDeviceChain (const juce::String& trackId, const juce::String& pluginId)
+{
+    auto& edit = projectManager.getEdit();
+    auto chains = chainsFor (edit, trackId);
+    auto plugin = chains.find (pluginId);
+
+    if (plugin == nullptr || chainOf (*plugin) != PluginChain::mixer)
+        return juce::Result::fail ("That plug-in isn't a mixer insert");
+
+    auto& um = edit.getUndoManager();
+    um.beginNewTransaction ("Move to Track Chain");
+    plugin->removeFromParent();
+    plugin->state.removeProperty (chainProperty, &um);
+    chains.track->pluginList.insertPlugin (plugin, chainsFor (edit, trackId).endIndex (PluginChain::device), nullptr);
+    return juce::Result::ok();
+}
+
+juce::Result PluginRack::copyInsert (const juce::String& fromTrackId, const juce::String& pluginId,
+                                     const juce::String& toTrackId, int index)
+{
+    auto& edit = projectManager.getEdit();
+    auto source = chainsFor (edit, fromTrackId).find (pluginId);
+    auto target = chainsFor (edit, toTrackId);
+
+    if (source == nullptr || target.track == nullptr)
+        return juce::Result::fail ("No such plug-in or track");
+
+    if ((int) target.mixer.size() >= maxMixerInserts)
+        return juce::Result::fail ("A track holds at most " + juce::String (maxMixerInserts) + " mixer inserts");
+
+    if (auto refusal = mixerRefusal (source->isSynth(), isMidiEffect (*source)); refusal.isNotEmpty())
+        return juce::Result::fail (refusal);
+
+    source->flushPluginStateToValueTree();
+    auto state = source->state.createCopy();
+    te::EditItemID::remapIDs (state, nullptr, edit);
+    state.setProperty (chainProperty, mixerChainValue, nullptr);
+
+    edit.getUndoManager().beginNewTransaction ("Copy Plug-in");
+    auto copy = edit.getPluginCache().createNewPlugin (state);
+
+    if (copy == nullptr)
+        return juce::Result::fail ("Couldn't copy the plug-in");
+
+    target.track->pluginList.insertPlugin (copy, target.indexFor (PluginChain::mixer, juce::jmax (0, index)), nullptr);
+    return juce::Result::ok();
+}
+
+std::vector<PluginInfo> PluginRack::getChain (const juce::String& trackId, PluginChain chain) const
+{
+    std::vector<PluginInfo> result;
+    auto chains = chainsFor (projectManager.getEdit(), trackId);
+
+    for (auto& plugin : chains[chain])
+        result.push_back (infoFromPlugin (*plugin));
+
+    return result;
 }
 
 std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& pluginId)

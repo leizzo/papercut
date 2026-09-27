@@ -152,7 +152,7 @@ void InsertStrip::refresh()
         selectedPluginId.clear();
     }
 
-    const auto inserts = trackId.isNotEmpty() ? rack.getInserts (trackId) : std::vector<PluginInfo>{};
+    const auto inserts = trackId.isNotEmpty() ? rack.getChain (trackId, PluginChain::device) : std::vector<PluginInfo>{};
     auto stillThere = false;
 
     for (const auto& insert : inserts)
@@ -182,7 +182,7 @@ void InsertStrip::selectPlugin (const juce::String& pluginId)
 void InsertStrip::removePlugin (const juce::String& pluginId)
 {
     if (shownTrackId.isNotEmpty() && pluginId.isNotEmpty())
-        commands.invoke ("plugin.remove", pluginRemoveArgs (shownTrackId, pluginId));
+        commands.invoke ("plugin.remove", pluginArgs (shownTrackId, pluginId));
 }
 
 } // namespace papercut

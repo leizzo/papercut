@@ -60,7 +60,7 @@ struct PluginRackTests : juce::UnitTest
         }
 
         //==============================================================================
-        beginTest ("Inserting the built-in reverb on an audio track lists it in getInserts, and edit.undo removes it");
+        beginTest ("Inserting the built-in reverb on an audio track lists it on the device chain, and edit.undo removes it");
         {
             Plugins f;
             f.invoke ("track.add");
@@ -68,14 +68,14 @@ struct PluginRackTests : juce::UnitTest
 
             f.invoke ("plugin.insert", pluginInsertArgs (id, te::ReverbPlugin::xmlTypeName));
 
-            const auto inserts = f.rack.getInserts (id);
+            const auto inserts = f.rack.getChain (id, PluginChain::device);
             expectEquals ((int) inserts.size(), 1);
             expectEquals (inserts[0].path, juce::String (te::ReverbPlugin::xmlTypeName));
             expect (inserts[0].id.isNotEmpty());
             expect (! inserts[0].instrument);
 
             f.invoke ("edit.undo");
-            expectEquals ((int) f.rack.getInserts (id).size(), 0);
+            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 0);
             expectEquals (f.numTracks(), 1);
         }
 
@@ -86,22 +86,22 @@ struct PluginRackTests : juce::UnitTest
             const auto id = f.trackId();
 
             f.invoke ("plugin.insert", pluginInsertArgs (id, te::ReverbPlugin::xmlTypeName));
-            expectEquals ((int) f.rack.getInserts (id).size(), 1);
-            const auto pluginId = f.rack.getInserts (id)[0].id;
+            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 1);
+            const auto pluginId = f.rack.getChain (id, PluginChain::device)[0].id;
 
-            f.invoke ("plugin.remove", pluginRemoveArgs (id, pluginId));
-            expectEquals ((int) f.rack.getInserts (id).size(), 0);
+            f.invoke ("plugin.remove", pluginArgs (id, pluginId));
+            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 0);
             expectEquals (f.numTracks(), 1);
 
             // Undo the remove and the insert, leaving only track.add.
             expect (f.undoOnce());
-            expectEquals ((int) f.rack.getInserts (id).size(), 1);
+            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 1);
             expect (f.undoOnce());
-            expectEquals ((int) f.rack.getInserts (id).size(), 0);
+            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 0);
             expectEquals (f.numTracks(), 1);
 
-            f.invoke ("plugin.remove", pluginRemoveArgs (id, "no-such-plugin"));
-            f.invoke ("plugin.remove", pluginRemoveArgs ("no-such-track", pluginId));
+            f.invoke ("plugin.remove", pluginArgs (id, "no-such-plugin"));
+            f.invoke ("plugin.remove", pluginArgs ("no-such-track", pluginId));
             f.invoke ("plugin.remove");
 
             expect (f.undoOnce());
@@ -117,19 +117,19 @@ struct PluginRackTests : juce::UnitTest
             f.invoke ("plugin.insert", pluginInsertArgs (id, te::ReverbPlugin::xmlTypeName));
             f.invoke ("plugin.insert", pluginInsertArgs (id, te::DelayPlugin::xmlTypeName));
 
-            auto inserts = f.rack.getInserts (id);
+            auto inserts = f.rack.getChain (id, PluginChain::device);
             expectEquals ((int) inserts.size(), 2);
             expectEquals (inserts[0].path, juce::String (te::ReverbPlugin::xmlTypeName));
             expectEquals (inserts[1].path, juce::String (te::DelayPlugin::xmlTypeName));
 
             f.invoke ("plugin.move", pluginMoveArgs (id, inserts[1].id, 0));
 
-            inserts = f.rack.getInserts (id);
+            inserts = f.rack.getChain (id, PluginChain::device);
             expectEquals (inserts[0].path, juce::String (te::DelayPlugin::xmlTypeName));
             expectEquals (inserts[1].path, juce::String (te::ReverbPlugin::xmlTypeName));
 
             f.invoke ("edit.undo");
-            inserts = f.rack.getInserts (id);
+            inserts = f.rack.getChain (id, PluginChain::device);
             expectEquals (inserts[0].path, juce::String (te::ReverbPlugin::xmlTypeName));
             expectEquals (inserts[1].path, juce::String (te::DelayPlugin::xmlTypeName));
             expectEquals (f.numTracks(), 1);
@@ -142,14 +142,14 @@ struct PluginRackTests : juce::UnitTest
             const auto id = f.trackId();
 
             expect (f.model.getTracks()[0].kind == TrackKind::midi);
-            expectEquals (instrumentCount (f.rack.getInserts (id)), 1);
-            expect (hasPath (f.rack.getInserts (id), te::FourOscPlugin::xmlTypeName));
+            expectEquals (instrumentCount (f.rack.getChain (id, PluginChain::device)), 1);
+            expect (hasPath (f.rack.getChain (id, PluginChain::device), te::FourOscPlugin::xmlTypeName));
 
             // An effect leaves the built-in synth in place.
             f.invoke ("plugin.insert", pluginInsertArgs (id, te::ReverbPlugin::xmlTypeName));
-            expectEquals (instrumentCount (f.rack.getInserts (id)), 1);
-            expect (hasPath (f.rack.getInserts (id), te::FourOscPlugin::xmlTypeName));
-            expect (hasPath (f.rack.getInserts (id), te::ReverbPlugin::xmlTypeName));
+            expectEquals (instrumentCount (f.rack.getChain (id, PluginChain::device)), 1);
+            expect (hasPath (f.rack.getChain (id, PluginChain::device), te::FourOscPlugin::xmlTypeName));
+            expect (hasPath (f.rack.getChain (id, PluginChain::device), te::ReverbPlugin::xmlTypeName));
 
             juce::String instrument (te::FourOscPlugin::xmlTypeName);
 
@@ -161,18 +161,18 @@ struct PluginRackTests : juce::UnitTest
                 }
 
             f.invoke ("plugin.insert", pluginInsertArgs (id, instrument));
-            expectEquals (instrumentCount (f.rack.getInserts (id)), 1);
-            expect (hasPath (f.rack.getInserts (id), instrument));
+            expectEquals (instrumentCount (f.rack.getChain (id, PluginChain::device)), 1);
+            expect (hasPath (f.rack.getChain (id, PluginChain::device), instrument));
             expect (f.model.getTracks()[0].kind == TrackKind::midi);
 
             if (instrument != te::FourOscPlugin::xmlTypeName)
-                expect (! hasPath (f.rack.getInserts (id), te::FourOscPlugin::xmlTypeName));
+                expect (! hasPath (f.rack.getChain (id, PluginChain::device), te::FourOscPlugin::xmlTypeName));
 
             // The replacement, including removal of the previous instrument, is one undo step.
             f.invoke ("edit.undo");
-            expectEquals (instrumentCount (f.rack.getInserts (id)), 1);
-            expect (hasPath (f.rack.getInserts (id), te::FourOscPlugin::xmlTypeName));
-            expect (hasPath (f.rack.getInserts (id), te::ReverbPlugin::xmlTypeName));
+            expectEquals (instrumentCount (f.rack.getChain (id, PluginChain::device)), 1);
+            expect (hasPath (f.rack.getChain (id, PluginChain::device), te::FourOscPlugin::xmlTypeName));
+            expect (hasPath (f.rack.getChain (id, PluginChain::device), te::ReverbPlugin::xmlTypeName));
             expectEquals (f.numTracks(), 1);
             expect (f.model.getTracks()[0].kind == TrackKind::midi);
         }

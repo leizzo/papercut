@@ -2,6 +2,7 @@
 
 #include "Engine/ApplicationModel.h"
 #include "Engine/Mixer.h"
+#include "Engine/PluginRack.h"
 
 #include <memory>
 #include <vector>
@@ -21,9 +22,9 @@ class ChannelStrip : public juce::Component
 {
 public:
     ChannelStrip (CommandRegistry&, ThemeManager&, const TrackInfo&,
-                  const std::vector<SendInfo>&, const std::vector<InsertSummary>&);
+                  const std::vector<SendInfo>&, const std::vector<PluginInfo>&);
 
-    void setState (const TrackInfo&, const std::vector<SendInfo>&, const std::vector<InsertSummary>&);
+    void setState (const TrackInfo&, const std::vector<SendInfo>&, const std::vector<PluginInfo>&);
 
     /** Peak from the track's level meter, in dB. */
     void setLevelDb (float db);
@@ -79,7 +80,7 @@ private:
     std::vector<std::unique_ptr<juce::Label>> insertLabels;
 
     void rebuildSends (const std::vector<SendInfo>&);
-    void rebuildInserts (const std::vector<InsertSummary>&);
+    void rebuildInserts (const std::vector<PluginInfo>&);
 };
 
 } // namespace papercut

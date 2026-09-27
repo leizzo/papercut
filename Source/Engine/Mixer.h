@@ -41,12 +41,6 @@ struct MasterInfo
     double pan = 0;
 };
 
-/** A plug-in on a track's insert chain, ahead of that track's volume plug-in. */
-struct InsertSummary
-{
-    juce::String id, name;
-};
-
 /** Facade over the current Edit's returns, sends, submix buses and master fader
     (ADR-0001, ADR-0012). Owns none of that state. Re-reads ProjectManager::getEdit()
     on every call. Nothing above this layer sees a Tracktion header.
@@ -104,10 +98,6 @@ public:
     /** Master fader, not a track fader. continuesGesture as for setSendGain. */
     bool setMasterVolume (double db, bool continuesGesture = false);
     bool setMasterPan (double pan, bool continuesGesture = false);
-
-    /** Inserts ahead of the track's volume plug-in. The volume plug-in, the
-        level meter after it, and aux send/return routing are not inserts. */
-    std::vector<InsertSummary> getInserts (const juce::String& trackId) const;
 
 private:
     struct MeterState;
