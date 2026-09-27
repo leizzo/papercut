@@ -147,6 +147,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "mute", &Theme::mute }, { "solo", &Theme::solo }, { "armed", &Theme::armed },
         { "recording", &Theme::recording }, { "loop", &Theme::loop },
         { "clip", &Theme::clip }, { "clipSelected", &Theme::clipSelected }, { "clipText", &Theme::clipText }, { "waveform", &Theme::waveform },
+        { "midiClip", &Theme::midiClip }, { "midiClipSelected", &Theme::midiClipSelected }, { "midiNote", &Theme::midiNote },
         { "ruler", &Theme::ruler }, { "playhead", &Theme::playhead }, { "error", &Theme::error },
     };
 
@@ -158,6 +159,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "inset", &LayoutMetrics::inset }, { "textPadding", &LayoutMetrics::textPadding },
         { "playheadWidth", &LayoutMetrics::playheadWidth }, { "clipResizeHandleWidth", &LayoutMetrics::clipResizeHandleWidth },
         { "trackControlHeight", &LayoutMetrics::trackControlHeight }, { "trackButtonWidth", &LayoutMetrics::trackButtonWidth },
+        { "midiNoteHeight", &LayoutMetrics::midiNoteHeight },
     };
 
     Theme newTheme;

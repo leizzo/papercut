@@ -100,6 +100,12 @@ namespace
         void execute (const juce::var&) override   { model.addAudioTrack(); }
     };
 
+    struct AddMidiTrackCommand : ModelCommand
+    {
+        AddMidiTrackCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.addMidi", "Add MIDI Track", m, h) {}
+        void execute (const juce::var&) override   { model.addMidiTrack(); }
+    };
+
     struct RemoveTrackCommand : ModelCommand
     {
         RemoveTrackCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.remove", "Remove Track", m, h) {}
@@ -170,6 +176,12 @@ namespace
         {
             host.chooseAudioFile ([this] (const juce::File& f) { report (model.insertAudioClip (f)); });
         }
+    };
+
+    struct AddMidiClipCommand : ModelCommand
+    {
+        AddMidiClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.addMidi", "Add MIDI Clip", m, h) {}
+        void execute (const juce::var&) override   { report (model.insertMidiClip()); }
     };
 
     /** A drag in the Arrangement. */
@@ -319,6 +331,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::move (saveAs));
 
     registry.add (std::make_unique<AddTrackCommand> (model, host));
+    registry.add (std::make_unique<AddMidiTrackCommand> (model, host));
     registry.add (std::make_unique<RemoveTrackCommand> (model, host));
     registry.add (std::make_unique<SetTrackVolumeCommand> (model, host));
     registry.add (std::make_unique<SetTrackPanCommand> (model, host));
@@ -330,6 +343,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
                                                             [] (const TrackInfo& t) { return t.armed; }, &ApplicationModel::setTrackArmed));
     registry.add (std::make_unique<SetTrackInputCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
+    registry.add (std::make_unique<AddMidiClipCommand> (model, host));
     registry.add (std::make_unique<MoveClipCommand> (model, host));
     registry.add (std::make_unique<ResizeClipCommand> (model, host));
     registry.add (std::make_unique<SplitClipCommand> (model, host));

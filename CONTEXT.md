@@ -28,7 +28,21 @@ JUCE's menu/keyboard-shortcut command ID. Always spelled in full.
 _Avoid_: Command
 
 **Engine Undo**:
-Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, track volume and pan, insert/move/resize/split clip, switching a clip's Take, and each Recording as a whole); a continuous gesture such as a fader drag is one undo step. Not undoable: transport (including the Loop), selection, zoom, scroll, mute, solo, a track's Input and arming.
+Tracktion's built-in ValueTree undo via `te::Edit`'s `juce::UndoManager`. Ctrl+Z delegates here. Undoable: model mutations (add/remove track, including a MIDI track, track volume and pan, insert/move/resize/split clip, including a MIDI clip, switching a clip's Take, and each Recording as a whole); a continuous gesture such as a fader drag is one undo step. A clip only moves onto a track of its own kind. Not undoable: transport (including the Loop), selection, zoom, scroll, mute, solo, a track's Input and arming.
+
+### Tracks & Clips
+
+**Track Kind**:
+Audio or MIDI. A track holds clips of its own kind.
+_Avoid_: track type
+
+**MIDI Track**:
+A track of kind MIDI. It holds MIDI clips.
+_Avoid_: instrument track
+
+**MIDI Clip**:
+A clip of MIDI notes on a MIDI track. It has no audio file.
+_Avoid_: pattern, sequence
 
 ### Recording
 

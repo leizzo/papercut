@@ -30,10 +30,10 @@ struct AppCommandHost
 /** Registers every model-facing Command:
 
     project.new  project.open  project.save  project.saveAs
-    track.add    track.remove
+    track.add    track.addMidi   track.remove
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
     track.setInput   track.toggleArm
-    clip.add     clip.move     clip.resize   clip.split   clip.setTake
+    clip.add     clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
     edit.undo    edit.redo
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
     transport.setPosition

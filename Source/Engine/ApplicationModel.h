@@ -11,6 +11,18 @@ namespace papercut
 
 class ProjectManager;
 
+/** Audio or MIDI. A track holds clips of its own kind (brief §5). */
+enum class TrackKind { audio, midi };
+
+/** One note of a MIDI clip, for the Arrangement's compact preview.
+    Times are within the clip, after its offset. */
+struct MidiNoteInfo
+{
+    int pitch = 0;              ///< 0..127
+    double startSeconds = 0;    ///< from the clip's start
+    double lengthSeconds = 0;
+};
+
 /** Read-only snapshot of a clip, for views. */
 struct ClipInfo
 {
@@ -18,19 +30,22 @@ struct ClipInfo
     juce::String name;
     double startSeconds = 0;
     double lengthSeconds = 0;
-    double sourceOffsetSeconds = 0;   ///< where in the source file the clip starts
-    double sourceLengthSeconds = 0;   ///< how long the source audio lasts on the timeline
+    double sourceOffsetSeconds = 0;   ///< where in the source the clip starts
+    double sourceLengthSeconds = 0;   ///< how far the clip can extend (the source audio, or the Edit, for MIDI)
     juce::File file;
     bool selected = false;
     int numTakes = 0;       ///< passes of a loop recording; 0 for a clip without takes
     int currentTake = -1;   ///< the take playing, or -1
+    TrackKind kind = TrackKind::audio;
+    std::vector<MidiNoteInfo> notes;
 };
 
-/** Read-only snapshot of an audio track, for views. */
+/** Read-only snapshot of a track, for views. */
 struct TrackInfo
 {
     juce::String id;
     juce::String name;
+    TrackKind kind = TrackKind::audio;
     bool selected = false;
     double volumeDb = 0;   ///< ApplicationModel::minVolumeDb is silence
     double pan = 0;        ///< -1 (left) to 1 (right)
@@ -60,10 +75,11 @@ struct TimeRangeSeconds
     Exposes app-level operations and read-only snapshots; owns no track or clip
     state of its own. Nothing above this layer sees a Tracktion header.
 
-    Undoable (Engine Undo): adding/removing tracks, track volume and pan, and
-    inserting, moving, resizing and splitting clips, switching a clip's take, and
-    each recording — one undo step per call that changes something. Never
-    undoable: transport (including the loop), selection, mute, solo, track input
+    Undoable (Engine Undo): adding/removing tracks (audio and MIDI), track volume
+    and pan, and inserting, moving, resizing and splitting clips, switching a
+    clip's take, and each recording — one undo step per call that changes
+    something. A clip only moves onto a track of its own kind. Not undoable:
+    transport (including the loop), selection, mute, solo, track input
     and arming (the engine keeps mute, solo and inputs out of its UndoManager). The track and clip
     operations return false, recording no undo step, when they would change
     nothing (unknown clip or track, same value or position, empty range).
@@ -95,6 +111,9 @@ public:
     //==============================================================================
     // Model mutations (each one is a single Engine Undo step)
     void addAudioTrack();
+
+    /** Adds a MIDI track: an audio track marked MIDI, with the built-in instrument (ADR-0011). */
+    void addMidiTrack();
 
     /** Removes the selected track, or the last one if none is selected.
         Returns false if there is no track to remove. */
@@ -132,9 +151,16 @@ public:
     /** The engine's fader range; minVolumeDb is silence. */
     static constexpr double minVolumeDb = -100.0, maxVolumeDb = 6.0;
 
-    /** Inserts the file as a clip at the end of the selected track, or the
-        selected clip's track (or the first track, creating one if the Edit has none). */
+    /** Inserts the file as a clip at the end of the selected audio track, or the
+        selected clip's track, or the first audio track — creating one if the Edit
+        has none. Fails, changing nothing, when that track is a MIDI track. */
     juce::Result insertAudioClip (const juce::File&);
+
+    /** Inserts an empty MIDI clip at the playhead, one bar long, on the selected
+        MIDI track, or the selected MIDI clip's track, or the first MIDI track
+        when nothing is selected. Fails, changing nothing, when the selected
+        track is not a MIDI track or the Edit has none. */
+    juce::Result insertMidiClip();
 
     /** Moves a clip to start at startSeconds (clamped to the Edit start), onto
         the track trackId if given. */

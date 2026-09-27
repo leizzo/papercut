@@ -28,6 +28,14 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     te::Edit& edit() const          { return projectManager.getEdit(); }
     juce::UndoManager& undoManager() { return edit().getUndoManager(); }
 
+    /** App-specific, on the track's ValueTree (ADR-0001). Absent means audio. */
+    static const juce::Identifier trackKindProperty;
+
+    bool isMidiTrack (const te::Track& track) const
+    {
+        return track.state[trackKindProperty].toString() == "midi";
+    }
+
     //==============================================================================
     /** Must wrap every replacement of the current Edit. */
     template <typename Fn>
@@ -212,19 +220,19 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         return nullptr;
     }
 
-    te::WaveAudioClip* findClip (const juce::String& id) const
+    te::Clip* findClip (const juce::String& id) const
     {
         for (auto* t : te::getAudioTracks (edit()))
             for (auto* c : t->getClips())
                 if (c->itemID.toString() == id)
-                    return dynamic_cast<te::WaveAudioClip*> (c);
+                    return c;
 
         return nullptr;
     }
 
-    te::WaveAudioClip* selectedClip() const
+    te::Clip* selectedClip() const
     {
-        auto selected = selectionManager.getItemsOfType<te::WaveAudioClip>();
+        auto selected = selectionManager.getItemsOfType<te::Clip>();
         return selected.isEmpty() ? nullptr : selected.getFirst();
     }
 
@@ -232,6 +240,58 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     {
         auto selected = selectionManager.getItemsOfType<te::AudioTrack>();
         return selected.isEmpty() ? nullptr : selected.getFirst();
+    }
+
+    ClipInfo midiClipInfo (const te::MidiClip& clip) const
+    {
+        const auto pos = clip.getPosition();
+        const auto clipStart = pos.getStart();
+        const auto clipEnd = pos.getEnd();
+
+        ClipInfo info;
+        info.id = clip.itemID.toString();
+        info.name = clip.getName();
+        info.startSeconds = clipStart.inSeconds();
+        info.lengthSeconds = pos.getLength().inSeconds();
+        info.sourceOffsetSeconds = pos.getOffset().inSeconds();
+        // MidiClip::getMaximumLength is the Edit's maximum end, and it isn't const.
+        info.sourceLengthSeconds = te::Edit::getMaximumEditEnd().inSeconds();
+        info.selected = selectionManager.isSelected (&clip);
+        info.kind = TrackKind::midi;
+
+        for (auto* note : clip.getSequence().getNotes())
+        {
+            const auto range = note->getEditTimeRange (clip);
+            const auto start = std::max (range.getStart(), clipStart);
+            const auto end = std::min (range.getEnd(), clipEnd);
+
+            if (end <= start)
+                continue;
+
+            info.notes.push_back ({ note->getNoteNumber(),
+                                    (start - clipStart).inSeconds(),
+                                    (end - start).inSeconds() });
+        }
+
+        return info;
+    }
+
+    /** One bar after start, at the Edit's tempo, keeping the beat within the bar. */
+    te::TimePosition oneBarAfter (te::TimePosition start) const
+    {
+        auto& tempo = edit().tempoSequence;
+        auto bars = tempo.toBarsAndBeats (start);
+        ++bars.bars;
+        return tempo.toTime (bars);
+    }
+
+    te::AudioTrack* firstMidiTrack() const
+    {
+        for (auto* t : te::getAudioTracks (edit()))
+            if (isMidiTrack (*t))
+                return t;
+
+        return nullptr;
     }
 
     /** Where a new clip goes: the selected track, or the selected clip's track. */
@@ -332,11 +392,30 @@ bool ApplicationModel::isProjectUntitled() const        { return impl->projectMa
 juce::String ApplicationModel::getProjectName() const   { return impl->projectManager.getProjectName(); }
 
 //==============================================================================
+const juce::Identifier ApplicationModel::Impl::trackKindProperty { "papercutKind" };
+
 void ApplicationModel::addAudioTrack()
 {
     auto& edit = impl->edit();
     impl->beginUndoStep ("Add Track");
     edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr);
+}
+
+void ApplicationModel::addMidiTrack()
+{
+    auto& edit = impl->edit();
+    impl->beginUndoStep ("Add MIDI Track");
+    auto track = edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr);
+
+    if (track == nullptr)
+        return;
+
+    // Kind is a property, not "whichever synth is loaded": Phase 6 replaces the synth (ADR-0011).
+    track->state.setProperty (Impl::trackKindProperty, "midi", &impl->undoManager());
+
+    // Ahead of the volume plugin, so the track's fader still applies.
+    if (auto plugin = edit.getPluginCache().createNewPlugin (te::FourOscPlugin::xmlTypeName, {}))
+        track->pluginList.insertPlugin (plugin, 0, nullptr);
 }
 
 bool ApplicationModel::removeTrack()
@@ -454,15 +533,27 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     if (! audioFile.isValid())
         return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
 
-    impl->beginUndoStep ("Insert Clip");
-
     auto* track = impl->insertionTrack();
 
+    if (track != nullptr && impl->isMidiTrack (*track))
+        return juce::Result::fail ("Audio clips go on audio tracks");
+
+    impl->beginUndoStep ("Insert Clip");
+
     if (track == nullptr)
-    {
-        edit.ensureNumberOfAudioTracks (1);
-        track = te::getAudioTracks (edit).getFirst();
-    }
+        for (auto* t : te::getAudioTracks (edit))
+            if (! impl->isMidiTrack (*t))
+            {
+                track = t;
+                break;
+            }
+
+    // ensureNumberOfAudioTracks counts MIDI tracks, so it would not add one here.
+    if (track == nullptr)
+        track = edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr).get();
+
+    if (track == nullptr)
+        return juce::Result::fail ("The engine refused the track");
 
     auto start = te::TimePosition();
 
@@ -487,13 +578,40 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     return juce::Result::ok();
 }
 
+juce::Result ApplicationModel::insertMidiClip()
+{
+    auto* track = impl->insertionTrack();
+
+    if (track != nullptr && ! impl->isMidiTrack (*track))
+        return juce::Result::fail ("Select a MIDI track");
+
+    // Nothing selected: the first MIDI track, as clip.add uses the first audio track.
+    if (track == nullptr)
+        track = impl->firstMidiTrack();
+
+    if (track == nullptr)
+        return juce::Result::fail ("Select a MIDI track");
+
+    impl->beginUndoStep ("Insert MIDI Clip");
+
+    const auto start = te::TimePosition::fromSeconds (std::max (0.0, getTransportPositionSeconds()));
+    auto clip = track->insertMIDIClip ("MIDI Clip", { start, impl->oneBarAfter (start) }, nullptr);
+
+    if (clip == nullptr)
+        return juce::Result::fail ("The engine refused the MIDI clip");
+
+    return juce::Result::ok();
+}
+
 bool ApplicationModel::moveClip (const juce::String& clipId, double startSeconds, const juce::String& trackId)
 {
     auto* clip = impl->findClip (clipId);
     auto* track = trackId.isEmpty() ? (clip != nullptr ? clip->getClipTrack() : nullptr)
                                     : impl->findTrack (trackId);
 
-    if (clip == nullptr || track == nullptr)
+    // A clip stays on tracks of its own kind.
+    if (clip == nullptr || track == nullptr
+         || impl->isMidiTrack (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
         return false;
 
     const auto start = te::TimePosition::fromSeconds (std::max (0.0, startSeconds));
@@ -563,7 +681,7 @@ bool ApplicationModel::setClipTake (const juce::String& clipId, int takeIndex)
 {
     // Not WaveAudioClip::setCurrentTake: that only knows takes that are items of a
     // te::Project, and deletes the file takes a loop recording makes here.
-    auto* clip = impl->findClip (clipId);
+    auto* clip = dynamic_cast<te::WaveAudioClip*> (impl->findClip (clipId));
 
     if (clip == nullptr || takeIndex == impl->currentTakeOf (*clip))
         return false;
@@ -740,6 +858,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         TrackInfo info;
         info.id = t->itemID.toString();
         info.name = t->getName();
+        info.kind = impl->isMidiTrack (*t) ? TrackKind::midi : TrackKind::audio;
         info.selected = impl->selectionManager.isSelected (t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
@@ -772,6 +891,10 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
                                         Impl::takesOf (*wave).getNumChildren(),
                                         impl->currentTakeOf (*wave) });
             }
+            else if (auto* midi = dynamic_cast<te::MidiClip*> (c))
+            {
+                info.clips.push_back (impl->midiClipInfo (*midi));
+            }
         }
 
         tracks.push_back (std::move (info));
@@ -783,7 +906,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
 std::unique_ptr<ClipWaveform> ApplicationModel::createWaveform (const juce::String& clipId,
                                                                 juce::Component& repaintTarget) const
 {
-    if (auto* clip = impl->findClip (clipId))
+    if (auto* clip = dynamic_cast<te::WaveAudioClip*> (impl->findClip (clipId)))
         return std::make_unique<ClipWaveform> (
             std::make_unique<ClipWaveform::Impl> (clip->edit.engine, clip->getPlaybackFile().getFile(), repaintTarget));
 

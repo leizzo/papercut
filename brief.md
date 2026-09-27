@@ -1079,8 +1079,8 @@ Plugin parameter IDs should be connected to the automation system.
 
 ## Phase 5 — MIDI
 
-* [ ] MIDI Track
-* [ ] MIDI Clip
+* [x] MIDI Track
+* [x] MIDI Clip
 * [ ] Piano Roll
 * [ ] Note Editing
 * [ ] Quantize

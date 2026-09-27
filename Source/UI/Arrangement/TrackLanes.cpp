@@ -220,7 +220,10 @@ void TrackLanes::mouseDown (const juce::MouseEvent& e)
         if (e.mods.isPopupMenu())
         {
             model.selectClip (info.id);
-            showTakeMenu (info);
+
+            if (info.kind == TrackKind::audio)
+                showTakeMenu (info);
+
             return;
         }
 
@@ -253,9 +256,16 @@ void TrackLanes::mouseDrag (const juce::MouseEvent& e)
     switch (drag->mode)
     {
         case DragMode::move:
+        {
             to.startSeconds = std::max (0.0, from.startSeconds + delta);
-            drag->row = juce::jlimit (0, (int) tracks.size() - 1, view.yToRow (e.y, themeManager.getMetrics().trackHeight));
+            const auto row = juce::jlimit (0, (int) tracks.size() - 1, view.yToRow (e.y, themeManager.getMetrics().trackHeight));
+
+            // A clip only lands on a track of its own kind; the Command refuses the other.
+            if (tracks[(size_t) row].kind == from.kind)
+                drag->row = row;
+
             break;
+        }
 
         case DragMode::resizeStart:
         {

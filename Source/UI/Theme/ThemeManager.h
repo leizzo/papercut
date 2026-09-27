@@ -14,7 +14,9 @@ struct Theme
                  laneA, laneB, trackHeader, trackHeaderSelected, mute, solo, armed,
                  recording,   ///< a recording in progress in its lane
                  loop,        ///< the loop range on the ruler
-                 clip, clipSelected, clipText, waveform, ruler, playhead, error;
+                 clip, clipSelected, clipText, waveform,
+                 midiClip, midiClipSelected, midiNote,
+                 ruler, playhead, error;
     float cornerRadius = 0;
     float fontSize = 0;
 };
@@ -34,6 +36,7 @@ struct LayoutMetrics
     int clipResizeHandleWidth = 0;   ///< grab zone at each clip edge
     int trackControlHeight = 0;      ///< one row of track header controls
     int trackButtonWidth = 0;        ///< mute and solo buttons
+    int midiNoteHeight = 0;          ///< compact note preview inside a MIDI clip
 };
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys

@@ -7,9 +7,9 @@ namespace papercut
 
 class ThemeManager;
 
-/** One audio clip in a lane: a themed box with its name and waveform.
-    Its bounds are set by TrackLanes; it draws the part of the source file
-    that its visible area covers. */
+/** One clip in a lane: a themed box with its name, and either a waveform or
+    a compact MIDI note preview. Its bounds are set by TrackLanes; a waveform
+    draws the part of the source file that its visible area covers. */
 class ClipComponent : public juce::Component
 {
 public:

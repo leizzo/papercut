@@ -98,6 +98,10 @@ void TrackHeader::setTrack (const TrackInfo& info, const juce::StringArray& inpu
 
     input.setSelectedId (track.input.isEmpty() ? noInputId : firstInputId + inputs.indexOf (track.input), juce::dontSendNotification);
 
+    const bool audio = track.kind == TrackKind::audio;
+    armButton.setVisible (audio);
+    input.setVisible (audio);
+
     // A drag in progress already shows the value it is sending.
     if (! volume.dragging)
         volume.setValue (track.volumeDb, juce::dontSendNotification);
@@ -128,10 +132,14 @@ void TrackHeader::paint (juce::Graphics& g)
     g.fillRoundedRectangle (getLocalBounds().toFloat(), theme.cornerRadius);
 
     g.setFont (themeManager.getFont());
+    auto row = getLocalBounds().reduced (metrics.textPadding).removeFromTop (metrics.trackControlHeight);
+    const auto kind = track.kind == TrackKind::midi ? juce::String ("MIDI") : juce::String ("Audio");
+    auto kindArea = row.removeFromRight (juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), kind) + metrics.textPadding);
+
     g.setColour (track.selected ? theme.text : theme.mutedText);
-    g.drawText (track.name,
-                getLocalBounds().reduced (metrics.textPadding).removeFromTop (metrics.trackControlHeight),
-                juce::Justification::centredLeft, true);
+    g.drawText (track.name, row, juce::Justification::centredLeft, true);
+    g.setColour (theme.accent);
+    g.drawText (kind, kindArea, juce::Justification::centredRight, true);
 }
 
 void TrackHeader::resized()
@@ -145,12 +153,16 @@ void TrackHeader::resized()
     muteButton.setBounds (buttons.removeFromLeft (metrics.trackButtonWidth));
     buttons.removeFromLeft (metrics.inset);
     soloButton.setBounds (buttons.removeFromLeft (metrics.trackButtonWidth));
-    buttons.removeFromLeft (metrics.inset);
-    armButton.setBounds (buttons.removeFromLeft (metrics.trackButtonWidth));
-    buttons.removeFromLeft (metrics.inset);
     pan.setBounds (buttons.removeFromRight (metrics.trackControlHeight));
-    buttons.removeFromRight (metrics.inset);
-    input.setBounds (buttons);
+
+    if (track.kind == TrackKind::audio)
+    {
+        buttons.removeFromLeft (metrics.inset);
+        armButton.setBounds (buttons.removeFromLeft (metrics.trackButtonWidth));
+        buttons.removeFromLeft (metrics.inset);
+        buttons.removeFromRight (metrics.inset);
+        input.setBounds (buttons);
+    }
 
     r.removeFromTop (metrics.inset);
     volume.setBounds (r.removeFromTop (metrics.trackControlHeight));

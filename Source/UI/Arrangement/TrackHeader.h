@@ -8,10 +8,10 @@ namespace papercut
 class CommandRegistry;
 class ThemeManager;
 
-/** One track's header: its name, mute, solo and arm buttons, its audio input,
-    a pan knob and a volume fader. Every change goes through a Command; a fader
-    or knob drag is one undo step. Clicks on the header's background fall through to the TrackList
-    (which selects the track). */
+/** One track's header: its name and kind, mute and solo buttons, a pan knob
+    and a volume fader. An audio track also shows its input and arm button.
+    Every change goes through a Command; a fader or knob drag is one undo step.
+    Clicks on the header's background fall through to the TrackList (which selects the track). */
 class TrackHeader : public juce::Component
 {
 public:

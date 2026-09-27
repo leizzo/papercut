@@ -179,6 +179,7 @@ target_sources(PapercutTests PRIVATE
     Tests/ClipEditingTests.cpp
     Tests/RecordingTests.cpp
     Tests/RenderTests.cpp
+    Tests/MidiTrackTests.cpp
     Tests/ComponentFactoryTests.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the
