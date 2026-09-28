@@ -49,6 +49,7 @@ struct TrackInfo
     juce::String name;
     TrackKind kind = TrackKind::audio;
     bool selected = false;
+    int colourIndex = 0;   ///< into the track palette (clip-drums .. clip-fx)
     double volumeDb = 0;   ///< ApplicationModel::minVolumeDb is silence
     double pan = 0;        ///< -1 (left) to 1 (right)
     bool muted = false;
@@ -145,6 +146,12 @@ public:
 
     /** Sets a track's pan, clamped to [-1, 1]; continuesGesture as for setTrackVolume. */
     bool setTrackPan (const juce::String& trackId, double pan, bool continuesGesture = false);
+
+    /** The track palette's size (PRD §15.1: clip-drums .. clip-fx). */
+    static constexpr int trackPaletteSize = 7;
+
+    /** Sets the track's palette colour, 0 .. trackPaletteSize - 1. One undo step. */
+    bool setTrackColour (const juce::String& trackId, int colourIndex);
 
     /** Never undoable. */
     bool setTrackMuted (const juce::String& trackId, bool muted);

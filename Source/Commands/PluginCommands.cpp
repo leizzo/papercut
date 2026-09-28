@@ -9,7 +9,8 @@ namespace papercut
 namespace ArgKeys
 {
     const juce::Identifier trackId ("trackId"), plugin ("plugin"), pluginId ("pluginId"), index ("index"),
-                           chain ("chain"), bypassed ("bypassed"), toTrackId ("toTrackId");
+                           chain ("chain"), bypassed ("bypassed"), toTrackId ("toTrackId"),
+                           parameterId ("parameterId"), value ("value"), continuesGesture ("continuesGesture");
 }
 
 namespace
@@ -117,6 +118,17 @@ namespace
         }
     };
 
+    struct SetParameterCommand : PluginCommand
+    {
+        SetParameterCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.setParameter", "Change Parameter", r, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
+                               (float) args[ArgKeys::value], (bool) args[ArgKeys::continuesGesture]);
+        }
+    };
+
     struct CopyInsertCommand : PluginCommand
     {
         CopyInsertCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.copyInsert", "Copy Insert", r, h) {}
@@ -138,6 +150,7 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     registry.add (std::make_unique<SetBypassedCommand> (rack, host));
     registry.add (std::make_unique<MoveToDeviceChainCommand> (rack, host));
     registry.add (std::make_unique<CopyInsertCommand> (rack, host));
+    registry.add (std::make_unique<SetParameterCommand> (rack, host));
 }
 
 juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin, PluginChain chain)
@@ -176,6 +189,17 @@ juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& p
 {
     auto args = pluginMoveArgs (fromTrackId, pluginId, index);
     args.getDynamicObject()->setProperty (ArgKeys::toTrackId, toTrackId);
+    return args;
+}
+
+juce::var pluginParameterArgs (const juce::String& pluginId, const juce::String& parameterId, float value,
+                               bool continuesGesture)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::pluginId, pluginId);
+    args->setProperty (ArgKeys::parameterId, parameterId);
+    args->setProperty (ArgKeys::value, value);
+    args->setProperty (ArgKeys::continuesGesture, continuesGesture);
     return args;
 }
 

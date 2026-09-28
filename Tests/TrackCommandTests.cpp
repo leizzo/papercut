@@ -97,6 +97,27 @@ struct TrackCommandTests : juce::UnitTest
             expectEquals (f.numTracks(), 0);
             expect (! f.model.canUndo());
         }
+
+        beginTest ("New tracks take the next colour of the track palette; track.setColour changes it, one undo step");
+        {
+            Fixture f;
+            f.invoke ("track.add");
+            f.invoke ("track.addMidi");
+            f.invoke ("track.add");
+            auto tracks = f.model.getTracks();
+            expectEquals (tracks[0].colourIndex, 0);
+            expectEquals (tracks[1].colourIndex, 1);
+            expectEquals (tracks[2].colourIndex, 2);
+
+            f.invoke ("track.setColour", trackColourArgs (tracks[1].id, 5));
+            expectEquals (f.model.getTracks()[1].colourIndex, 5);
+
+            f.invoke ("track.setColour", trackColourArgs (tracks[1].id, 99));   // out of the palette: refused
+            expectEquals (f.model.getTracks()[1].colourIndex, 5);
+
+            f.invoke ("edit.undo");
+            expectEquals (f.model.getTracks()[1].colourIndex, 1);
+        }
     }
 };
 

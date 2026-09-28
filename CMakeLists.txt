@@ -161,7 +161,8 @@ add_library(papercut_ui STATIC
     Source/Commands/ProductionCommands.cpp
     Source/UI/Browser/Library.cpp
     Source/UI/Browser/Browser.cpp
-    Source/UI/Plugins/InsertStrip.cpp
+    Source/UI/Detail/DeviceCard.cpp
+    Source/UI/Detail/DetailView.cpp
     Source/UI/Plugins/PluginEditorWindow.cpp
     Source/UI/Mixer/ChannelStrip.cpp
     Source/UI/Mixer/MasterStrip.cpp

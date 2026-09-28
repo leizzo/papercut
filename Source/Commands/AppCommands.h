@@ -31,7 +31,7 @@ struct AppCommandHost
     project.new  project.open  project.save  project.saveAs
     track.add    track.addMidi   track.remove
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
-    track.setInput   track.toggleArm
+    track.setInput   track.toggleArm   track.setColour
     clip.add     clip.insertAt  clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
     note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
     edit.undo    edit.redo
@@ -52,6 +52,9 @@ juce::var trackVolumeArgs (const juce::String& trackId, double db, bool continue
 
 /** Arguments for track.setPan (-1 left to 1 right); continuesGesture as for trackVolumeArgs. */
 juce::var trackPanArgs (const juce::String& trackId, double pan, bool continuesGesture = false);
+
+/** Arguments for track.setColour: an index into the track palette. */
+juce::var trackColourArgs (const juce::String& trackId, int colourIndex);
 
 /** Arguments for track.setInput: an input named by ApplicationModel::getAudioInputs(),
     or empty for none. */

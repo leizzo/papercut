@@ -35,6 +35,13 @@ struct PluginInfo
     bool missing = false;                       ///< saved in the project but not installed; audio passes through
 };
 
+/** One automatable parameter of a plug-in on a track, in its own units. */
+struct PluginParameter
+{
+    juce::String id, name;
+    float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
+};
+
 /** Facade over the current Edit's plug-ins (ADR-0001, ADR-0012).
 
     Owns no plug-in state. Every call re-reads ProjectManager::getEdit(), because
@@ -100,6 +107,17 @@ public:
         level meter, aux sends or aux returns. */
     std::vector<PluginInfo> getChain (const juce::String& trackId, PluginChain) const;
 
+    /** A plug-in's parameters, in its own order. Empty for an unknown id. */
+    std::vector<PluginParameter> getParameters (const juce::String& pluginId) const;
+
+    /** How the plug-in shows a value of one of its parameters (e.g. "2.4 kHz"). */
+    juce::String getParameterText (const juce::String& pluginId, const juce::String& parameterId, float value) const;
+
+    /** Sets a parameter (clamped to its range). continuesGesture joins the
+        previous call's undo step when that set the same parameter: a knob drag
+        is one step. */
+    bool setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture = false);
+
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
     std::unique_ptr<juce::Component> createEditor (const juce::String& pluginId);
 
@@ -109,6 +127,7 @@ private:
 
     ProjectManager& projectManager;
     std::unique_ptr<ScanThread> scanThread;
+    juce::String openGestureKey;   ///< the parameter whose undo step a drag may still join
     std::atomic<bool> scanning { false };
 
     /** Set from the scan thread when its body starts on a thread other than startScan's caller. */

@@ -608,6 +608,105 @@ std::vector<PluginInfo> PluginRack::getChain (const juce::String& trackId, Plugi
     return result;
 }
 
+namespace
+{
+    te::Plugin::Ptr findPlugin (te::Edit& edit, const juce::String& pluginId)
+    {
+        if (pluginId.isEmpty())
+            return {};
+
+        for (auto* track : te::getAudioTracks (edit))
+            for (auto* plugin : track->pluginList)
+                if (plugin->itemID.toString() == pluginId)
+                    return plugin;
+
+        return {};
+    }
+
+    te::AutomatableParameter::Ptr findParameter (te::Plugin& plugin, const juce::String& parameterId)
+    {
+        for (auto* parameter : plugin.getAutomatableParameters())
+            if (parameter->paramID == parameterId)
+                return parameter;
+
+        return {};
+    }
+
+    /** One parameter change in Engine Undo. The engine writes parameters into
+        the Edit outside its UndoManager, so the change is recorded here, by id:
+        undo still finds the plug-in if it was rebuilt from its state. */
+    struct ParameterChange : juce::UndoableAction
+    {
+        ParameterChange (te::Edit& e, juce::String plugin, juce::String parameter, float from, float to)
+            : edit (e), pluginId (std::move (plugin)), parameterId (std::move (parameter)), before (from), after (to) {}
+
+        bool perform() override   { return apply (after); }
+        bool undo() override      { return apply (before); }
+
+        bool apply (float value)
+        {
+            if (auto plugin = findPlugin (edit, pluginId))
+                if (auto parameter = findParameter (*plugin, parameterId))
+                    parameter->setParameter (value, juce::sendNotificationSync);
+
+            return true;
+        }
+
+        te::Edit& edit;
+        juce::String pluginId, parameterId;
+        float before, after;
+    };
+}
+
+std::vector<PluginParameter> PluginRack::getParameters (const juce::String& pluginId) const
+{
+    std::vector<PluginParameter> result;
+
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+    {
+        for (auto* parameter : plugin->getAutomatableParameters())
+        {
+            const auto range = parameter->getValueRange();
+            result.push_back ({ parameter->paramID, parameter->getParameterName(), range.getStart(), range.getEnd(),
+                                parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()) });
+        }
+    }
+
+    return result;
+}
+
+juce::String PluginRack::getParameterText (const juce::String& pluginId, const juce::String& parameterId, float value) const
+{
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+        if (auto parameter = findParameter (*plugin, parameterId))
+            return parameter->valueToString (value);
+
+    return {};
+}
+
+bool PluginRack::setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture)
+{
+    auto& edit = projectManager.getEdit();
+    auto plugin = findPlugin (edit, pluginId);
+    auto parameter = plugin != nullptr ? findParameter (*plugin, parameterId) : nullptr;
+
+    if (parameter == nullptr)
+        return false;
+
+    const auto clamped = parameter->getValueRange().clipValue (value);
+
+    if (juce::exactlyEqual (clamped, parameter->getCurrentValue()))
+        return false;
+
+    const auto key = pluginId + ":" + parameterId;
+
+    if (! continuesGesture || openGestureKey != key)
+        edit.getUndoManager().beginNewTransaction ("Change " + parameter->getParameterName());
+
+    openGestureKey = key;
+    return edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameterId, parameter->getCurrentValue(), clamped));
+}
+
 std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& pluginId)
 {
     if (pluginId.isEmpty())

@@ -262,6 +262,49 @@ struct DeviceChainTests : juce::UnitTest
             expectEquals (f.paths (to, PluginChain::mixer), Chains::joined ({ eq }));
         }
 
+        beginTest ("A device's parameters are listed with names, ranges and text");
+        {
+            Chains f;
+            f.invoke ("track.add");
+            const auto id = f.trackId();
+            f.insert (id, reverb.toRawUTF8());
+            const auto pluginId = f.rack.getChain (id, PluginChain::device)[0].id;
+
+            const auto params = f.rack.getParameters (pluginId);
+            expectGreaterThan ((int) params.size(), 2);
+
+            for (auto& p : params)
+            {
+                expect (p.id.isNotEmpty() && p.name.isNotEmpty());
+                expect (p.maximum > p.minimum);
+                expect (p.value >= p.minimum && p.value <= p.maximum);
+                expect (f.rack.getParameterText (pluginId, p.id, p.value).isNotEmpty());
+            }
+
+            expect (f.rack.getParameters ("no-such-plugin").empty());
+        }
+
+        beginTest ("plugin.setParameter changes a device knob; a drag is one undo step");
+        {
+            Chains f;
+            f.invoke ("track.add");
+            const auto id = f.trackId();
+            f.insert (id, reverb.toRawUTF8());
+            const auto pluginId = f.rack.getChain (id, PluginChain::device)[0].id;
+            const auto param = f.rack.getParameters (pluginId)[0];
+            const auto mid = param.minimum + (param.maximum - param.minimum) * 0.5f;
+            const auto high = param.minimum + (param.maximum - param.minimum) * 0.8f;
+
+            f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, param.minimum + (param.maximum - param.minimum) * 0.3f));
+            f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, mid, true));
+            f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, high, true));
+            expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, high, 1.0e-4f);
+
+            f.invoke ("edit.undo");
+            expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, param.value, 1.0e-4f);
+            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 1);
+        }
+
         beginTest ("copyInsert refuses a full mixer chain");
         {
             Chains f;

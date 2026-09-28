@@ -58,6 +58,8 @@ struct Snapshots : juce::UnitTest
         f.invoke ("mixer.addReturn");
         plugins.insert (f.model.getTracks()[0].id, tracktion::ReverbPlugin::xmlTypeName);
         plugins.insert (f.model.getTracks()[0].id, tracktion::CompressorPlugin::xmlTypeName, PluginChain::mixer);
+        plugins.insert (f.model.getTracks()[0].id, tracktion::DelayPlugin::xmlTypeName);
+        f.model.selectClip (f.model.getTracks()[0].clips[0].id);
 
         juce::ApplicationCommandManager commandManager;
         const auto size = juce::Point<int> (juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_W", "1600").getIntValue(),

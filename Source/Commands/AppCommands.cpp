@@ -141,6 +141,16 @@ namespace
     };
 
     /** A track header's input menu. */
+    struct SetTrackColourCommand : ModelCommand
+    {
+        SetTrackColourCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.setColour", "Set Track Colour", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            model.setTrackColour (args[ArgKeys::trackId].toString(), (int) args[ArgKeys::value]);
+        }
+    };
+
     struct SetTrackInputCommand : ModelCommand
     {
         SetTrackInputCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.setInput", "Set Track Input", m, h) {}
@@ -488,6 +498,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<ToggleTrackFlagCommand> ("track.toggleArm", "Arm Track for Recording", model, host,
                                                             [] (const TrackInfo& t) { return t.armed; }, &ApplicationModel::setTrackArmed));
     registry.add (std::make_unique<SetTrackInputCommand> (model, host));
+    registry.add (std::make_unique<SetTrackColourCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
     registry.add (std::make_unique<InsertClipAtCommand> (model, host));
     registry.add (std::make_unique<AddMidiClipCommand> (model, host));
@@ -662,6 +673,14 @@ juce::var clipInsertAtArgs (const juce::File& file, const juce::String& trackId,
     args->setProperty (ArgKeys::file, file.getFullPathName());
     args->setProperty (ArgKeys::trackId, trackId);
     args->setProperty (ArgKeys::start, startSeconds);
+    return args;
+}
+
+juce::var trackColourArgs (const juce::String& trackId, int colourIndex)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::trackId, trackId);
+    args->setProperty (ArgKeys::value, colourIndex);
     return args;
 }
 

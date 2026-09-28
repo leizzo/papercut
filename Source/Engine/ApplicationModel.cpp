@@ -36,6 +36,27 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     /** App-specific, on a MIDI note's ValueTree, so a note can be named across undo. */
     static const juce::Identifier noteIdProperty;
 
+    /** App-specific, on the track's ValueTree: its index in the track palette.
+        Absent (older projects, tracks the engine made): by track order. */
+    static const juce::Identifier trackColourProperty;
+
+    int colourOf (const te::AudioTrack& track) const
+    {
+        if (auto colour = track.state[trackColourProperty]; colour.isInt())
+            return juce::jlimit (0, trackPaletteSize - 1, (int) colour);
+
+        return te::getAudioTracks (edit()).indexOf (const_cast<te::AudioTrack*> (&track)) % trackPaletteSize;
+    }
+
+    /** A new track takes the palette colour after the last track's. */
+    void giveNextColour (te::AudioTrack& track)
+    {
+        auto tracks = te::getAudioTracks (edit());
+        const auto index = tracks.indexOf (&track);
+        const auto colour = index > 0 ? (colourOf (*tracks[index - 1]) + 1) % trackPaletteSize : 0;
+        track.state.setProperty (trackColourProperty, colour, &undoManager());
+    }
+
     juce::StringArray selectedNoteIds;
 
     bool isMidiTrack (const te::Track& track) const
@@ -489,12 +510,27 @@ juce::String ApplicationModel::getProjectName() const   { return impl->projectMa
 //==============================================================================
 const juce::Identifier ApplicationModel::Impl::trackKindProperty { "papercutKind" };
 const juce::Identifier ApplicationModel::Impl::noteIdProperty { "papercutNoteId" };
+const juce::Identifier ApplicationModel::Impl::trackColourProperty { "papercutColour" };
+
+bool ApplicationModel::setTrackColour (const juce::String& trackId, int colourIndex)
+{
+    auto* track = impl->findTrack (trackId);
+
+    if (track == nullptr || ! juce::isPositiveAndBelow (colourIndex, trackPaletteSize) || impl->colourOf (*track) == colourIndex)
+        return false;
+
+    impl->beginUndoStep ("Set Track Colour");
+    track->state.setProperty (Impl::trackColourProperty, colourIndex, &impl->undoManager());
+    return true;
+}
 
 void ApplicationModel::addAudioTrack()
 {
     auto& edit = impl->edit();
     impl->beginUndoStep ("Add Track");
-    edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr);
+
+    if (auto track = edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr))
+        impl->giveNextColour (*track);
 }
 
 void ApplicationModel::addMidiTrack()
@@ -508,6 +544,7 @@ void ApplicationModel::addMidiTrack()
 
     // Kind is a property, not "whichever synth is loaded": Phase 6 replaces the synth (ADR-0011).
     track->state.setProperty (Impl::trackKindProperty, "midi", &impl->undoManager());
+    impl->giveNextColour (*track);
 
     // Ahead of the volume plugin, so the track's fader still applies.
     if (auto plugin = edit.getPluginCache().createNewPlugin (te::FourOscPlugin::xmlTypeName, {}))
@@ -1332,6 +1369,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         info.name = t->getName();
         info.kind = impl->isMidiTrack (*t) ? TrackKind::midi : TrackKind::audio;
         info.selected = impl->selectionManager.isSelected (t);
+        info.colourIndex = impl->colourOf (*t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
 

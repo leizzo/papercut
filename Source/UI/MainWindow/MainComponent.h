@@ -7,7 +7,7 @@
 #include "UI/Layout/LayoutManager.h"
 #include "UI/Mixer/MixerView.h"
 #include "UI/PianoRoll/PianoRollView.h"
-#include "UI/Plugins/InsertStrip.h"
+#include "UI/Detail/DetailView.h"
 #include "UI/Browser/Browser.h"
 #include "Engine/SamplePreview.h"
 #include "UI/Plugins/PluginEditorWindow.h"
@@ -78,8 +78,7 @@ private:
     ArrangementView arrangement;
     PianoRollView pianoRoll;
     Browser browser;
-    InsertStrip insertStrip;
-    juce::TextButton editPluginButton { "Edit" };
+    DetailView detailView;
     SessionView sessionView;
     MixerView mixerView;
 

@@ -19,7 +19,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
       browser (services.commands, services.plugins, services.model, services.themeManager, services.preview,
                Library::defaultRoot()),
-      insertStrip (services.commands, services.plugins, services.model, services.themeManager),
+      detailView (services.model, services.plugins, services.commands, services.themeManager, shell,
+                  services.uiState.getState ("detail")),
       sessionView (services.model, services.session, services.commands, services.themeManager),
       mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager),
       editorPlaceholder (services.themeManager, "The audio Editor arrives with M4. Double-click an audio clip then."),
@@ -52,13 +53,12 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
         resized();
     };
 
-    editPluginButton.onClick = [this]
+    detailView.onOpenEditor = [this] (const juce::String& id)
     {
-        if (auto id = insertStrip.getSelectedPluginId(); id.isNotEmpty())
-            pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
+        pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
     };
 
-    for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &insertStrip, &editPluginButton,
+    for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &detailView,
                                                              &arrangement, &sessionView, &pianoRoll, &mixerView,
                                                              &editorPlaceholder, &pianoRollPlaceholder,
                                                              &developerOverlay, &statusBarHost })
@@ -124,8 +124,7 @@ void MainComponent::resized()
     const auto showDetail = timeline && ! shell.isDetailCollapsed();
 
     browser.setVisible (showBrowser);
-    insertStrip.setVisible (showDetail);
-    editPluginButton.setVisible (showDetail);
+    detailView.setVisible (showDetail);
     sessionView.setVisible (view == View::session);
     arrangement.setVisible (view == View::arrange);
     mixerView.setVisible (view == View::mixer);
@@ -135,9 +134,7 @@ void MainComponent::resized()
 
     if (showDetail)
     {
-        auto detail = r.removeFromBottom (shell.getDetailHeight());
-        editPluginButton.setBounds (detail.removeFromRight (metrics.trackHeaderWidth / 2).removeFromTop (metrics.trackControlHeight));
-        insertStrip.setBounds (detail);
+        detailView.setBounds (r.removeFromBottom (shell.getDetailHeight()));
     }
 
     if (showBrowser)
@@ -212,10 +209,6 @@ void MainComponent::modelChanged()
 
 void MainComponent::themeChanged()
 {
-    auto& theme = services.themeManager.getTheme();
-    editPluginButton.setColour (juce::TextButton::buttonColourId, theme.trackHeader);
-    editPluginButton.setColour (juce::TextButton::textColourOffId, theme.text);
-
     if (auto* top = getTopLevelComponent())
         top->sendLookAndFeelChange();
 
