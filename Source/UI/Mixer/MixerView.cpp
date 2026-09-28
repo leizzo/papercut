@@ -1,5 +1,6 @@
 #include "MixerView.h"
 #include "Commands/MixerCommands.h"
+#include "Commands/PluginCommands.h"
 
 namespace papercut
 {
@@ -103,6 +104,34 @@ void MixerView::showAddMenu()
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton));
 }
 
+void MixerView::showEffectPicker (const juce::String& trackId, InsertSlot& slot, const juce::String& replacing)
+{
+    // Mixer inserts take effects only (PRD §10.6).
+    juce::PopupMenu builtIn, external;
+
+    for (auto& info : plugins.getCatalogue())
+    {
+        if (info.instrument || info.midiEffect)
+            continue;
+
+        auto action = [this, trackId, replacing, path = info.path]
+        {
+            if (replacing.isNotEmpty())
+                commands.invoke ("plugin.replace", pluginReplaceArgs (trackId, replacing, path));
+            else
+                commands.invoke ("plugin.insert", pluginInsertArgs (trackId, path, PluginChain::mixer));
+        };
+
+        (info.external ? external : builtIn).addItem (info.name, action);
+    }
+
+    juce::PopupMenu menu;
+    menu.addSectionHeader (replacing.isNotEmpty() ? "Replace with" : "Add effect");
+    menu.addSubMenu ("Papercut", builtIn);
+    menu.addSubMenu ("Plug-Ins", external, external.getNumItems() > 0);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&slot));
+}
+
 void MixerView::applySections()
 {
     for (auto& chip : sectionChips)
@@ -201,6 +230,11 @@ void MixerView::refresh()
             strip = std::make_unique<ChannelStrip> (commands, themeManager);
             strip->onTrackChainClicked = [this, id = track.id] { if (onShowDeviceChain) onShowDeviceChain (id); };
             strip->onFlowStageHovered = [this] (int stage) { setFlowStage (stage); };
+            strip->onOpenPlugin = [this] (const juce::String& pluginId) { if (onOpenPlugin) onOpenPlugin (pluginId); };
+            strip->onPickInsert = [this, id = track.id] (InsertSlot& slot, const juce::String& replacing)
+            {
+                showEffectPicker (id, slot, replacing);
+            };
             strip->setMeterMode ((MeterMode) meterMode.getSelectedIndex());
 
             for (auto& chip : sectionChips)

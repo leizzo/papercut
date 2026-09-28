@@ -36,6 +36,10 @@ void paintFocusRing (juce::Graphics&, const Theme&, juce::Rectangle<float> bound
 /** A circle with a slash: disabled controls and invalid drop targets. */
 juce::MouseCursor notAllowedCursor();
 
+/** An invalid drop or action (PRD §16.3): the component gives a short shake
+    and a bubble explains why. */
+void rejectWithShake (juce::Component&, const juce::String& why);
+
 /** Disabled components sit at the Theme's disabled opacity and show a not-allowed cursor. */
 void applyEnablement (juce::Component&, const Theme&);
 

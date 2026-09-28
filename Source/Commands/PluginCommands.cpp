@@ -118,6 +118,17 @@ namespace
         }
     };
 
+    struct ReplacePluginCommand : PluginCommand
+    {
+        ReplacePluginCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.replace", "Replace Plug-in", r, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            report (rack.replace (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
+                                  args[ArgKeys::plugin].toString()));
+        }
+    };
+
     struct SetParameterCommand : PluginCommand
     {
         SetParameterCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.setParameter", "Change Parameter", r, h) {}
@@ -151,6 +162,7 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     registry.add (std::make_unique<MoveToDeviceChainCommand> (rack, host));
     registry.add (std::make_unique<CopyInsertCommand> (rack, host));
     registry.add (std::make_unique<SetParameterCommand> (rack, host));
+    registry.add (std::make_unique<ReplacePluginCommand> (rack, host));
 }
 
 juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin, PluginChain chain)
@@ -200,6 +212,13 @@ juce::var pluginParameterArgs (const juce::String& pluginId, const juce::String&
     args->setProperty (ArgKeys::parameterId, parameterId);
     args->setProperty (ArgKeys::value, value);
     args->setProperty (ArgKeys::continuesGesture, continuesGesture);
+    return args;
+}
+
+juce::var pluginReplaceArgs (const juce::String& trackId, const juce::String& pluginId, const juce::String& plugin)
+{
+    auto args = pluginArgs (trackId, pluginId);
+    args.getDynamicObject()->setProperty (ArgKeys::plugin, plugin);
     return args;
 }
 

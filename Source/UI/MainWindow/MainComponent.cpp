@@ -66,7 +66,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
         resized();
     };
 
-    detailView.onOpenEditor = [this] (const juce::String& id)
+    detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id)
     {
         pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
     };

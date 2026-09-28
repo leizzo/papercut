@@ -1,6 +1,8 @@
 #include "ChannelStrip.h"
 #include "Commands/AppCommands.h"
 #include "Commands/MixerCommands.h"
+#include "Commands/PluginCommands.h"
+#include "UI/Browser/Library.h"
 
 namespace papercut
 {
@@ -126,11 +128,189 @@ ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
     for (int i = 0; i < PluginRack::maxMixerInserts; ++i)
     {
         insertSlots.push_back (std::make_unique<InsertSlot> (themeManager, i));
+        setUpInsertSlot (*insertSlots.back());
         addChildComponent (*insertSlots.back());
     }
 }
 
 ChannelStrip::~ChannelStrip() = default;
+
+void ChannelStrip::setUpInsertSlot (InsertSlot& slot)
+{
+    slot.onClick = [this, &slot] (const juce::MouseEvent&)
+    {
+        if (slot.getPlugin())
+        {
+            if (onOpenPlugin)
+                onOpenPlugin (slot.getPlugin()->id);
+        }
+        else if (onPickInsert)
+        {
+            onPickInsert (slot, {});
+        }
+    };
+
+    slot.onPowerClick = [this, &slot] (const juce::MouseEvent&)
+    {
+        if (auto& plugin = slot.getPlugin())
+            commands.invoke ("plugin.setBypassed", pluginBypassArgs (state.track.id, plugin->id, plugin->enabled));
+    };
+
+    slot.onMenu = [this, &slot] (const juce::MouseEvent&) { showInsertMenu (slot); };
+
+    slot.onDrag = [this, &slot] (const juce::MouseEvent&)
+    {
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+
+        if (container == nullptr || container->isDragAndDropActive() || ! slot.getPlugin())
+            return;
+
+        auto d = new juce::DynamicObject();
+        d->setProperty ("mixerInsert", slot.getPlugin()->id);
+        d->setProperty ("fromTrack", state.track.id);
+        container->startDragging (juce::var (d), &slot, juce::ScaledImage (slot.createComponentSnapshot (slot.getLocalBounds())));
+    };
+}
+
+void ChannelStrip::showInsertMenu (InsertSlot& slot)
+{
+    juce::PopupMenu menu;
+    const auto& plugin = slot.getPlugin();
+
+    if (! plugin)
+    {
+        menu.addItem ("Add Effect...", [this, &slot] { if (onPickInsert) onPickInsert (slot, {}); });
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&slot));
+        return;
+    }
+
+    const auto trackId = state.track.id;
+    const auto id = plugin->id;
+    const auto name = plugin->name;
+
+    menu.addItem ("Replace...", [this, &slot, id] { if (onPickInsert) onPickInsert (slot, id); });
+    menu.addItem (plugin->enabled ? "Bypass" : "Enable",
+                  [this, trackId, id, on = plugin->enabled] { commands.invoke ("plugin.setBypassed", pluginBypassArgs (trackId, id, on)); });
+    menu.addItem ("Remove", [this, trackId, id] { commands.invoke ("plugin.remove", pluginArgs (trackId, id)); });
+    menu.addItem ("Save Preset...", false, false, nullptr);   // presets arrive with the racks work
+    menu.addSeparator();
+    menu.addItem ("Move to Track Chain", [this, trackId, id, name]
+    {
+        // It changes where the sound is made, so it asks first (PRD §10.6).
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, "Move to Track Chain",
+                                            "Move \"" + name + "\" from the mixer inserts to the end of the track's device chain?",
+                                            "Move", "Cancel", this,
+                                            juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<ChannelStrip> (this), trackId, id] (int result)
+                                            {
+                                                if (result == 1 && safe != nullptr)
+                                                    safe->commands.invoke ("plugin.moveToDeviceChain", pluginArgs (trackId, id));
+                                            }));
+    });
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&slot));
+}
+
+InsertSlot* ChannelStrip::slotAt (juce::Point<int> p) const
+{
+    for (auto& slot : insertSlots)
+        if (slot->isVisible() && slot->getBounds().expanded (0, 2).contains (p))
+            return slot.get();
+
+    return nullptr;
+}
+
+juce::String ChannelStrip::dropRefusal (const SourceDetails& details, const InsertSlot& slot) const
+{
+    if (auto moved = details.description["mixerInsert"].toString(); moved.isNotEmpty())
+    {
+        const auto sameStrip = details.description["fromTrack"].toString() == state.track.id;
+
+        if (sameStrip)
+            return {};
+
+        if (! juce::ModifierKeys::currentModifiers.isAltDown())
+            return "Alt+drag copies an insert to another strip";
+
+        return (int) state.inserts.size() >= PluginRack::maxMixerInserts ? "This strip's inserts are full" : juce::String();
+    }
+
+    if (auto item = itemFromDrag (details.description))
+    {
+        if (item->kind != LibraryItem::Kind::plugin)
+            return "Only effects go in mixer inserts";
+
+        if (item->instrument || item->midiEffect)
+            return "Mixer inserts take effects only";
+
+        if (slot.getPlugin())
+            return "Drop on an empty slot";
+    }
+
+    return {};
+}
+
+void ChannelStrip::clearDropHighlights()
+{
+    for (auto& slot : insertSlots)
+        slot->setDropHighlight (std::nullopt);
+}
+
+bool ChannelStrip::isInterestedInDragSource (const SourceDetails& details)
+{
+    if (! shown (Section::inserts))
+        return false;
+
+    if (details.description.hasProperty ("mixerInsert"))
+        return true;
+
+    auto item = itemFromDrag (details.description);
+    return item && item->kind == LibraryItem::Kind::plugin;
+}
+
+void ChannelStrip::itemDragMove (const SourceDetails& details)
+{
+    clearDropHighlights();
+
+    if (auto* slot = slotAt (details.localPosition))
+        slot->setDropHighlight (dropRefusal (details, *slot).isEmpty());
+}
+
+void ChannelStrip::itemDragExit (const SourceDetails&)
+{
+    clearDropHighlights();
+}
+
+void ChannelStrip::itemDropped (const SourceDetails& details)
+{
+    clearDropHighlights();
+    auto* slot = slotAt (details.localPosition);
+
+    if (slot == nullptr)
+        return;
+
+    if (auto why = dropRefusal (details, *slot); why.isNotEmpty())
+    {
+        rejectWithShake (*slot, why);
+        return;
+    }
+
+    const auto index = juce::jmin (slot->getIndex(), (int) state.inserts.size());
+
+    if (auto moved = details.description["mixerInsert"].toString(); moved.isNotEmpty())
+    {
+        const auto from = details.description["fromTrack"].toString();
+
+        if (from == state.track.id)
+            commands.invoke ("plugin.move", pluginMoveArgs (state.track.id, moved, juce::jmin (index, (int) state.inserts.size() - 1)));
+        else
+            commands.invoke ("plugin.copyInsert", pluginCopyArgs (from, moved, state.track.id, index));
+
+        return;
+    }
+
+    if (auto item = itemFromDrag (details.description))
+        commands.invoke ("plugin.insert", pluginInsertArgs (state.track.id, item->pluginPath, PluginChain::mixer));
+}
 
 void ChannelStrip::setState (const StripState& next)
 {

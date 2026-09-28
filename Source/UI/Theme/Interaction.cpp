@@ -1,5 +1,7 @@
 #include "Interaction.h"
 
+#include <juce_gui_extra/juce_gui_extra.h>
+
 namespace papercut
 {
 
@@ -55,6 +57,52 @@ juce::MouseCursor notAllowedCursor()
     }();
 
     return cursor;
+}
+
+namespace
+{
+    /** Moves a component side to side for a moment, then puts it back. Deletes itself. */
+    struct Shake : juce::Timer
+    {
+        explicit Shake (juce::Component& c) : target (&c), home (c.getPosition())   { startTimer (16); }
+
+        void timerCallback() override
+        {
+            static constexpr int offsets[] = { 5, -5, 4, -4, 2, -2, 0 };
+
+            if (target == nullptr || step >= (int) std::size (offsets))
+            {
+                if (target != nullptr)
+                    target->setTopLeftPosition (home);
+
+                delete this;
+                return;
+            }
+
+            target->setTopLeftPosition (home.translated (offsets[step++], 0));
+        }
+
+        juce::Component::SafePointer<juce::Component> target;
+        juce::Point<int> home;
+        int step = 0;
+    };
+}
+
+void rejectWithShake (juce::Component& c, const juce::String& why)
+{
+    new Shake (c);
+
+    if (why.isEmpty())
+        return;
+
+    if (auto* top = c.getTopLevelComponent())
+    {
+        auto* bubble = new juce::BubbleMessageComponent (300);
+        top->addChildComponent (bubble);
+        juce::AttributedString text;
+        text.append (why, juce::FontOptions (12.0f), juce::Colours::white);
+        bubble->showAt (top->getLocalArea (&c, c.getLocalBounds()), text, 2500, true, true);
+    }
 }
 
 void applyEnablement (juce::Component& c, const Theme& theme)

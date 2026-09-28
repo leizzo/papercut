@@ -305,6 +305,25 @@ struct DeviceChainTests : juce::UnitTest
             expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 1);
         }
 
+        beginTest ("plugin.replace swaps a mixer insert in place, one undo step; an instrument is refused");
+        {
+            Chains f;
+            f.invoke ("track.add");
+            const auto id = f.trackId();
+            f.insert (id, eq.toRawUTF8(), PluginChain::mixer);
+            f.insert (id, compressor.toRawUTF8(), PluginChain::mixer);
+            const auto eqId = f.rack.getChain (id, PluginChain::mixer)[0].id;
+
+            f.invoke ("plugin.replace", pluginReplaceArgs (id, eqId, delay));
+            expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ delay, compressor }));
+
+            f.invoke ("plugin.replace", pluginReplaceArgs (id, f.rack.getChain (id, PluginChain::mixer)[0].id, synth));
+            expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ delay, compressor }));
+
+            f.invoke ("edit.undo");
+            expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ eq, compressor }));
+        }
+
         beginTest ("copyInsert refuses a full mixer chain");
         {
             Chains f;

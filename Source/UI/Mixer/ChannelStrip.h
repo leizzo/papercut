@@ -38,7 +38,8 @@ struct StripState
     sections can be hidden (the mixer's section chips); the fader takes the
     freed height. */
 class ChannelStrip : public juce::Component,
-                     public juce::SettableTooltipClient
+                     public juce::SettableTooltipClient,
+                     public juce::DragAndDropTarget
 {
 public:
     enum class Section { io, inserts, sends, fader };
@@ -61,8 +62,18 @@ public:
     /** The pointer is over a section (the toolbar's signal-flow indicator); -1: none. */
     std::function<void (int stage)> onFlowStageHovered;
 
-    /** Mixer insert slots, for the mixer's insert behaviour. */
-    const std::vector<std::unique_ptr<InsertSlot>>& getInsertSlots() const noexcept   { return insertSlots; }
+    /** An insert slot wants the effects picker: to fill it (replacing empty) or to replace that insert. */
+    std::function<void (InsertSlot&, const juce::String& replacing)> onPickInsert;
+
+    /** A filled insert slot was clicked: open the plug-in's window. */
+    std::function<void (const juce::String& pluginId)> onOpenPlugin;
+
+    // Mixer inserts (PRD §10.6): drop a Browser effect on an empty slot,
+    // drag an insert to reorder it, Alt+drag it onto another strip to copy.
+    bool isInterestedInDragSource (const SourceDetails&) override;
+    void itemDragMove (const SourceDetails&) override;
+    void itemDragExit (const SourceDetails&) override;
+    void itemDropped (const SourceDetails&) override;
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -94,6 +105,13 @@ private:
                          faderArea, peakReadout, buttonsArea;
 
     bool shown (Section s) const   { return sectionShown[(size_t) s]; }
+    void setUpInsertSlot (InsertSlot&);
+    void showInsertMenu (InsertSlot&);
+    InsertSlot* slotAt (juce::Point<int>) const;
+
+    /** Whether a drop on that slot would do something, and if not, why not. */
+    juce::String dropRefusal (const SourceDetails&, const InsertSlot&) const;
+    void clearDropHighlights();
     void rebuildSends();
     void rebuildInsertSlots();
     juce::String chainSummary() const;

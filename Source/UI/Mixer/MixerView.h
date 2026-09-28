@@ -39,6 +39,9 @@ public:
     /** A strip's Track chain row was clicked. */
     std::function<void (const juce::String& trackId)> onShowDeviceChain;
 
+    /** A filled insert slot was clicked. */
+    std::function<void (const juce::String& pluginId)> onOpenPlugin;
+
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -81,6 +84,7 @@ private:
     void refresh();
     void layoutStrips();
     void showAddMenu();
+    void showEffectPicker (const juce::String& trackId, InsertSlot&, const juce::String& replacing);
     void applySections();
     void applyMeterMode();
     void setFlowStage (int);

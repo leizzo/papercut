@@ -499,6 +499,41 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     return juce::Result::ok();
 }
 
+juce::Result PluginRack::replace (const juce::String& trackId, const juce::String& pluginId, const juce::String& typeOrIdentifier)
+{
+    auto& edit = projectManager.getEdit();
+    auto chains = chainsFor (edit, trackId);
+    auto old = chains.find (pluginId);
+
+    if (old == nullptr)
+        return juce::Result::fail ("No such plug-in");
+
+    const auto chain = chainOf (*old);
+    auto& members = chains[chain];
+    const auto index = (int) std::distance (members.begin(), std::find (members.begin(), members.end(), old));
+
+    // The new one goes on the end, then takes the old one's place; both inside
+    // insert()'s transaction, so Replace is one undo step. A full mixer chain
+    // still has room: the old insert is about to go.
+    if (chain == PluginChain::mixer)
+        old->state.setProperty (chainProperty, juce::var(), nullptr);
+
+    auto result = insert (trackId, typeOrIdentifier, chain);
+
+    if (chain == PluginChain::mixer)
+        old->state.setProperty (chainProperty, mixerChainValue, nullptr);
+
+    if (result.failed())
+        return result;
+
+    auto after = chainsFor (edit, trackId);
+    auto added = after[chain].back();
+    added->removeFromParent();
+    after.track->pluginList.insertPlugin (added, chainsFor (edit, trackId).indexFor (chain, index), nullptr);
+    old->deleteFromParent();
+    return juce::Result::ok();
+}
+
 bool PluginRack::remove (const juce::String& trackId, const juce::String& pluginId)
 {
     auto& edit = projectManager.getEdit();

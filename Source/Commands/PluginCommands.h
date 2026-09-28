@@ -18,6 +18,7 @@ struct AppCommandHost;
     plugin.moveToDeviceChain  args: trackId, pluginId (a mixer insert)
     plugin.copyInsert         args: trackId, pluginId, toTrackId, index (on toTrackId's mixer chain)
     plugin.setParameter       args: pluginId, parameterId, value, continuesGesture
+    plugin.replace            args: trackId, pluginId, plugin (a type name or catalogue path)
 */
 void registerPluginCommands (CommandRegistry&, PluginRack&, AppCommandHost&);
 
@@ -37,6 +38,9 @@ juce::var pluginBypassArgs (const juce::String& trackId, const juce::String& plu
 /** Arguments for plugin.setParameter; continuesGesture joins a knob drag into one undo step. */
 juce::var pluginParameterArgs (const juce::String& pluginId, const juce::String& parameterId, float value,
                                bool continuesGesture = false);
+
+/** Arguments for plugin.replace: a new plug-in in pluginId's place. */
+juce::var pluginReplaceArgs (const juce::String& trackId, const juce::String& pluginId, const juce::String& plugin);
 
 /** Arguments for plugin.copyInsert. */
 juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& pluginId,

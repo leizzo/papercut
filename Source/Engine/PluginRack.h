@@ -87,6 +87,10 @@ public:
     juce::Result insert (const juce::String& trackId, const juce::String& typeOrIdentifier,
                          PluginChain = PluginChain::device);
 
+    /** Puts a new plug-in where pluginId is, on the same chain, removing the
+        old one: one undo step. A mixer insert is still effects only. */
+    juce::Result replace (const juce::String& trackId, const juce::String& pluginId, const juce::String& typeOrIdentifier);
+
     /** Removes a plug-in from either chain. */
     bool remove (const juce::String& trackId, const juce::String& pluginId);
 

@@ -23,6 +23,7 @@ struct LibraryItem
     juce::String pluginPath;    ///< a plug-in: what plugin.insert takes
     juce::File file;            ///< a folder or an audio file
     bool instrument = false;
+    bool midiEffect = false;
 };
 
 /** What the Browser lists. Instruments, Audio Effects, MIDI Effects and

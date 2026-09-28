@@ -80,7 +80,7 @@ std::vector<LibraryItem> Library::list (LibraryCategory category, const juce::Fi
                                                                           : ! info.instrument && ! info.midiEffect;
 
             if (wanted && matches (info.name, search))
-                items.push_back ({ LibraryItem::Kind::plugin, info.name, info.path, {}, info.instrument });
+                items.push_back ({ LibraryItem::Kind::plugin, info.name, info.path, {}, info.instrument, info.midiEffect });
         }
 
         std::sort (items.begin(), items.end(), [] (auto& a, auto& b) { return a.name.compareIgnoreCase (b.name) < 0; });
@@ -128,6 +128,7 @@ juce::var dragDescription (const LibraryItem& item)
     d->setProperty ("pluginPath", item.pluginPath);
     d->setProperty ("file", item.file.getFullPathName());
     d->setProperty ("instrument", item.instrument);
+    d->setProperty ("midiEffect", item.midiEffect);
     return d;
 }
 
@@ -144,6 +145,7 @@ std::optional<LibraryItem> itemFromDrag (const juce::var& description)
     item.pluginPath = description["pluginPath"].toString();
     item.file = juce::File (description["file"].toString());
     item.instrument = description["instrument"];
+    item.midiEffect = description["midiEffect"];
     return item;
 }
 
