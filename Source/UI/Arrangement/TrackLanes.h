@@ -36,6 +36,9 @@ public:
     /** Re-positions every clip from the view state (after zoom/scroll). */
     void layoutClips();
 
+    /** The lane height the view state holds (Alt + wheel). */
+    int laneHeight() const;
+
     void paint (juce::Graphics&) override;
     void paintOverChildren (juce::Graphics&) override;
     void resized() override   { layoutClips(); }

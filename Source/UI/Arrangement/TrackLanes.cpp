@@ -72,13 +72,18 @@ void TrackLanes::layoutClips()
                                       tracks[trackRow].muted);
 
             const auto x = view.timeToX (clip.startSeconds);
-            const auto y = view.rowToY (row, metrics.trackHeight);
+            const auto y = view.rowToY (row, laneHeight());
             const auto width = (float) (clip.lengthSeconds * pixelsPerSecond);
-            it->second->setBounds (juce::Rectangle<float> (x, (float) y, width, (float) metrics.trackHeight)
+            it->second->setBounds (juce::Rectangle<float> (x, (float) y, width, (float) laneHeight())
                                        .getSmallestIntegerContainer()
                                        .reduced (0, metrics.spaceSm));
         }
     }
+}
+
+int TrackLanes::laneHeight() const
+{
+    return view.getLaneHeight (themeManager.getMetrics().trackHeight);
 }
 
 juce::Colour TrackLanes::trackColour (const TrackInfo& track) const
@@ -90,7 +95,7 @@ juce::Colour TrackLanes::trackColour (const TrackInfo& track) const
 void TrackLanes::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
-    const auto rowHeight = themeManager.getMetrics().trackHeight;
+    const auto rowHeight = laneHeight();
 
     g.fillAll (theme.bgDeep);
 
@@ -118,7 +123,7 @@ void TrackLanes::paintOverChildren (juce::Graphics& g)
 
         const auto x = view.timeToX (recording.startSeconds);
         const auto width = (float) (recording.lengthSeconds * view.getPixelsPerSecond());
-        const auto area = juce::Rectangle<float> (x, (float) view.rowToY (row, metrics.trackHeight), width, (float) metrics.trackHeight)
+        const auto area = juce::Rectangle<float> (x, (float) view.rowToY (row, laneHeight()), width, (float) laneHeight())
                               .getSmallestIntegerContainer()
                               .reduced (0, metrics.spaceSm);
 
@@ -363,7 +368,7 @@ void TrackLanes::mouseDown (const juce::MouseEvent& e)
     }
 
     if (onRowClicked)
-        onRowClicked (view.yToRow (e.y, themeManager.getMetrics().trackHeight));
+        onRowClicked (view.yToRow (e.y, laneHeight()));
 }
 
 void TrackLanes::mouseDrag (const juce::MouseEvent& e)
@@ -388,7 +393,7 @@ void TrackLanes::mouseDrag (const juce::MouseEvent& e)
         {
             drag->copy = e.mods.isAltDown();
             to.startSeconds = std::max (0.0, snap (from.startSeconds + delta, e.mods.isCommandDown()));
-            const auto row = juce::jlimit (0, (int) tracks.size() - 1, view.yToRow (e.y, themeManager.getMetrics().trackHeight));
+            const auto row = juce::jlimit (0, (int) tracks.size() - 1, view.yToRow (e.y, laneHeight()));
 
             // A clip only lands on a track of its own kind; the Command refuses the other.
             if (tracks[(size_t) row].kind == from.kind)

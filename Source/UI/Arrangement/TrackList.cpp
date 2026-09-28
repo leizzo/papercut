@@ -46,8 +46,8 @@ void TrackList::layoutHeaders()
     auto& metrics = themeManager.getMetrics();
 
     for (size_t row = 0; row < tracks.size(); ++row)
-        headers[tracks[row].id]->setBounds (juce::Rectangle<int> (0, view.rowToY ((int) row, metrics.trackHeight),
-                                                                  getWidth(), metrics.trackHeight));
+        headers[tracks[row].id]->setBounds (juce::Rectangle<int> (0, view.rowToY ((int) row, view.getLaneHeight (metrics.trackHeight)),
+                                                                  getWidth(), view.getLaneHeight (metrics.trackHeight)));
 }
 
 void TrackList::applyTheme()
@@ -66,7 +66,7 @@ void TrackList::paint (juce::Graphics& g)
 void TrackList::mouseDown (const juce::MouseEvent& e)
 {
     if (onRowClicked)
-        onRowClicked (view.yToRow (e.y, themeManager.getMetrics().trackHeight));
+        onRowClicked (view.yToRow (e.y, view.getLaneHeight (themeManager.getMetrics().trackHeight)));
 }
 
 } // namespace papercut

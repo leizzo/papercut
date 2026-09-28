@@ -98,6 +98,7 @@ private:
     std::unique_ptr<PluginEditorWindow> pluginEditor;
 
     void updateStatusBar();
+    void registerArrangementZoomCommands();
     void showMenu (const juce::String& name, juce::Rectangle<int> screenArea);
     void openPianoRollForSelection();
     void mouseDown (const juce::MouseEvent&) override;

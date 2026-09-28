@@ -15,7 +15,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       layouts (services.layoutSource, factory, services.uiState),
       topBar (services.model, services.commands, services.themeManager, shell),
       arrangement (services.model, services.commands, services.themeManager, services.uiState,
-                   services.automation, services.shaper),
+                   services.automation, services.shaper, shell),
       pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
       browser (services.commands, services.plugins, services.model, services.themeManager, services.preview,
                Library::defaultRoot()),
@@ -31,6 +31,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     registerPrimitives (factory, services.commands, services.themeManager);
     registerDeveloperCommands (services.commands, layouts, services.themeManager, services.reportError);
     registerShellCommands (services.commands, shell);
+    registerArrangementZoomCommands();
 
     layouts.onError = services.reportError;
     statusBarHost.onBuilt = [this] { updateStatusBar(); };
@@ -90,6 +91,33 @@ MainComponent::~MainComponent()
     shell.getState().removeListener (this);
     services.themeManager.removeListener (this);
     services.model.removeListener (this);
+}
+
+void MainComponent::registerArrangementZoomCommands()
+{
+    struct ZoomCommand : Command
+    {
+        ZoomCommand (const char* id, const char* name, std::function<void()> fn)
+            : Command (id, name), action (std::move (fn)) {}
+
+        void execute (const juce::var&) override   { action(); }
+        std::function<void()> action;
+    };
+
+    // Zoom is for the Arrangement, so these only act while it shows.
+    auto add = [this] (const char* id, const char* name, void (ArrangementView::*fn)())
+    {
+        services.commands.add (std::make_unique<ZoomCommand> (id, name, [this, fn]
+        {
+            if (arrangement.isShowing())
+                (arrangement.*fn)();
+        }));
+    };
+
+    add ("arrange.zoomIn", "Zoom In", &ArrangementView::zoomIn);
+    add ("arrange.zoomOut", "Zoom Out", &ArrangementView::zoomOut);
+    add ("arrange.zoomToSelection", "Zoom to Selection", &ArrangementView::zoomToSelection);
+    add ("arrange.zoomToSong", "Zoom to Song", &ArrangementView::zoomToSong);
 }
 
 void MainComponent::Placeholder::paint (juce::Graphics& g)

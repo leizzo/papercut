@@ -1,5 +1,6 @@
 #include "ArrangementView.h"
 #include "UI/Browser/Library.h"
+#include "UI/State/ShellState.h"
 #include "UI/State/UIStateStore.h"
 #include "UI/Theme/Interaction.h"
 
@@ -13,14 +14,14 @@ namespace
 }
 
 ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, UIStateStore& uiState,
-                                  Automation& autoLanes, Shaper& shapers)
+                                  Automation& autoLanes, Shaper& shapers, ShellState& s)
     : model (m), automation (autoLanes), themeManager (tm), view (uiState.getState (componentId)),
       timeline (model, c, themeManager, view),
       trackList (c, themeManager, view),
       lanes (model, c, themeManager, view),
       automationLane (model, automation, c, themeManager, view),
       shaperPanel (model, shapers, c, themeManager),
-      commands (c)
+      commands (c), shell (s)
 {
     setComponentID (componentId);
 
@@ -52,6 +53,7 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, Theme
     view.getState().addListener (this);
     styleParameterBox();
     refresh();
+    startTimerHz (30);
 }
 
 ArrangementView::~ArrangementView()
@@ -61,8 +63,72 @@ ArrangementView::~ArrangementView()
     model.removeListener (this);
 }
 
+void ArrangementView::updateZoomLimits()
+{
+    // 8..400 px per bar at the Edit's tempo (PRD §8.3).
+    const auto secondsPerBar = model.beatsToSeconds ((double) model.getBeatsPerBar (0.0));
+
+    if (secondsPerBar > 0.0)
+        view.setZoomLimits (8.0 / secondsPerBar, 400.0 / secondsPerBar);
+}
+
+void ArrangementView::zoomBy (double factor)
+{
+    view.zoomAround (factor, (float) lanes.getWidth() * 0.5f);
+}
+
+void ArrangementView::zoomToSelection()
+{
+    double start = 0, end = 0;
+
+    for (auto& track : tracks)
+        for (auto& clip : track.clips)
+            if (clip.selected)
+            {
+                start = end > start ? std::min (start, clip.startSeconds) : clip.startSeconds;
+                end = std::max (end, clip.startSeconds + clip.lengthSeconds);
+            }
+
+    if (end > start)
+        view.zoomToFit (start, end, (float) lanes.getWidth());
+}
+
+void ArrangementView::zoomToSong()
+{
+    double end = 0;
+
+    for (auto& track : tracks)
+        for (auto& clip : track.clips)
+            end = std::max (end, clip.startSeconds + clip.lengthSeconds);
+
+    // An empty song still shows eight bars.
+    end = std::max (end, model.beatsToSeconds (8.0 * model.getBeatsPerBar (0.0)));
+    view.zoomToFit (0.0, end, (float) lanes.getWidth());
+}
+
+void ArrangementView::scrolledByHand()
+{
+    if (model.isPlaying())
+        followPaused = true;
+}
+
+void ArrangementView::timerCallback()
+{
+    const auto playing = model.isPlaying();
+
+    // Each Play resumes Follow.
+    if (playing && ! wasPlaying)
+        followPaused = false;
+
+    wasPlaying = playing;
+
+    if (playing && ! followPaused && shell.isFollowing() && isShowing())
+        view.follow (model.getTransportPositionSeconds(), (float) lanes.getWidth());
+}
+
 void ArrangementView::refresh()
 {
+    updateZoomLimits();
     tracks = model.getTracks();
     trackList.setTracks (tracks, model.getAudioInputs());
     lanes.setTracks (tracks);
@@ -157,7 +223,7 @@ void ArrangementView::resized()
 
 void ArrangementView::clampVerticalScroll()
 {
-    const auto contentHeight = (int) tracks.size() * themeManager.getMetrics().trackHeight;
+    const auto contentHeight = (int) tracks.size() * laneHeight();
     const auto maxScroll = std::max (0, contentHeight - lanes.getHeight());
 
     if (view.getScrollY() > maxScroll)
@@ -171,6 +237,7 @@ void ArrangementView::selectRow (int row)
 
 void ArrangementView::valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&)
 {
+    clampVerticalScroll();
     // Zoom or scroll changed: everything re-derives its position from the view state.
     lanes.layoutClips();
     lanes.repaint();
@@ -189,8 +256,18 @@ void ArrangementView::mouseWheelMove (const juce::MouseEvent& e, const juce::Mou
         return;
     }
 
+    if (e.mods.isAltDown())
+    {
+        const auto delta = wheel.deltaY != 0.0f ? wheel.deltaY : wheel.deltaX;
+        view.setLaneHeight (view.getLaneHeight (themeManager.getMetrics().trackHeight) + juce::roundToInt (delta * 100.0f));
+        return;
+    }
+
     const auto dx = e.mods.isShiftDown() ? wheel.deltaY : wheel.deltaX;
     const auto dy = e.mods.isShiftDown() ? 0.0f : wheel.deltaY;
+
+    if (dx != 0.0f)
+        scrolledByHand();
 
     if (dx != 0.0f)
         view.setScrollSeconds (view.getScrollSeconds() - dx * wheelPixelsPerUnit / view.getPixelsPerSecond());
@@ -206,7 +283,7 @@ ArrangementView::DropTarget ArrangementView::dropTargetAt (const SourceDetails& 
 {
     const auto item = itemFromDrag (details.description);
     const auto lanePoint = lanes.getLocalPoint (this, details.localPosition);
-    const auto row = view.yToRow (lanePoint.y, themeManager.getMetrics().trackHeight);
+    const auto row = view.yToRow (lanePoint.y, laneHeight());
 
     if (! item || ! juce::isPositiveAndBelow (row, (int) tracks.size())
         || ! (lanes.getBounds().contains (details.localPosition) || trackList.getBounds().contains (details.localPosition)))
@@ -260,7 +337,7 @@ void ArrangementView::paintOverChildren (juce::Graphics& g)
         return;
 
     // Valid targets get an accent-dim outline (§16.3).
-    const auto rowHeight = themeManager.getMetrics().trackHeight;
+    const auto rowHeight = laneHeight();
     const auto y = lanes.getY() + view.rowToY (dropTarget.row, rowHeight);
     g.setColour (themeManager.getTheme().accentDim);
     g.drawRoundedRectangle (juce::Rectangle<int> (trackList.getX(), y, lanes.getRight() - trackList.getX(), rowHeight)

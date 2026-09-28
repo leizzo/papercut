@@ -85,3 +85,68 @@ struct ShellTests : juce::UnitTest
 static ShellTests shellTests;
 
 } // namespace papercut::test
+
+#include "UI/State/ArrangementViewState.h"
+
+namespace papercut::test
+{
+
+/** Arrangement zoom, lane height and Follow (PRD §8.3), all UI State. */
+struct ArrangementViewTests : juce::UnitTest
+{
+    ArrangementViewTests() : juce::UnitTest ("Arrangement View", "Papercut") {}
+
+    void runTest() override
+    {
+        beginTest ("Zoom stays inside its limits (the view sets them from the bar length)");
+        {
+            UIStateStore store;
+            ArrangementViewState view (store.getState ("arrangement"));
+            view.setZoomLimits (4.0, 200.0);   // 8..400 px per bar at 2 s per bar
+
+            view.zoomAround (1000.0, 0.0f);
+            expectEquals (view.getPixelsPerSecond(), 200.0);
+            view.zoomAround (0.00001, 0.0f);
+            expectEquals (view.getPixelsPerSecond(), 4.0);
+        }
+
+        beginTest ("Lane height defaults to the metric and clamps to 32..240");
+        {
+            UIStateStore store;
+            ArrangementViewState view (store.getState ("arrangement"));
+            expectEquals (view.getLaneHeight (78), 78);
+            view.setLaneHeight (10);
+            expectEquals (view.getLaneHeight (78), 32);
+            view.setLaneHeight (1000);
+            expectEquals (view.getLaneHeight (78), 240);
+        }
+
+        beginTest ("Zoom to fit shows a time range across the width, with a margin");
+        {
+            UIStateStore store;
+            ArrangementViewState view (store.getState ("arrangement"));
+            view.setZoomLimits (1.0, 1000.0);
+            view.zoomToFit (10.0, 20.0, 1000.0f);
+
+            expect (view.timeToX (10.0) > 0.0f && view.timeToX (10.0) < 100.0f);
+            expect (view.timeToX (20.0) < 1000.0f && view.timeToX (20.0) > 900.0f);
+        }
+
+        beginTest ("Follow pages when the playhead leaves the view, and not before");
+        {
+            UIStateStore store;
+            ArrangementViewState view (store.getState ("arrangement"));
+            view.setPixelsPerSecond (100.0);   // 10 s across 1000 px
+
+            expect (! view.follow (5.0, 1000.0f));
+            expectEquals (view.getScrollSeconds(), 0.0);
+
+            expect (view.follow (10.5, 1000.0f));
+            expect (view.timeToX (10.5) >= 0.0f && view.timeToX (10.5) < 200.0f);
+        }
+    }
+};
+
+static ArrangementViewTests arrangementViewTests;
+
+} // namespace papercut::test

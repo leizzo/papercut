@@ -15,7 +15,7 @@ namespace papercut
 class ArrangementViewState
 {
 public:
-    static constexpr double minPixelsPerSecond = 5.0;
+    static constexpr double minPixelsPerSecond = 0.5;
     static constexpr double maxPixelsPerSecond = 2000.0;
     static constexpr double defaultPixelsPerSecond = 17.0;   ///< 34 px per bar at 120 BPM in 4/4 (PRD §8.1)
 
@@ -31,6 +31,23 @@ public:
 
     /** Zooms by factor while keeping the time under anchorX fixed on screen. */
     void zoomAround (double factor, float anchorX);
+
+    /** Zoom bounds in pixels per second. The view sets them from the bar
+        length, for 8..400 px per bar (PRD §8.3). */
+    void setZoomLimits (double minPixelsPerSecond, double maxPixelsPerSecond);
+
+    /** Zooms and scrolls so [startSeconds, endSeconds] fills width, with a 5 % margin. */
+    void zoomToFit (double startSeconds, double endSeconds, float width);
+
+    /** Follow: when seconds is off the visible width, scrolls so it sits near
+        the left edge. Returns whether it scrolled. */
+    bool follow (double seconds, float width);
+
+    static constexpr int minLaneHeight = 32, maxLaneHeight = 240;
+
+    /** Track lane height (Alt + wheel); defaultHeight until the user changes it. */
+    int getLaneHeight (int defaultHeight) const;
+    void setLaneHeight (int);
 
     float timeToX (double seconds) const;
     double xToTime (float x) const;
@@ -50,6 +67,7 @@ public:
 
 private:
     juce::ValueTree state;
+    double zoomMin = minPixelsPerSecond, zoomMax = maxPixelsPerSecond;
 };
 
 } // namespace papercut

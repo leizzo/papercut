@@ -13,16 +13,21 @@ namespace papercut
 {
 
 class CommandRegistry;
+class ShellState;
 class UIStateStore;
 
 /** The hand-coded Arrangement: ruler, track headers, lanes with clips, and
     the playhead, all positioned through one ArrangementViewState.
 
     Mouse wheel scrolls (vertical, and horizontal with shift or a trackpad);
-    cmd/ctrl + wheel zooms around the pointer. Clip gestures live in TrackLanes.
+    Mod + wheel zooms around the pointer (8–400 px per bar); Alt + wheel sets
+    the lane height (32–240). With Follow on, playback pages the view along;
+    a manual horizontal scroll pauses that until the next Play (PRD §8.3).
+    Zoom and scroll are UI State, never undoable. Clip gestures live in TrackLanes.
 */
 class ArrangementView : public juce::Component,
                         public juce::DragAndDropTarget,
+                        private juce::Timer,
                         private ApplicationModel::Listener,
                         private ThemeManager::Listener,
                         private juce::ValueTree::Listener
@@ -30,7 +35,16 @@ class ArrangementView : public juce::Component,
 public:
     static constexpr const char* componentId = "arrangement";
 
-    ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&, Automation&, Shaper&);
+    ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&, Automation&, Shaper&, ShellState&);
+
+    void zoomIn()    { zoomBy (2.0); }
+    void zoomOut()   { zoomBy (0.5); }
+
+    /** Z: the selected clips fill the view. */
+    void zoomToSelection();
+
+    /** Shift+Z: the whole song fills the view. */
+    void zoomToSong();
     ~ArrangementView() override;
 
     /** Double-click on a MIDI clip (Piano Roll) or an audio clip (Editor). */
@@ -65,6 +79,14 @@ private:
     juce::String shownTrackId;
     juce::String parameterKey { "volume" };
     CommandRegistry& commands;
+    ShellState& shell;
+    bool followPaused = false, wasPlaying = false;
+
+    int laneHeight() const   { return lanes.laneHeight(); }
+    void zoomBy (double factor);
+    void updateZoomLimits();
+    void scrolledByHand();
+    void timerCallback() override;
 
     struct DropTarget
     {
