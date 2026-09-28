@@ -4,8 +4,8 @@
 |---|---|
 | **Product** | Papercut — Digital Audio Workstation (desktop) |
 | **Document** | Product Requirements Document (PRD) |
-| **Version** | 1.0 (draft) |
-| **Date** | 2026-09-28 |
+| **Version** | 1.1 (draft) |
+| **Date** | 2026-09-28 (v1.0) · updated 2026-09-28 (v1.1) |
 | **Owner** | Ismail Bahtiyar |
 | **Design source** | `@design/papercut.pen` — screens + `Papercut DS — Foundations / Components / Patterns & Handoff` |
 | **Status** | Ready for engineering review |
@@ -15,6 +15,13 @@
 > - Items marked **[Designed]** are drawn on the canvas and are the source of truth for layout and visuals.
 > - Items marked **[Proposed]** are interaction behaviours that the static designs imply but do not show (drag behaviour, shortcuts, edge cases). They are recommended defaults and need sign-off.
 > - Token names like `$accent` refer to design-system variables (see §15).
+
+### Changelog
+
+| Version | Changes |
+|---|---|
+| **1.1** | Native devices vs plug-ins (§9.2) and floating **plug-in windows that open on insert** (§9.6). **Sidechain inputs** (§9.7) with source picker and indicators. **Iconography** (§15.8). Sidechain key path in the signal flow (§4.1). Detail view grows for expanded device panels (§6.3). New tokens `state-sidechain`, `bg-hover`, `accent-hover`, `focus-ring`. Accessibility, performance, data model, edge states, release plan (new **M1.1 — Devices & Plug-ins** phase after v0.1.0; sidechain in M2) and screen inventory updated for plug-ins and sidechain. Mixer redesigned to #16: FX / PRE / POST send taps, returns A–D (`return-c`, `return-d` tokens) in a horizontally scrolling strips area with pinned Master, send-section paging. Open items listed in §23.2. |
+| **1.0** | Initial PRD: shell, Session, Arrangement, racks, Mixer (inserts, sends, returns, master), folders & buses, automation, piano roll, audio editor, design system. Open questions resolved in #16. |
 
 ---
 
@@ -42,7 +49,7 @@
 20. [Data model](#20-data-model)
 21. [Error, empty & edge states](#21-error-empty--edge-states)
 22. [Release plan](#22-release-plan)
-23. [Resolved questions](#23-resolved-questions)
+23. [Resolved questions & open items](#23-resolved-questions--open-items)
 24. [Appendix — screen inventory](#24-appendix--screen-inventory)
 
 ---
@@ -52,7 +59,8 @@
 Papercut is a dark-themed, dense, keyboard-friendly DAW for electronic producers and mix engineers. It combines:
 
 - a **clip-launching Session view** and a **linear Arrangement view**;
-- a **rack-based device chain** (Instrument / Drum / Audio Effect racks) for sound design, edited in the arrangement or session detail view;
+- a **rack-based device chain** (Instrument / Drum / Audio Effect racks) for sound design, edited in the arrangement or session detail view. It mixes **native devices** (edited inline on their cards) and **third-party plug-ins** (VST3 / AU / CLAP) whose own UI opens in a **floating plug-in window as soon as they are added**;
+- a **sidechain input system**: any track, rack chain/pad, bus, return or external input can key a compressor, gate, ducker or plug-in aux input, with the link visible at both ends;
 - a **console-style Mixer** with its **own post-chain insert chain**, rich sends (Pre-FX / Pre-Fader / Post-Fader, send pan, polarity), folder buses, returns and a master with loudness metering;
 - **first-class automation**: arrangement lanes, MIDI clip envelopes and audio clip envelopes, including **unlinked clip-envelope loops**;
 - a **piano roll** with scale awareness, chord detection and a velocity lane;
@@ -140,6 +148,24 @@ Tap-point definitions:
 | **Pre-Fader** | After mixer inserts, **before** fader/pan. |
 | **Post-Fader** (default) | After fader and channel pan; follows fader moves and mute. |
 
+**Sidechain key path.** Separate from the audio path. It feeds a device's detector and is never heard on the destination (§9.7):
+
+```
+Source (track | rack chain / pad | folder bus | return | external input)
+  → Sidechain tap  [Pre-FX | Post-FX | Post-Mixer]   (default Pre-FX)
+  → Key conditioning: band filter · gain · mono sum · listen
+  → Detector of the destination device (native compressor / gate / ducker, or plug-in aux bus)
+       → only the destination's gain changes; its own audio path is unchanged
+```
+
+Sidechain taps are defined relative to the **source** track:
+
+| Tap | Key signal taken |
+|---|---|
+| **Pre-FX** (default) | Source before its device chain (raw clip / input). |
+| **Post-FX** | After the source's device chain, before its mixer inserts. |
+| **Post-Mixer** | After the source's fader and pan; follows mute. |
+
 ### 4.2 Two chains, one track
 
 | | Track device chain (racks) | Mixer inserts |
@@ -148,6 +174,9 @@ Tap-point definitions:
 | Where edited | Detail view (Arrangement / Session) | Mixer strip |
 | Structure | Racks with chains, macros, nesting | Flat list, 4 visible slots per strip (scrollable to 8) |
 | Mixer shows | Read-only **Track chain** link | Editable **Mixer inserts** slots |
+| Device types | Native devices + plug-ins + racks (§9.2) | Native effects + effect plug-ins (`InsertSlot/Filled` vs `InsertSlot/Plugin`) |
+| Plug-in UI | Floating plug-in window, opens on insert (§9.6) | Same window, opens on insert (§10.6) |
+| Sidechain | Any detector device can be keyed (§9.7) | Inserts can be keyed; shown with `Sidechain/Insert Tag` |
 
 The mixer **MUST NOT** display rack devices as inserts. The **Track chain** row in the strip is a read-only summary (e.g. `909 Kit › Drum Bus`) that opens the device view on click.
 
@@ -220,7 +249,8 @@ Left → right:
 ### 6.2 Browser (left, width 236) **[Designed]**
 
 - Search field, category list (Sounds, Drums, Instruments, Audio Effects, MIDI Effects, Plugins, Clips, Samples…), divider, file list.
-- **[Proposed]** Drag item onto a track → adds device to the **end of the device chain** (not the mixer). Drag onto an **empty insert slot in the mixer** → loads as mixer insert (only plug-ins tagged as effects allowed; instruments rejected with shake + tooltip).
+- **[Proposed]** Drag item onto a track → adds device to the **end of the device chain** (not the mixer). A dropped **native device** appears as an inline card with focus on its first control. A dropped **plug-in** appears as a `DeviceCard/Plugin` **and its plug-in window opens immediately** (§9.6), confirmed by a toast with Undo.
+- Browser rows show a **plug icon + format badge** (VST3 / AU / CLAP) for plug-ins, so they're distinguishable from native devices before insertion **[Proposed]**. Drag onto an **empty insert slot in the mixer** → loads as mixer insert (only plug-ins tagged as effects allowed; instruments rejected with shake + tooltip).
 - **[Proposed]** Hover a sample → preview through Cue; `→` key previews.
 
 ### 6.3 Detail view (bottom, height 192) **[Designed]**
@@ -228,7 +258,8 @@ Left → right:
 Contextual to the selected track/clip:
 
 - **Clip panel** (230): clip name, colour, key props.
-- **Device chain** (fill): racks and devices, horizontal (see §9).
+- **Device chain** (fill): racks, native devices and plug-in cards, horizontal, ending in a **drop zone** ("Drop device or plug-in here") (see §9).
+- When a device's **sidechain panel** is expanded, the detail view grows to **236 px** so the panel fits without scrolling (**[Designed]** in *Papercut — Sidechain*). It returns to 192 when the panel collapses.
 - In **Arrangement · Automation**, the detail view becomes the **Automation inspector** (§12.5).
 - In **Arrangement · Folders & Buses**, it becomes the **Folder / Bus inspector** (§11.4).
 
@@ -316,12 +347,65 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 - Devices flow left → right. A **Rack** groups devices into parallel **chains** with **macros**.
 - Rack types: **Instrument Rack**, **Drum Rack** (pads = chains), **Audio Effect Rack**, **MIDI Effect Rack**.
 
-### 9.2 Device card (`DeviceCard`)
+### 9.2 Device cards — native vs plug-in
+
+**Screen:** Papercut — Devices · Native & Plug-ins **[Designed]**
+
+A device chain can mix two kinds of device. They share the chain (order, drag, bypass, racks, automation) but follow **different UI contracts**. Users **MUST** be able to tell them apart at a glance.
+
+- **Native devices** are built into Papercut: EQ Eight, Compressor, Glue Compressor, Echo, Saturator, Reverb, Auto Filter, Simpler and so on.
+- **Plug-ins** are third-party VST3, AU or CLAP devices.
+
+#### 9.2.1 Native device card (`DeviceCard/Native`)
 
 - 164 high, radius 8, `$bg-track`, stroke `$border`.
-- Title bar filled with device colour: power button (14 px circle), name (11/700, `$text-on-accent`).
-- Body: knobs (`Knob` 36 px) with label (9, `$text-dim`) and value.
-- **[Proposed]** Title bar drag = reorder; double-click title = collapse to 28 px wide; power click = bypass (card at 50 % opacity, arc greys out).
+- **Title bar filled with the device colour.** It contains:
+  - a power button (dark 14 px disc with a coloured dot),
+  - the name (11/700, `$text-on-accent`),
+  - a **save preset** icon and a **collapse** chevron.
+- **Edited inline.** Every parameter lives on the card, drawn with Papercut controls and tokens.
+- **Live visualisation.** Examples:
+  - **EQ Eight** (340 wide): an interactive curve display with numbered, colour-coded band nodes, grid and frequency labels. The selected band's params (Freq / Gain / Q, mono values) and an L/R ↔ M/S scale switch sit to the right.
+  - **Compressor** (370 wide): a **GR meter** (orange, filling from the top, value readout), a **transfer-curve** display with the threshold knee and a live level dot, and a single row of knobs (Threshold, Ratio, Attack, Release).
+- **[Proposed]** Interactions:
+  - Drag an EQ node to change freq/gain; scroll wheel on a node changes Q; double-click a node toggles the band.
+  - Drag the title bar to reorder; double-click the title to collapse the card to 28 px.
+  - Click power to bypass (card drops to 50 % opacity).
+
+#### 9.2.2 Plug-in device card (`DeviceCard/Plugin`)
+
+- 214 wide, 164 high, radius 8, `$bg-track`, stroke `$border`.
+- **Neutral title bar** (`$bg-elevated`, bottom border). It contains:
+  - a power button (accent ring + dot),
+  - a **plug icon**,
+  - the plug-in name (10.5/700) with the **vendor** below it (8.5, dim),
+  - a **format badge** (`VST3` / `AU` / `CLAP`, outlined mono).
+- Body:
+  1. **Open plug-in window** button. When the window is open it reads **"Window open · focus"** and the card gets a 1.5 px `$accent-dim` outline.
+  2. **Pinned parameters.** Up to 4 plug-in parameters chosen by the user, each shown as name, mini bar and mono value. They are editable inline, automatable, and mappable to macros.
+- **Status footer** (`$bg-slot`): CPU %, reported latency in samples, and sandbox state (green shield = out-of-process).
+- The host **MUST NOT** try to render the plug-in's own controls inside the card.
+
+#### 9.2.3 Comparison (normative)
+
+| | Native device | Plug-in |
+|---|---|---|
+| Title bar | Filled device colour | `$bg-elevated` + plug icon + vendor + format badge |
+| Power | Dark disc, coloured dot | Accent ring + dot |
+| Editing | Inline on the card | In a floating **plug-in window**; card shows ≤ 4 pinned params |
+| Visual style | Papercut tokens only | Vendor UI inside the window body — never restyled by the host |
+| On insert | Card appears, focus on first control | Card appears **and the plug-in window opens** (§9.6) |
+| Double-click title | Collapse / expand card | Open / focus window |
+| Status | — | CPU, latency, sandbox in card footer + window toolbar |
+| Presets | Papercut preset browser (save icon) | Host preset menu + A/B + undo/redo in window toolbar |
+| Automation / macros | Every control | Only parameters the plug-in exposes; pin to surface on card |
+| Failure | n/a | Red outline, "Crashed — Reload" button, audio bypassed, window closed |
+
+The same distinction applies in the **Mixer**:
+
+- Native mixer inserts use `InsertSlot/Filled` (power LED + name).
+- Plug-in inserts use `InsertSlot/Plugin` (power LED + name + plug icon + format).
+- Clicking a plug-in insert opens its window. Clicking a native insert opens an inline native editor popover **[Proposed]**.
 
 ### 9.3 Rack container (`RackBar`)
 
@@ -353,6 +437,128 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 - The mixer strip shows a read-only **Track chain** row: `layers` icon + rack names joined with `›` + `arrow-up-right` link.
 - Clicking it **MUST** switch to the Arrangement (or Session, whichever was last) with the track selected and the detail view scrolled to the device chain.
 
+### 9.6 Plug-in window (`PluginWindow`) **[Designed]**
+
+**Opening rule (normative):** when a plug-in is added — via browser drag, device-chain drop zone, empty mixer insert slot, or replace — its **window MUST open immediately**, focused.
+
+- A toast confirms it: *"Vintage Plate added to Vocal · Plug-in window opened automatically"*. The toast has an **Undo** action (removes the plug-in and closes the window) and an **Auto-open window on insert** toggle.
+- That preference is on by default. When it's off, the card appears and the window stays closed until the user opens it.
+
+**Window structure.** Floating, non-modal, radius 10, elevation L2 (`0 18 48 #000000B0` + `0 2 6 #00000066`). Everything except the vendor UI area is drawn by the host, identically for every vendor:
+
+| Zone | Content |
+|---|---|
+| Title bar (36, `$bg-panel`) | Plug icon (accent), track name › plug-in name, vendor, format badge, drag area, **Pin** (keep on top), **Close**. |
+| Host toolbar (38) | **Bypass** (power, accent when on), preset menu (prev/next, name, save), **A/B** compare + *Copy A→B*, undo/redo (plug-in parameter history), latency (samples), CPU %, sandbox status. |
+| Vendor UI (fill) | The plug-in's own editor at its native size. Papercut **never** restyles, recolours or overlays it. |
+| Host footer (26) | "Plug-in UI · rendered by *Vendor* · *Format version* · out-of-process", UI scale (100 / 150 / 200 %), resize grip (only if the plug-in supports resizing). |
+
+**Window behaviour [Proposed]**
+
+| Rule | Detail |
+|---|---|
+| Placement | First window centred over the arrangement. Later windows cascade 24 px down-right; position is remembered per plug-in instance and saved with the project. |
+| One per instance | Re-opening focuses the existing window instead of creating another. |
+| Pin | Pinned windows stay on top and stay open across view switches and track selection changes. Unpinned windows hide when their track is deselected (preference "Show plug-in windows for selected track only"). |
+| Link to card | While open, the card shows "Window open · focus" + accent outline; clicking it brings the window forward. Selecting the window selects its track. |
+| Keyboard | `Esc` closes the focused plug-in window; `Cmd/Ctrl+Alt+P` shows/hides all plug-in windows; `Cmd/Ctrl+W` closes the focused one. Plug-in keyboard focus is released back to the host on click outside. |
+| Multi-monitor | Windows can move to any display; if a display is disconnected, windows return to the main display. |
+| Scanning / loading | While a plug-in instantiates, the window shows a host-drawn loading state (spinner + name); timeout after 10 s → error state with "Retry" and "Run in-process". |
+| Crash | Sandbox crash → window closes, card turns red-outlined with **Reload**, audio for that device is bypassed, toast explains. The rest of the session keeps playing. |
+| Automation | Moving a plug-in control records automation only when Automation Arm is on; otherwise it overrides (§12.6). |
+
+### 9.7 Sidechain inputs
+
+**Screen:** Papercut — Sidechain **[Designed]**. Example: the Bass track's Compressor is keyed from the **Kick pad inside the Drums' 909 Kit rack**, tapped Pre-FX, band-passed to 40–120 Hz.
+
+#### 9.7.1 Concept
+
+A **sidechain** feeds a *key signal* from a source into a device's detector. The key controls the device (e.g. how much a compressor ducks). The key signal itself is never heard on the destination.
+
+- **Sources:**
+  - any track,
+  - any **rack chain or drum pad** inside a track,
+  - folder buses,
+  - returns,
+  - external hardware inputs.
+- **Destinations:**
+  - native devices with a detector: Compressor, Glue Compressor, Gate, Auto Filter (envelope), Ducker,
+  - plug-ins that expose an **aux / sidechain input bus** (VST3 aux bus, AU sidechain, CLAP aux port),
+  - mixer inserts of either kind.
+- One source per sidechain input. A source can feed any number of destinations.
+
+#### 9.7.2 Native device sidechain panel (`Sidechain/Panel`)
+
+- Title-bar **SC toggle** (`Sidechain/Device Toggle`): the key icon + `SC` shows the device has a sidechain; clicking it expands or collapses the panel.
+- The panel sits on the **right side of the device card**, 200 wide, with a light teal tint and a teal left divider. It contains:
+
+| Control | Behaviour |
+|---|---|
+| Enable toggle | Turns the sidechain on/off. Off = the device detects on its own input. The source is remembered. |
+| **Source select** (`Sidechain/Source Select`) | Shows a colour dot + `Track › Chain/Pad`. Click opens the **Source Picker** (§9.7.4); the select gets a teal outline while it's open. |
+| Tap | **Pre-FX** (source before its device chain) · **Post-FX** (after the chain, before mixer inserts) · **Post-Mixer** (after fader). Default **Pre-FX**. |
+| Key filter | Mini EQ display with HPF / LPF / band-pass (e.g. `40 – 120 Hz`). Drag the edges in the display. |
+| Gain · Mix | Key gain (−24…+24 dB) and **Mix** (0 % = internal detector, 100 % = full sidechain). |
+| Listen | Solos the conditioned key signal to Cue / the master so the user can hear what the detector hears. Latching; auto-off when the device is deselected. |
+| Input meter | Teal horizontal meter of the key level after conditioning. |
+
+- The card's visualisation shows the relationship. On the Compressor, the **Ducking Scope** draws the teal key signal and the orange gain-reduction curve on the same time base.
+
+#### 9.7.3 Plug-in sidechain (`Sidechain/Plugin Input`)
+
+- Plug-ins that expose an aux bus show a **"Sidechain input · Aux"** select on the card (below pinned params) and in the plug-in window's host toolbar.
+- It uses the same Source Picker and taps. Filter, gain and listen are left to the plug-in's own UI; the host shows only the source and tap.
+- Plug-ins without an aux bus show no sidechain controls. The picker is not offered for them.
+
+#### 9.7.4 Source picker (`Popover` + `Sidechain/Picker Row*`)
+
+Popover (290 wide) anchored to the Source select, with a caret:
+
+1. **Header**: key icon, "Sidechain source", destination path (`Bass › Compressor`), close.
+2. **Search** across tracks, chains, pads and inputs.
+3. **List**, grouped:
+   - **Tracks**: expandable into racks → chains/pads (tree indent).
+   - **Buses & returns**.
+   - **External** inputs.
+   
+   Each row has a colour dot or type icon, the name, and a **live level meter**, so the user can see which source is active. The selected row is teal-tinted with a ✓.
+4. **Disabled rows** (`Picker Row Disabled`, 45 % opacity, with a reason label):
+   - `self`: the destination's own track,
+   - `feedback`: any bus/return that the destination track feeds.
+   
+   They are listed rather than hidden, so users understand why they can't pick them.
+5. **Footer**: tap point segmented (Pre-FX / Post-FX / Post-Mixer with descriptions) and **Mono sum** toggle.
+
+Selecting a row applies immediately (one undo step). `Esc` / click outside closes the picker; `↑↓` + `Enter` navigate it.
+
+#### 9.7.5 Indicators (normative)
+
+Every sidechain link **MUST** be visible at both ends, using `$state-sidechain` (`#3FC9B0`) and the `key-round` icon:
+
+| Place | Source side | Destination side |
+|---|---|---|
+| Arrangement track header | `SC → Bass · Compressor` (`Sidechain/Badge Out`) | `SC ← Drums › Kick` (`Sidechain/Badge In`) + teal left edge on the header |
+| Arrangement lane | — | Optional **ducking trace** (teal gain-reduction line along the bottom of the lane) while playing |
+| Mixer strip head | Key badge `→n` (n = number of destinations) | — |
+| Mixer insert slot | — | `Sidechain/Insert Tag` with the source name, e.g. `Kick` |
+| Device title bar | — | SC toggle lit |
+| Routing sidebar (Mixer · Folders & Buses) | Key icon on the source node | Key-icon link under the destination **[Proposed]** |
+
+Hovering any badge highlights the other end (teal outline). Clicking it selects that track and reveals the device.
+
+#### 9.7.6 Behaviour & edge cases [Proposed]
+
+| Case | Behaviour |
+|---|---|
+| Feedback loop | Engine rejects it; picker disables the row with a reason. |
+| Latency | Key and audio paths are delay-compensated together (including plug-in aux buses and nested rack chains), so ducking lands on the transient. |
+| Source deleted | Destination shows a dim "Source missing" badge; the detector falls back to internal; a toast offers Undo. |
+| Source muted | Pre-FX / Post-FX taps still feed the key (muting affects the audible output only). Post-Mixer follows mute. |
+| Rename / move into folder / freeze | Links persist. Freezing the source keeps feeding the key from the frozen audio. |
+| Duplicate track | Duplicating the destination keeps the same source; duplicating the source does **not** create new links. |
+| Bounce / export stems | Sidechain processing is included; exporting only the source stem is unaffected. |
+| Automation | Sidechain enable, gain, mix and filter are automatable; the source and tap are not. |
+
 ---
 
 ## 10. Mixer
@@ -364,7 +570,11 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 - **Mixer toolbar** (40):
   - Left: title `Mixer` + **section chips** (`Chip/Toggle`): I/O, Inserts, Sends, EQ, Fader, Comments — toggle visibility of strip sections.
   - Right: **signal flow indicator** `Track chain › Inserts › Sends › Fader` (current emphasis in lime), meter mode segmented **Peak | RMS | LUFS**, **Reset Peaks**.
-- **Strips area** (padding 12, gap 14): Tracks group (strips 145 wide, gap 6) · Returns group · **Master** strip (fill).
+- **Strips area** (padding 12, gap 14) **[Designed]**:
+  - A **horizontally scrolling viewport** holds the Tracks group (strips 145 wide, gap 6) and the Returns group (A–D).
+  - The **Master** strip (201 wide) is **pinned** to the right, outside the scroll.
+  - When strips overflow, the viewport shows a right-edge **fade**, an **edge tab** with the badges of the hidden strips (e.g. `C · D ›`) that scrolls to them on click, and a 4 px horizontal scrollbar along the bottom.
+  - **[Proposed]** Shift + scroll or trackpad swipe scrolls horizontally; selecting a track scrolls its strip into view.
 - **[Designed]** A **send editor popover** anchored to a send row (§10.5).
 
 ### 10.2 Channel strip anatomy (top → bottom)
@@ -376,7 +586,7 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 | 3 | Track chain | `SectionHeader` (tag **RACKS**), `TrackChain Link` | Read-only summary of racks; opens device view. |
 | — | Flow arrow | icon | `arrow-down` separator between chain and inserts. |
 | 4 | Mixer inserts | `SectionHeader` (tag **POST**), `InsertSlot` ×4 | Filled slot: power LED + name. Empty slot remains visible as drop target. |
-| 5 | Sends | `Send Row` per return | See §10.4. Shows 2 send rows; with more than 2 returns the sends section scrolls horizontally. |
+| 5 | Sends | `Send Row` per return | See §10.4. Shows 2 send rows; with more than 2 returns the sends section scrolls horizontally, one page of 2 sends at a time. The section header shows the visible page (`A–B`), page dots and a chevron to reach `C–D` **[Designed]**. |
 | 6 | Channel pan | `Knob/Bipolar` + channel **Ø** button | Arc from 12 o'clock; value `C`, `L20`, `R30` (mono). |
 | 7 | Fader & meter | readouts + `Fader` + `Meter/Stereo` | Gain readout, peak readout (red when > −1.5 dBFS), dB scale +6…−∞. |
 | 8 | Track buttons | `TrackBtn` ×3 | M / S / ● (returns: M / S only). |
@@ -429,7 +639,8 @@ Behaviour: opens on click, closes on ✕ / `Esc` / click outside; only one popov
 ### 10.6 Inserts behaviour [Proposed]
 
 - Mixer inserts hold **effects only**; instruments and MIDI effects are rejected. Click empty slot → plug-in picker (effects only). Drag from browser → load.
-- Click filled slot → open plug-in window; power LED click = bypass; drag = reorder within strip; `Alt`+drag = copy to another strip.
+- Adding a **plug-in** to a slot opens its plug-in window immediately (§9.6). Plug-in slots use `InsertSlot/Plugin` (plug icon + format badge); native slots use `InsertSlot/Filled`.
+- Click filled slot → plug-in: open/focus plug-in window; native: open native editor popover. Power LED click = bypass; drag = reorder within strip; `Alt`+drag = copy to another strip.
 - Right-click: Replace, Bypass, Remove, Save preset, Move to track chain (converts to device in rack chain — confirmation dialog).
 - Up to 8 inserts; section shows 4 rows and grows / scrolls when > 4.
 
@@ -679,10 +890,11 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 | | `state-warning` / `state-mute` | `#E8A33D` | Mute, override |
 | | `state-pre` / `state-solo` | `#5B8DEF` | Solo, pre-fader |
 | | `state-polarity` | `#E8C53D` | Ø inverted |
+| | `state-sidechain` | `#3FC9B0` | Sidechain links, key signal |
 | | `playhead` | `#C6F135` | Playhead |
 | Metering | `meter-low` / `-mid` / `-high` | `#5FBF6B` / `#E8C53D` / `#F0503C` | Meter ramp |
 | Track palette | `clip-drums` `clip-bass` `clip-chords` `clip-pads` `clip-arp` `clip-vocal` `clip-fx` | `#E8A33D` `#E0564F` `#9B6DD6` `#5B8DEF` `#4FC4D9` `#D96BA0` `#5FBF6B` | Track identity |
-| Returns | `return-a` / `return-b` / `return-c` / `return-d` | `#8E97AD` / `#AD9A8E` / `#9A9AA2` / `#9A9AA2` | Return identity (C and D use the default `text-secondary` grey until designed) |
+| Returns | `return-a` / `return-b` / `return-c` / `return-d` | `#8E97AD` / `#AD9A8E` / `#9DAD8E` / `#AD8EA6` | Return identity (A blue-grey, B taupe, C sage, D mauve) |
 
 ### 15.2 Typography
 
@@ -706,14 +918,15 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 - **Sizing**: control 16 / 20 / 22 / 26, transport 34, toolbar 40, top bar 52; track header 200, inspector 248, strip 145, compact strip 86, bus strip 104.
 - **Elevation**: L0 flat (borders only), L1 control (`0 3 8 #00000080`), L2 popover (`0 12 32 #000000A0` + `0 2 6 #00000066`).
 
-### 15.4 Component library (56)
+### 15.4 Component library (69 + 90 icons)
 
 | Category | Components |
 |---|---|
 | Controls | `Button/Primary · Secondary · Outline · Ghost`, `IconButton/Transport`, `IconButton/Transport Active`, `IconButton/Small`, `Toggle/On · Off`, `Segmented/Item`, `Segmented/Item Active`, `Chip/Toggle On · Off`, `Tab/View`, `Tab/View Active`, `Select`, `ValueField`, `ValueField/Stacked`, `Slider`, `Knob`, `Knob/Bipolar` |
-| Mixer & channel | `TrackBtn/Off`, `TrackBtn/Mute On`, `TrackBtn/Solo On`, `TrackBtn/Arm On`, `Monitor Switch`, `InsertSlot/Filled · Empty`, `SectionHeader`, `Badge/Type`, `TrackChain Link`, `Route Chip`, `Send Row`, `Meter/Stereo`, `Fader`, `Strip/Head` |
+| Mixer & channel | `TrackBtn/Off`, `TrackBtn/Mute On`, `TrackBtn/Solo On`, `TrackBtn/Arm On`, `Monitor Switch`, `InsertSlot/Filled · Empty · Plugin`, `SectionHeader`, `Badge/Type`, `TrackChain Link`, `Route Chip`, `Send Row`, `Meter/Stereo`, `Fader`, `Strip/Head` |
 | Arrangement | `TrackHeader`, `FolderHeader`, `AutomationLaneHeader`, `Clip`, `TreeIndent`, `Breakpoint`, `Breakpoint/Selected`, `ValueTag`, `LoopTag`, `Playhead` |
-| Devices & panels | `DeviceCard`, `RackBar`, `ChainRow`, `ChainRow/Selected`, `Pad`, `Pad/Selected`, `Pad/Empty`, `InspectorSection` (slot), `Popover` (slot), `Toolbar` (slots) |
+| Devices & panels | `DeviceCard/Native`, `DeviceCard/Plugin`, `PluginWindow` (vendor UI slot), `RackBar`, `ChainRow`, `ChainRow/Selected`, `Pad`, `Pad/Selected`, `Pad/Empty`, `InspectorSection` (slot), `Popover` (slot), `Toolbar` (slots) |
+| Sidechain | `Sidechain/Badge In`, `Sidechain/Badge Out`, `Sidechain/Insert Tag`, `Sidechain/Source Select`, `Sidechain/Device Toggle`, `Sidechain/Picker Row · Selected · Disabled`, `Sidechain/Panel`, `Sidechain/Plugin Input` |
 
 ### 15.5 Interaction states (all interactive components)
 
@@ -748,8 +961,39 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 | `FolderHeader` | `<TrackHeader type="folder" mode="bus" />` |
 | `RackBar` | `<RackHeader type="audio-effect" />` |
 | `Popover` | `<Popover anchor>` header / body / footer |
+| `DeviceCard/Native` | `<DeviceCard kind="native" device="eq8">` + device-specific body |
+| `DeviceCard/Plugin` | `<DeviceCard kind="plugin" format="vst3" vendor pinnedParams windowOpen />` |
+| `InsertSlot/Plugin` | `<InsertSlot plugin format="vst3" enabled />` |
+| `PluginWindow` | `<PluginWindow instanceId pinned>` host chrome + `<VendorView/>` |
+| `Sidechain/Panel` | `<SidechainPanel source tap filter gain mix listen />` |
+| `Sidechain/Source Select` | `<SidechainSourceSelect value open onOpen />` → `<SidechainPicker/>` |
+| `Sidechain/Badge In · Out` | `<SidechainBadge direction="in" \| "out" label />` |
+| `Icon/<name>` | `<Icon name="git-merge" size={12} />` (lucide) |
 
-Tokens ship as CSS custom properties `--Papercut-<token>` (e.g. `--Papercut-bg-deep`, `--Papercut-radius-md: 4px`).
+Tokens ship as CSS custom properties `--papercut-<token>` (e.g. `--papercut-bg-deep`, `--papercut-radius-md: 4px`).
+
+### 15.8 Iconography
+
+**[Designed]** in *Papercut DS — Components › Icons*: **90 reusable icon components**, each named `Icon/<name>`.
+
+| Rule | Detail |
+|---|---|
+| Library | **lucide** for all UI. **phosphor** icons (13, marked *legacy*) appear only in the original Session / Arrangement top-bar transport and browser categories; they **SHOULD** be migrated to lucide equivalents. |
+| Sizes | 9–10 px inline chips and badges · 11–12 px controls and list rows · 13–14 px section / window icons · 16 px transport and toolbar tools. |
+| Colour | Default `$text-secondary` · inactive `$text-dim` · active `$accent` · on filled states `$text-on-accent` · track / folder icons use the track colour · sidechain icons `$state-sidechain`. |
+| Usage | Always instance `Icon/*` components; never place raw icons. New icons are added to the Icons section first, then used. |
+| Code | `<Icon name size color />`; name = lucide name. |
+
+| Group | Count | Icons |
+|---|---|---|
+| Transport & audio | 13 | play, skip-back, repeat, rotate-ccw, timer, audio-lines, audio-waveform, activity, waves, spline, chart-spline, piano, music-2 |
+| Navigation & disclosure | 14 | chevron-down, chevron-right, arrow-down, arrow-left, arrow-right, arrow-up-right, arrow-left-right, corner-down-right, ellipsis, x, maximize, maximize-2, zoom-in, zoom-out |
+| Editing tools | 14 | mouse-pointer-2, text-cursor, pencil, eraser, scissors, scissors-line-dashed, magnet, fold-vertical, copy, trash-2, plus, undo-2, flag, search |
+| Routing, racks & structure | 12 | git-merge, layers, network, folder, folder-open, folder-minus, list, sliders-horizontal, sliders-vertical, link-2-off, unlink, circle-dot |
+| Files & visibility | 5 | file-music, file-code, download, eye, eye-off |
+| Plug-ins & windows | 13 | plug, app-window, external-link, pin, power, cpu, shield-check, save, redo-2, move-diagonal-2, square-dashed, sparkles, package |
+| Sidechain | 6 | key-round, headphones, funnel, cable, check, arrow-right-to-line |
+| Phosphor (legacy) | 13 | play, pause, stop, record, skip-back, crosshair-simple, music-notes, piano-keys, speaker-high, sliders, cube, puzzle-piece, circles-three |
 
 ---
 
@@ -815,6 +1059,7 @@ Delay 600 ms, show name + shortcut; controls show current value + unit.
 | | `Mod+Alt+M` | Mixer |
 | | `Mod+Alt+L` | Toggle detail view |
 | | `Mod+Alt+B` | Toggle browser |
+| | `Mod+Alt+P` | Show / hide all plug-in windows |
 | Edit | `Mod+Z` / `Mod+Shift+Z` | Undo / Redo |
 | | `Mod+D` | Duplicate |
 | | `Mod+E` | Split |
@@ -846,6 +1091,9 @@ Delay 600 ms, show name + shortcut; controls show current value + unit.
 | Scaling | UI scale 80–200 % (min text 7.5 px at 100 % → 9 px at 120 % default recommended on non-retina). |
 | Motion | Meter/animation respects "reduce motion" (peak falls instantly, no blinking queued clips — use outline instead). |
 | Hit targets | Minimum 16 × 16 px (TrackBtn); 20 px preferred. |
+| Plug-in windows | Host chrome (title bar, toolbar, footer) is fully keyboard and screen-reader accessible even when the vendor UI isn't. `Esc` returns focus from the plug-in to the host. Opening a window on insert moves focus to it and announces "*Plug-in* window opened". |
+| Native vs plug-in | The difference isn't colour-only: plug-ins always carry the plug icon, vendor and format text. |
+| Sidechain | Links are announced with direction, e.g. "Compressor, sidechain from Drums, Kick, pre-FX". The `key-round` icon and `SC ←/→` text accompany the teal colour. Disabled picker rows expose their reason ("self", "feedback loop"). |
 
 ---
 
@@ -862,7 +1110,11 @@ Delay 600 ms, show name + shortcut; controls show current value + unit.
 | Project load | 64-track project opens < 5 s (excluding sample streaming). |
 | Autosave | Every 2 min + on focus loss; crash recovery prompt on relaunch. |
 | Platforms | macOS 13+ (Apple Silicon native), Windows 11 x64. |
-| Plugins | VST3, AU (macOS), CLAP. Sandboxed / out-of-process option. |
+| Plugins | VST3, AU (macOS), CLAP. Out-of-process (sandboxed) by default, with an in-process fallback per plug-in. |
+| Plug-in isolation | A plug-in crash **MUST NOT** stop playback or other tracks: the instance is bypassed, its window closes, and the card shows *Crashed — Reload* (§9.6). |
+| Plug-in windows | Window visible ≤ 300 ms after insert for already-scanned plug-ins (host chrome and loading state first, vendor UI when ready). Instantiation timeout 10 s. Window positions persist per instance. |
+| Plug-in scanning | Background scan with per-plug-in timeout; failed plug-ins are listed as *Failed to scan* with Retry, never blocking startup. |
+| Sidechain | Key and audio paths are delay-compensated together (rack chains, plug-in aux buses, all taps). Feedback-creating routes are rejected by the engine, not only the UI. Up to 64 active sidechain links at ≤ 1 % extra CPU for routing. |
 
 ---
 
@@ -888,7 +1140,7 @@ Track {
 }
 
 MixerChannel {
-  inserts: Insert[8],                      // post-chain, independent of deviceChain
+  inserts: Insert[8],                      // post-chain, independent of deviceChain; Insert = NativeDevice | Plugin (effects only)
   sends: Send[],                           // one per return
   pan: number /* -1..1 */, polarity: boolean,
   gainDb: number, peakDb: number
@@ -899,12 +1151,39 @@ Send {
   pan: number, panLinked: boolean, polarity: boolean, active: boolean
 }
 
-Device  = Plugin | Rack
+Device  = NativeDevice | Plugin | Rack
+
+NativeDevice {
+  id, kind: "eq8" | "compressor" | "glue" | "gate" | "echo" | "reverb" | "saturator" | "autoFilter" | "simpler" | "operator" | …,
+  enabled: boolean, collapsed: boolean, params: Record<string, number>,
+  sidechain?: Sidechain                    // only for detector devices
+}
+
+Plugin {
+  id, format: "vst3" | "au" | "clap", pluginUid, name, vendor, version,
+  enabled: boolean, state: Blob,           // opaque vendor state
+  pinnedParams: ParamId[],                 // ≤ 4, shown on the card
+  sandboxed: boolean, latencySamples: number,
+  status: "ok" | "loading" | "missing" | "crashed" | "failedScan",
+  window: { open: boolean, pinned: boolean, x, y, uiScale: 1 | 1.5 | 2 },
+  presetName?: string, abSlot: "A" | "B",
+  sidechain?: Sidechain                    // only if the plug-in exposes an aux input
+}
 Rack {
   type: "instrument" | "drum" | "audioEffect" | "midiEffect",
   chains: Chain[], macros: Macro[16], selectedChainId
 }
 Chain { id, name, volumeDb, enabled, solo, devices: Device[], padNote?: number }
+
+Sidechain {                               // on any device / insert with a detector or aux bus
+  enabled: boolean,
+  source?: { kind: "track" | "chain" | "bus" | "return" | "external",
+             trackId?: string, chainId?: string, inputId?: string },
+  tap: "preFx" | "postFx" | "postMixer",   // default "preFx"
+  gainDb: number, mix: number /* 0..1 */, monoSum: boolean,
+  filter?: { type: "hpf" | "lpf" | "bandpass", lowHz?: number, highHz?: number },
+  listen: boolean                          // UI state, not saved
+}
 
 Clip { id, kind: "audio" | "midi", start, length, loop: {start, length, enabled},
        color, name, notes?: Note[], audio?: AudioRef, warp?: WarpMarker[],
@@ -926,7 +1205,13 @@ Breakpoint { time, value, curve: "linear" | "hold" | "bezier", tension?: number 
 | Situation | Behaviour |
 |---|---|
 | New empty project | Arrangement shows 2 empty tracks + "Drag sounds from the browser" hint; mixer shows master only + "Add track" ghost strip. |
-| Missing plugin | Device card / insert slot shows red dashed outline, name kept, "Missing" badge, audio passes through. |
+| Missing plugin | Device card / insert slot shows red dashed outline, name kept, "Missing" badge, audio passes through. Its window can't open; the card offers *Locate* / *Replace*. |
+| Plug-in crash | Instance bypassed, window closes, card red-outlined with **Reload**, toast explains; playback continues (§9.6). |
+| Plug-in still loading | Window shows host-drawn loading state; after 10 s → error with *Retry* and *Run in-process*. |
+| Plug-in failed scan | Listed in the browser as *Failed to scan* (dim) with Retry; can't be inserted. |
+| Sidechain source deleted | Destination shows a dim "Source missing" badge; detector falls back to internal; toast with Undo (§9.7.6). |
+| Sidechain feedback | Source picker disables the row with its reason; the engine also rejects the route. |
+| Plug-in without aux input | No sidechain controls shown; the source picker isn't offered. |
 | Missing sample | Clip hatched pattern, "Offline" label; Locate / Search actions. |
 | CPU overload | CPU meter turns `$meter-high`; toast "Audio engine overloaded"; offer freeze on heaviest track. |
 | Clipping master | Peak readout red; True Peak row orange; clicking resets. |
@@ -943,8 +1228,9 @@ Breakpoint { time, value, curve: "linear" | "hold" | "bezier", tension?: number 
 
 | Phase | Scope |
 |---|---|
-| **M1 — Core** | Shell, transport, Arrangement (tracks, clips, editing), device chain with plugins, basic Mixer (fader, pan, meter, inserts, sends Post), design system tokens + controls. |
-| **M2 — Mix** | Sends Pre-FX/Pre/Post + send pan + Ø + popover, returns, master loudness, folders (Folder only + Folder + Bus), routing sidebar. |
+| **M1 — Core** | Shell, transport, Arrangement (tracks, clips, editing), device chain with plugins, basic Mixer (fader, pan, meter, inserts, sends Post), design system tokens + controls. Shipped as v0.1.0. |
+| **M1.1 — Devices & Plug-ins** | Core follow-up to M1: **native devices** (EQ Eight, Compressor) vs **plug-ins** (`DeviceCard/Native`, `DeviceCard/Plugin`), **plug-in hosting** (VST3 / AU / CLAP, out-of-process, crash isolation, background scanning), **plug-in window opens on insert**, plug-in inserts (`InsertSlot/Plugin`), iconography (§15.8). |
+| **M2 — Mix** | Sends Pre-FX/Pre/Post + send pan + Ø + popover, returns, master loudness, folders (Folder only + Folder + Bus), routing sidebar, **sidechain inputs** (native sidechain panel, plug-in aux input, source picker, indicators, latency compensation). |
 | **M3 — Automation** | Arrangement lanes, clip overlay, inspector, Read/Touch/Latch/Write, override + re-enable, shapes. |
 | **M4 — Editors** | Piano roll (scale, chords, velocity), MIDI clip envelopes (linked/unlinked, absolute/modulation), audio editor (warp, fades), audio clip envelopes. |
 | **M5 — Racks & Session** | Instrument/Drum/Audio Effect racks, chains, macros, Session view + scenes, crossfader. |
@@ -953,7 +1239,9 @@ Each milestone ships behind a feature flag with usability test gates (§2.3).
 
 ---
 
-## 23. Resolved questions
+## 23. Resolved questions & open items
+
+### 23.1 Resolved questions
 
 Answered in #16 (2026-09-28).
 
@@ -966,6 +1254,19 @@ Answered in #16 (2026-09-28).
 7. Mixer inserts hold **effects only**, no instruments or MIDI effects (§10.6).
 8. Light theme: deferred; not designed yet.
 
+### 23.2 Open items (v1.1)
+
+| # | Item | Status |
+|---|---|---|
+| 1 | #16 decision 1: compact send rows show **FX / PRE / POST** on *Papercut — Mixer* and in the `Send Row` component (Pads → A shows Pre-FX active). | ✅ Designed (v1.1) |
+| 2 | #16 decision 2: returns **A–D** (C Plate, D Parallel) in a horizontally scrolling strips area with pinned Master, edge tab and scrollbar; send sections page `A–B` → `C–D`. | ✅ Designed (v1.1) |
+| 3 | Clicking a **native** mixer insert opens an inline native editor popover (proposed in §9.2.3). Alternative: open native devices in a window like plug-ins. | Needs decision |
+| 4 | Sidechain links in the **routing sidebar** (*Mixer · Folders & Buses*) are specified (§9.7.5) but not drawn. | Design update needed |
+| 5 | Should one sidechain input accept **multiple summed sources**, or stay one source per input (current spec)? | Needs decision |
+| 6 | Plug-in window behaviour on **view switch** when unpinned: hide or keep visible (current proposal: hide when track deselected, preference-controlled). | Needs decision |
+| 7 | Screens still use hand-drawn elements. They should be rebuilt from DS component instances so component changes propagate. | Planned |
+| 8 | Migrate the 13 phosphor (legacy) icons to lucide equivalents (§15.8). | Planned |
+
 ---
 
 ## 24. Appendix — screen inventory
@@ -974,7 +1275,7 @@ Answered in #16 (2026-09-28).
 |---|---|---|
 | Papercut DAW | Session | Clip grid, mini mixer, master column, device chain with racks |
 | Papercut — Arrangement | Arrange | Lanes, clips, rack-based device chain (909 Kit Drum Rack, Drum Bus Audio Effect Rack, Glue Compressor) |
-| Papercut — Mixer | Mixer | Track chain link, post inserts, send rows (pre/post/pan/Ø), send popover, returns, master loudness |
+| Papercut — Mixer | Mixer | Track chain link, post inserts, send rows (FX/PRE/POST, pan, Ø) with `A–B` pager, send popover, returns A–D in a horizontally scrolling area (edge tab + scrollbar), pinned master with loudness, sidechain badges (Drums head `→1`, Bass Opto Comp `Kick` tag) |
 | Papercut — Piano Roll | Piano Roll | Clip inspector, scale, detected chords, notes, velocity lane |
 | Papercut — Editor | Editor | Sample inspector, overview, warp, stereo waveform, fades, clip gain |
 | Papercut — Arrangement · Automation | Arrange | Automation lanes, clip overlay envelope, automation inspector, automation arm + re-enable |
@@ -982,6 +1283,8 @@ Answered in #16 (2026-09-28).
 | Papercut — Audio Clip Automation | Editor | Audio clip envelopes (gain, pan, unlinked echo dry/wet) |
 | Papercut — Arrangement · Folders & Buses | Arrange | Folder tracks (bus / folder-only, expanded / collapsed), folder/bus inspector |
 | Papercut — Mixer · Folders & Buses | Mixer | Routing sidebar, group bands, compact strips, bus strips |
-| Papercut DS — Foundations | — | Tokens: colour, type, spacing, radius, sizing, elevation, rules |
-| Papercut DS — Components | — | 56 reusable components + interaction states |
-| Papercut DS — Patterns & Handoff | — | Signal flow, channel strip anatomy, tokens.css, component → code map |
+| Papercut — Devices · Native & Plug-ins | Arrange | Native EQ Eight + Compressor cards, plug-in cards (VST3 / AU), floating plug-in window opened on insert, "plug-in added" toast |
+| Papercut — Sidechain | Arrange | Bass Compressor keyed from Drums › Kick: SC badges on both track headers, ducking trace, sidechain panel, plug-in aux input, source picker; Mixer shows SC badges on Drums head + Bass Opto Comp insert |
+| Papercut DS — Foundations | — | Tokens: colour (incl. `state-sidechain`), type, spacing, radius, sizing, elevation, rules |
+| Papercut DS — Components | — | 90 icon components (8 groups) + 69 reusable components (controls, mixer, arrangement, devices & plug-ins, sidechain) + interaction states |
+| Papercut DS — Patterns & Handoff | — | Signal flow, native vs plug-in rules, plug-in window rules, sidechain flow + rules, channel strip anatomy, tokens.css, component → code map |
