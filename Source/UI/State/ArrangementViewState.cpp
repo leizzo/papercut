@@ -32,6 +32,16 @@ void ArrangementViewState::setPixelsPerSecond (double pps)
 void ArrangementViewState::setScrollSeconds (double seconds)   { state.setProperty (scrollSecondsId, std::max (0.0, seconds), nullptr); }
 void ArrangementViewState::setScrollY (int y)                  { state.setProperty (scrollYId, std::max (0, y), nullptr); }
 
+bool ArrangementViewState::isAutomationShown (const juce::String& trackId) const
+{
+    return state.getProperty ("automation_" + trackId, false);
+}
+
+void ArrangementViewState::setAutomationShown (const juce::String& trackId, bool shown)
+{
+    state.setProperty ("automation_" + trackId, shown, nullptr);
+}
+
 void ArrangementViewState::zoomAround (double factor, float anchorX)
 {
     const auto anchorTime = xToTime (anchorX);

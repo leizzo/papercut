@@ -13,21 +13,28 @@ TrackList::TrackList (CommandRegistry& c, ThemeManager& tm, ArrangementViewState
 void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::StringArray& inputs)
 {
     tracks = newTracks;
+    currentInputs = inputs;
     std::map<juce::String, std::unique_ptr<TrackHeader>> kept;
 
     for (auto& track : tracks)
     {
         if (auto existing = headers.find (track.id); existing != headers.end())
         {
-            existing->second->setTrack (track, inputs);
             kept[track.id] = std::move (existing->second);
         }
         else
         {
             auto header = std::make_unique<TrackHeader> (commands, themeManager, track, inputs);
+            header->onToggleAutomation = [this, id = track.id]
+            {
+                view.setAutomationShown (id, ! view.isAutomationShown (id));
+                setTracks (tracks, currentInputs);
+            };
             addAndMakeVisible (*header);
             kept[track.id] = std::move (header);
         }
+
+        kept[track.id]->setTrack (track, inputs, view.isAutomationShown (track.id));
     }
 
     headers = std::move (kept);
@@ -40,8 +47,7 @@ void TrackList::layoutHeaders()
 
     for (size_t row = 0; row < tracks.size(); ++row)
         headers[tracks[row].id]->setBounds (juce::Rectangle<int> (0, view.rowToY ((int) row, metrics.trackHeight),
-                                                                  getWidth(), metrics.trackHeight)
-                                                .reduced (metrics.inset));
+                                                                  getWidth(), metrics.trackHeight));
 }
 
 void TrackList::applyTheme()
@@ -54,7 +60,7 @@ void TrackList::applyTheme()
 
 void TrackList::paint (juce::Graphics& g)
 {
-    g.fillAll (themeManager.getTheme().panel);
+    g.fillAll (themeManager.getTheme().bgPanel);
 }
 
 void TrackList::mouseDown (const juce::MouseEvent& e)

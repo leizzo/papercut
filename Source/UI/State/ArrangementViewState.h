@@ -17,7 +17,7 @@ class ArrangementViewState
 public:
     static constexpr double minPixelsPerSecond = 5.0;
     static constexpr double maxPixelsPerSecond = 2000.0;
-    static constexpr double defaultPixelsPerSecond = 100.0;
+    static constexpr double defaultPixelsPerSecond = 17.0;   ///< 34 px per bar at 120 BPM in 4/4 (PRD §8.1)
 
     explicit ArrangementViewState (juce::ValueTree uiState);
 
@@ -39,6 +39,10 @@ public:
         (vertical scroll applied). yToRow may return a row that doesn't exist. */
     int rowToY (int row, int rowHeight) const;
     int yToRow (int y, int rowHeight) const;
+
+    /** Whether a track's automation shows (its header's Auto button). */
+    bool isAutomationShown (const juce::String& trackId) const;
+    void setAutomationShown (const juce::String& trackId, bool);
 
     /** Listen here for zoom/scroll changes. */
     juce::ValueTree& getState() noexcept             { return state; }

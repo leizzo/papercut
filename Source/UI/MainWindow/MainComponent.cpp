@@ -44,6 +44,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
         shell.setView (ShellState::View::pianoRoll);
     };
 
+    arrangement.onAudioClipOpened = [this] (const juce::String&) { shell.setView (ShellState::View::editor); };
+
     // Closing the Piano Roll returns to the timeline it was opened from.
     pianoRoll.onOpenStateChanged = [this]
     {

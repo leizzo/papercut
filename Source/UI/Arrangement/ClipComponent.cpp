@@ -1,5 +1,5 @@
 #include "ClipComponent.h"
-#include "UI/Theme/ThemeManager.h"
+#include "UI/Theme/Interaction.h"
 
 namespace papercut
 {
@@ -27,70 +27,100 @@ void ClipComponent::setClip (const ClipInfo& info)
     repaint();
 }
 
+void ClipComponent::setTrackLook (juce::Colour c, bool isMuted)
+{
+    if (c == colour && isMuted == muted)
+        return;
+
+    colour = c;
+    muted = isMuted;
+    setAlpha (muted ? 0.5f : 1.0f);
+    repaint();
+}
+
 void ClipComponent::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
     auto& metrics = themeManager.getMetrics();
     auto bounds = getLocalBounds();
+    constexpr float radius = 5.0f;
+    const auto ink = theme.textOnAccent;
 
-    const bool midi = clip.kind == TrackKind::midi;
-    g.setColour (clip.selected ? (midi ? theme.midiClipSelected : theme.clipSelected)
-                               : (midi ? theme.midiClip : theme.clip));
-    g.fillRoundedRectangle (bounds.toFloat(), theme.cornerRadius);
+    g.setColour (colour);
+    g.fillRoundedRectangle (bounds.toFloat(), radius);
 
     auto header = bounds.removeFromTop (metrics.clipHeaderHeight);
-    g.setColour (theme.clipText);
-    g.setFont (themeManager.getFont (0.85f));
+    {
+        juce::Graphics::ScopedSaveState save (g);
+        juce::Path shape;
+        shape.addRoundedRectangle (getLocalBounds().toFloat(), radius);
+        g.reduceClipRegion (shape);
+        g.setColour (ink.withAlpha ((juce::uint8) 0x22));
+        g.fillRect (header);
+    }
+
     // Keep the name readable when the clip starts off-screen.
-    auto nameArea = header.withLeft (std::max (header.getX(), g.getClipBounds().getX())).reduced (metrics.textPadding, 0);
+    auto nameArea = header.withLeft (std::max (header.getX(), g.getClipBounds().getX())).reduced (6, 0);
     const auto take = clip.numTakes == 0 ? juce::String()
                     : clip.currentTake < 0 ? "  (" + juce::String (clip.numTakes) + " takes)"
                                            : "  (Take " + juce::String (clip.currentTake + 1) + "/" + juce::String (clip.numTakes) + ")";
-    g.drawText (clip.name + take, nameArea, juce::Justification::centredLeft, true);
+    drawStyledText (g, themeManager, clip.name + take, TypeStyle { 9.5f, false, 700 }, nameArea,
+                    juce::Justification::centredLeft, ink);
 
-    if (midi)
+    const auto content = ink.withAlpha ((juce::uint8) 0x88);
+    const auto body = bounds.reduced (0, 4);
+
+    if (clip.kind == TrackKind::midi)
     {
-        if (getWidth() <= 0 || clip.lengthSeconds <= 0 || clip.notes.empty())
-            return;
-
-        auto body = bounds.toFloat();
-        const auto noteHeight = (float) metrics.midiNoteHeight;
-        g.setColour (theme.midiNote);
-
-        for (auto& note : clip.notes)
+        if (getWidth() > 0 && clip.lengthSeconds > 0 && ! clip.notes.empty())
         {
-            const auto x = (float) (note.startSeconds / clip.lengthSeconds) * (float) getWidth();
-            const auto w = juce::jmax (1.0f, (float) (note.lengthSeconds / clip.lengthSeconds) * (float) getWidth());
-            const auto pitch = juce::jlimit (0, 127, note.pitch);
-            const auto y = juce::jlimit (body.getY(), body.getBottom() - noteHeight,
-                                          body.getBottom() - ((float) (pitch + 1) / 128.0f) * body.getHeight());
-            g.fillRect (x, y, w, noteHeight);
-        }
+            // Note dashes, placed by pitch across the clip's own range.
+            int low = 127, high = 0;
 
-        return;
+            for (auto& note : clip.notes)
+            {
+                low = std::min (low, note.pitch);
+                high = std::max (high, note.pitch);
+            }
+
+            const auto noteHeight = (float) metrics.midiNoteHeight;
+            const auto span = (float) juce::jmax (12, high - low + 1);
+            g.setColour (content);
+
+            for (auto& note : clip.notes)
+            {
+                const auto x = (float) (note.startSeconds / clip.lengthSeconds) * (float) getWidth();
+                const auto w = juce::jmax (2.0f, (float) (note.lengthSeconds / clip.lengthSeconds) * (float) getWidth() - 1.0f);
+                const auto y = (float) body.getBottom() - noteHeight - ((float) (note.pitch - low) / span) * ((float) body.getHeight() - noteHeight);
+                g.fillRoundedRectangle (x, y, w, noteHeight, 1.0f);
+            }
+        }
+    }
+    else if (waveform != nullptr && getWidth() > 0 && clip.lengthSeconds > 0)
+    {
+        // Only the visible slice: a zoomed-in clip can be far wider than the screen.
+        auto visible = body.getIntersection (g.getClipBounds());
+
+        if (! visible.isEmpty())
+        {
+            const auto secondsPerPixel = clip.lengthSeconds / getWidth();
+            const auto sourceStart = clip.sourceOffsetSeconds + visible.getX() * secondsPerPixel;
+            const auto sourceEnd = clip.sourceOffsetSeconds + visible.getRight() * secondsPerPixel;
+
+            g.setColour (content);
+            waveform->draw (g, visible, sourceStart, sourceEnd);
+
+            if (waveform->isGenerating())
+                drawStyledText (g, themeManager,
+                                "Preparing audio " + juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%",
+                                theme.bodySm, visible.reduced (6), juce::Justification::centredLeft, ink);
+        }
     }
 
-    if (waveform == nullptr || getWidth() <= 0 || clip.lengthSeconds <= 0)
-        return;
-
-    // Only the visible slice: a zoomed-in clip can be far wider than the screen.
-    auto visible = bounds.getIntersection (g.getClipBounds());
-
-    if (visible.isEmpty())
-        return;
-
-    const auto secondsPerPixel = clip.lengthSeconds / getWidth();
-    const auto sourceStart = clip.sourceOffsetSeconds + visible.getX() * secondsPerPixel;
-    const auto sourceEnd = clip.sourceOffsetSeconds + visible.getRight() * secondsPerPixel;
-
-    g.setColour (theme.waveform);
-    waveform->draw (g, visible, sourceStart, sourceEnd);
-
-    if (waveform->isGenerating())
+    if (clip.selected)
     {
-        g.setColour (theme.clipText);
-        g.drawText ("Preparing audio " + juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%",
-                    visible.reduced (metrics.textPadding), juce::Justification::centredLeft, true);
+        g.setColour (juce::Colours::white);
+        g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), radius, 1.0f);
     }
 }
 

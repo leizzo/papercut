@@ -39,6 +39,7 @@ private:
     ThemeManager& themeManager;
     ArrangementViewState& view;
     std::vector<TrackInfo> tracks;
+    juce::StringArray currentInputs;
     std::map<juce::String, std::unique_ptr<TrackHeader>> headers;
 };
 

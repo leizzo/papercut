@@ -1,5 +1,6 @@
 #include "TimelineHeader.h"
 #include "Commands/AppCommands.h"
+#include "UI/PianoRoll/BeatGrid.h"
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
@@ -10,24 +11,6 @@ namespace
 {
     /** Movement below this stays a click (move the playhead), not a loop drag. */
     constexpr int loopDragThresholdPixels = 4;
-
-    /** The smallest "nice" tick interval that keeps labels apart. */
-    double tickIntervalFor (double pixelsPerSecond, float minPixels)
-    {
-        for (auto step : { 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0 })
-            if (step * pixelsPerSecond >= minPixels)
-                return step;
-
-        return 1200.0;
-    }
-
-    juce::String formatTime (double seconds, double interval)
-    {
-        const auto minutes = (int) (seconds / 60.0);
-        const auto secs = seconds - minutes * 60.0;
-        const auto decimals = interval >= 1.0 ? 0 : interval >= 0.1 ? 1 : 2;
-        return juce::String (minutes) + ":" + (secs < 10.0 ? "0" : "") + juce::String (secs, decimals);
-    }
 }
 
 TimelineHeader::TimelineHeader (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
@@ -38,42 +21,37 @@ TimelineHeader::TimelineHeader (ApplicationModel& m, CommandRegistry& c, ThemeMa
 void TimelineHeader::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
-    g.fillAll (theme.panel);
+    g.fillAll (theme.bgPanel);
 
-    // The loop, in the ruler's upper half.
+    // Bar numbers, one per grid line.
+    const auto numberFont = themeManager.numberFont (TypeStyle { 10.0f, true, 400 });
+    const auto every = barsPerGridLine (model, view);
+
+    for (auto& line : barLines (model, view.xToTime (0.0f), view.xToTime ((float) getWidth()), every))
+    {
+        const auto x = juce::roundToInt (view.timeToX (line.seconds));
+        g.setColour (theme.border);
+        g.fillRect (x, 0, 1, getHeight());
+        g.setColour (theme.textDim);
+        g.setFont (numberFont);
+        g.drawText (juce::String (line.barNumber), x + 5, 0, 40, getHeight(), juce::Justification::centredLeft, false);
+    }
+
+    // The loop brace: lime while looping, faint when off.
     const auto loop = draggedLoop.value_or (model.getLoopRange());
 
     if (loop.end > loop.start)
     {
         const auto x1 = view.timeToX (loop.start), x2 = view.timeToX (loop.end);
-        g.setColour (theme.loop.withMultipliedAlpha (draggedLoop || model.isLooping() ? 0.8f : 0.25f));
-        g.fillRect (juce::Rectangle<float> (x1, 0.0f, x2 - x1, (float) getHeight() * 0.5f));
+        const auto brace = juce::Rectangle<float> (x1, 2.0f, x2 - x1, 6.0f);
+        g.setColour (theme.accent.withAlpha (draggedLoop || model.isLooping() ? 0.9f : 0.3f));
+        g.fillRoundedRectangle (brace, 2.0f);
+        g.fillRect (juce::Rectangle<float> (x1, 2.0f, 2.0f, 12.0f));
+        g.fillRect (juce::Rectangle<float> (x2 - 2.0f, 2.0f, 2.0f, 12.0f));
     }
 
-    const auto font = themeManager.getFont (0.8f);
-    const auto textPadding = themeManager.getMetrics().textPadding / 2;
-    const auto interval = tickIntervalFor (view.getPixelsPerSecond(), juce::GlyphArrangement::getStringWidth (font, "00:00.00") * 1.5f);
-    const auto first = std::floor (view.xToTime (0) / interval) * interval;
-
-    g.setFont (font);
-    g.setColour (theme.ruler);
-
-    for (auto t = first; view.timeToX (t) < (float) getWidth(); t += interval)
-    {
-        const auto x = view.timeToX (t);
-
-        if (x < 0)
-            continue;
-
-        const auto text = formatTime (t, interval);
-        const auto textWidth = (int) std::ceil (juce::GlyphArrangement::getStringWidth (font, text));
-
-        g.drawVerticalLine (juce::roundToInt (x), (float) getHeight() * 0.5f, (float) getHeight());
-        g.drawText (text, juce::roundToInt (x) + textPadding, 0, textWidth, getHeight() / 2 + textPadding,
-                    juce::Justification::bottomLeft, false);
-    }
-
-    g.drawHorizontalLine (getHeight() - 1, 0.0f, (float) getWidth());
+    g.setColour (theme.borderSoft);
+    g.fillRect (0, getHeight() - 1, getWidth(), 1);
 }
 
 void TimelineHeader::mouseDown (const juce::MouseEvent& e)

@@ -44,11 +44,8 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, Theme
     // Clicking a track header or an empty lane selects the track (engine
     // selection; never undoable, never through the UndoManager).
     trackList.onRowClicked = lanes.onRowClicked = [this] (int row) { selectRow (row); };
-    lanes.onMidiClipOpened = [this] (const juce::String& id)
-    {
-        if (onMidiClipOpened)
-            onMidiClipOpened (id);
-    };
+    lanes.onMidiClipOpened = [this] (const juce::String& id) { if (onMidiClipOpened) onMidiClipOpened (id); };
+    lanes.onAudioClipOpened = [this] (const juce::String& id) { if (onAudioClipOpened) onAudioClipOpened (id); };
 
     model.addListener (this);
     themeManager.addListener (this);
@@ -117,6 +114,20 @@ void ArrangementView::styleParameterBox()
     parameterBox.setColour (juce::ComboBox::backgroundColourId, theme.background);
     parameterBox.setColour (juce::ComboBox::textColourId, theme.text);
     parameterBox.setColour (juce::ComboBox::outlineColourId, theme.gridLine);
+}
+
+void ArrangementView::paint (juce::Graphics& g)
+{
+    // The corner above the headers, beside the ruler.
+    auto& theme = themeManager.getTheme();
+    auto corner = juce::Rectangle<int> (0, 0, trackList.getWidth(), timeline.getHeight());
+    g.setColour (theme.bgPanel);
+    g.fillRect (corner);
+    g.setColour (theme.borderSoft);
+    g.fillRect (corner.removeFromBottom (1));
+    g.fillRect (corner.getRight() - 1, 0, 1, timeline.getHeight());
+    drawStyledText (g, themeManager, "Bars", theme.caption, juce::Rectangle<int> (12, 0, trackList.getWidth() - 12, timeline.getHeight()),
+                    juce::Justification::centredLeft, theme.textDim);
 }
 
 void ArrangementView::resized()

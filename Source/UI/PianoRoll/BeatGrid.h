@@ -79,4 +79,24 @@ inline std::vector<BeatLine> beatLines (const ApplicationModel& model, double st
     return lines;
 }
 
+/** How many bars apart the Arrangement's grid lines and bar numbers are: the
+    smallest power of two that keeps them minPixels apart (every 4 bars at the
+    default 34 px per bar, PRD §8.1). */
+inline int barsPerGridLine (const ApplicationModel& model, const ArrangementViewState& view, float minPixels = 100.0f)
+{
+    const auto pixelsPerBar = pixelsPerBeat (model, view, 0.0f) * std::max (1, model.getBeatsPerBar (0.0));
+
+    for (int bars = 1; bars < 1024; bars *= 2)
+        if (pixelsPerBar * bars >= (double) minPixels)
+            return bars;
+
+    return 1024;
+}
+
+/** The Arrangement's grid lines between two times, one every barsPerLine bars. */
+inline std::vector<BeatLine> barLines (const ApplicationModel& model, double startSeconds, double endSeconds, int barsPerLine)
+{
+    return beatLines (model, startSeconds, endSeconds, (double) (barsPerLine * std::max (1, model.getBeatsPerBar (0.0))));
+}
+
 } // namespace papercut

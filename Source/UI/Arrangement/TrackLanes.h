@@ -45,8 +45,8 @@ public:
     /** Called with the row index under a click on an empty lane (may be out of range). */
     std::function<void (int row)> onRowClicked;
 
-    /** Double-click on a MIDI clip. */
-    std::function<void (const juce::String& clipId)> onMidiClipOpened;
+    /** Double-click on a MIDI clip (Piano Roll) or an audio clip (Editor). */
+    std::function<void (const juce::String& clipId)> onMidiClipOpened, onAudioClipOpened;
 
 private:
     enum class DragMode { move, resizeStart, resizeEnd };
@@ -71,6 +71,7 @@ private:
     std::vector<RecordingInfo> recordings;
     std::map<juce::String, std::unique_ptr<ClipWaveform>> recordingWaveforms;   ///< by track ID
 
+    juce::Colour trackColour (const TrackInfo&) const;
     ClipComponent* clipAt (juce::Point<int>) const;
     DragMode dragModeAt (const ClipComponent&, juce::Point<int>) const;
     int rowOf (const juce::String& clipId) const;

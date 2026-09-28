@@ -59,6 +59,11 @@ struct Snapshots : juce::UnitTest
         plugins.insert (f.model.getTracks()[0].id, tracktion::ReverbPlugin::xmlTypeName);
         plugins.insert (f.model.getTracks()[0].id, tracktion::CompressorPlugin::xmlTypeName, PluginChain::mixer);
         plugins.insert (f.model.getTracks()[0].id, tracktion::DelayPlugin::xmlTypeName);
+        f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 0.0, 0.25, 60));
+        f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 0.5, 0.25, 64));
+        f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 1.0, 0.5, 67));
+        f.invoke ("track.toggleSolo", trackArgs (f.model.getTracks()[1].id));
+        f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, 8.0));
         f.model.selectClip (f.model.getTracks()[0].clips[0].id);
 
         juce::ApplicationCommandManager commandManager;

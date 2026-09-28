@@ -1,5 +1,6 @@
 #include "TrackLanes.h"
 #include "Commands/AppCommands.h"
+#include "UI/PianoRoll/BeatGrid.h"
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
@@ -65,15 +66,22 @@ void TrackLanes::layoutClips()
             const auto row = dragged ? drag->row : (int) trackRow;
 
             it->second->setClip (clip);
+            it->second->setTrackLook (trackColour (tracks[trackRow]), tracks[trackRow].muted);
 
             const auto x = view.timeToX (clip.startSeconds);
             const auto y = view.rowToY (row, metrics.trackHeight);
             const auto width = (float) (clip.lengthSeconds * pixelsPerSecond);
             it->second->setBounds (juce::Rectangle<float> (x, (float) y, width, (float) metrics.trackHeight)
                                        .getSmallestIntegerContainer()
-                                       .reduced (0, metrics.inset));
+                                       .reduced (0, metrics.spaceSm));
         }
     }
+}
+
+juce::Colour TrackLanes::trackColour (const TrackInfo& track) const
+{
+    auto& palette = themeManager.getTheme().trackPalette;
+    return palette[(size_t) juce::jlimit (0, (int) palette.size() - 1, track.colourIndex)];
 }
 
 void TrackLanes::paint (juce::Graphics& g)
@@ -81,13 +89,16 @@ void TrackLanes::paint (juce::Graphics& g)
     auto& theme = themeManager.getTheme();
     const auto rowHeight = themeManager.getMetrics().trackHeight;
 
-    g.fillAll (theme.background);
+    g.fillAll (theme.bgDeep);
+
+    // Grid lines where the ruler numbers its bars.
+    g.setColour (theme.borderSoft);
+
+    for (auto& line : barLines (model, view.xToTime (0.0f), view.xToTime ((float) getWidth()), barsPerGridLine (model, view)))
+        g.fillRect (juce::roundToInt (view.timeToX (line.seconds)), 0, 1, getHeight());
 
     for (size_t row = 0; row < tracks.size(); ++row)
-    {
-        g.setColour (row % 2 == 0 ? theme.laneA : theme.laneB);
-        g.fillRect (0, view.rowToY ((int) row, rowHeight), getWidth(), rowHeight);
-    }
+        g.fillRect (0, view.rowToY ((int) row, rowHeight) + rowHeight - 1, getWidth(), 1);
 }
 
 void TrackLanes::paintOverChildren (juce::Graphics& g)
@@ -106,10 +117,10 @@ void TrackLanes::paintOverChildren (juce::Graphics& g)
         const auto width = (float) (recording.lengthSeconds * view.getPixelsPerSecond());
         const auto area = juce::Rectangle<float> (x, (float) view.rowToY (row, metrics.trackHeight), width, (float) metrics.trackHeight)
                               .getSmallestIntegerContainer()
-                              .reduced (0, metrics.inset);
+                              .reduced (0, metrics.spaceSm);
 
         g.setColour (theme.recording);
-        g.fillRoundedRectangle (area.toFloat(), theme.cornerRadius);
+        g.fillRoundedRectangle (area.toFloat(), 5.0f);
 
         if (auto waveform = recordingWaveforms.find (recording.trackId); waveform != recordingWaveforms.end())
         {
@@ -227,12 +238,13 @@ void TrackLanes::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
-        if (e.getNumberOfClicks() == 2 && info.kind == TrackKind::midi)
+        if (e.getNumberOfClicks() == 2)
         {
             model.selectClip (info.id);
+            auto& open = info.kind == TrackKind::midi ? onMidiClipOpened : onAudioClipOpened;
 
-            if (onMidiClipOpened)
-                onMidiClipOpened (info.id);
+            if (open)
+                open (info.id);
 
             return;
         }

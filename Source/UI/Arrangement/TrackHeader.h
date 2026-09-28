@@ -1,17 +1,21 @@
 #pragma once
 
 #include "Engine/ApplicationModel.h"
+#include "UI/Controls/Controls.h"
 
 namespace papercut
 {
 
 class CommandRegistry;
-class ThemeManager;
 
-/** One track's header: its name and kind, mute and solo buttons, a pan knob
-    and a volume fader. An audio track also shows its input and arm button.
-    Every change goes through a Command; a fader or knob drag is one undo step.
-    Clicks on the header's background fall through to the TrackList (which selects the track). */
+/** One track's header (PRD §8.1, §8.4): fold chevron, colour dot, name, and
+    Arm / Solo / Mute / Auto. The right-click menu sets the colour and, on an
+    audio track, the input. Volume and pan live in the mixer.
+
+    States: armed, solo and muted fill their buttons; Auto shows a lime tint
+    and turns the chevron down; a selected header is bg-elevated with an
+    accent left edge. Clicks on the background fall through to the TrackList,
+    which selects the track. */
 class TrackHeader : public juce::Component
 {
 public:
@@ -19,46 +23,29 @@ public:
     TrackHeader (CommandRegistry&, ThemeManager&, const TrackInfo&, const juce::StringArray& inputs);
 
     const TrackInfo& getTrack() const noexcept   { return track; }
-    void setTrack (const TrackInfo&, const juce::StringArray& inputs);
+    void setTrack (const TrackInfo&, const juce::StringArray& inputs, bool automationShown);
+
+    /** The Auto button or the chevron. */
+    std::function<void()> onToggleAutomation;
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
 
-    /** Re-applies the Theme's mute, solo and arm colours. */
-    void applyTheme();
+    /** Kept for the view's theme pass; the header reads the Theme when it paints. */
+    void applyTheme()   { repaint(); }
 
 private:
-    /** A slider that invokes a Command per value change, marking every value
-        after the first of a drag as continuing that gesture. */
-    struct GestureSlider : juce::Slider
-    {
-        std::function<void (double value, bool continuesGesture)> onGestureValue;
-
-        void startedDragging() override   { dragging = true; sentInDrag = false; }
-        void stoppedDragging() override   { dragging = false; }
-
-        void valueChanged() override
-        {
-            if (onGestureValue)
-                onGestureValue (getValue(), dragging && sentInDrag);
-
-            sentInDrag = dragging;
-        }
-
-        bool dragging = false, sentInDrag = false;
-    };
-
     CommandRegistry& commands;
     ThemeManager& themeManager;
     TrackInfo track;
+    juce::StringArray inputs;
+    bool automationShown = false;
 
-    juce::TextButton muteButton { "M" }, soloButton { "S" }, armButton { "R" };
-    juce::ComboBox input;
-    juce::StringArray inputs;   ///< the input menu's items after "No Input"
+    TrackButton arm, solo, mute, automation;
 
-    // The input menu's item IDs: inputs[i] has firstInputId + i.
-    static constexpr int noInputId = 1, firstInputId = 2;
-    GestureSlider pan, volume;
+    juce::Rectangle<int> chevronBounds() const;
+    void showMenu();
 };
 
 } // namespace papercut
