@@ -1,4 +1,5 @@
 #include "Production.h"
+#include "Render.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -18,69 +19,6 @@ namespace
                 return track;
 
         return nullptr;
-    }
-
-    /** Bit for one track in Renderer::Parameters::tracksToDo.
-
-        te::toBitSet sets every track whenever the array is non-empty, so a
-        one-track bounce cannot use it. The renderer indexes getAllTracks. */
-    juce::BigInteger bitForTrack (te::Track& track)
-    {
-        juce::BigInteger bits;
-        const auto all = te::getAllTracks (track.edit);
-
-        if (const int index = all.indexOf (&track); index >= 0)
-            bits.setBit (index);
-
-        return bits;
-    }
-
-    /** Same Parameters as Tests/RenderTests.cpp, with the caller's track mask. */
-    juce::Result renderToWav (te::Edit& edit, const juce::File& destFile, const juce::BigInteger& tracksToDo)
-    {
-        if (destFile == juce::File() || destFile.getFullPathName().isEmpty() || destFile.isDirectory())
-            return juce::Result::fail ("Offline render needs a WAV file path");
-
-        if (auto r = destFile.getParentDirectory().createDirectory(); r.failed())
-            return r;
-
-        destFile.deleteFile();
-
-        auto& dm = edit.engine.getDeviceManager();
-
-        if (dm.getSampleRate() <= 7000.0 || dm.getBlockSize() <= 0)
-            return juce::Result::fail ("Offline render needs a sample rate and block size");
-
-        if (tracksToDo.isZero())
-            return juce::Result::fail ("Offline render has no tracks");
-
-        if (edit.getLength().inSeconds() <= 0.0)
-            return juce::Result::fail ("The Edit has no length to render");
-
-        // A later Edit allocates a playback context once the device has been used.
-        // ScopedRenderStatus frees it and stops it being rebuilt for the duration
-        // of the render. false: don't reattach afterwards; tests are headless.
-        const te::Edit::ScopedRenderStatus renderStatus (edit, false);
-
-        // Not Renderer::renderToFile (Edit&, File): that un-mutes and solo-isolates every track.
-        te::Renderer::Parameters params (edit);
-        params.destFile = destFile;
-        params.audioFormat = edit.engine.getAudioFileFormatManager().getWavFormat();
-        params.bitDepth = 24;
-        params.sampleRateForAudio = dm.getSampleRate();
-        params.blockSizeForAudio = dm.getBlockSize();
-        params.time = { te::TimePosition(), edit.getLength() };
-        params.tracksToDo = tracksToDo;
-        params.usePlugins = params.useMasterPlugins = true;
-        // An empty track has no audio nodes. Still write the silent file.
-        params.checkNodesForAudio = false;
-
-        auto rendered = te::Renderer::renderToFile ({}, params);
-
-        if (! rendered.existsAsFile() || rendered.getSize() <= 44)
-            return juce::Result::fail ("Offline render produced no audio");
-
-        return juce::Result::ok();
     }
 
     juce::File recoveryFolder (const ProjectManager& projects)
@@ -233,13 +171,13 @@ juce::Result Production::bounceTrack (const juce::String& trackId, const juce::F
     if (track == nullptr)
         return juce::Result::fail ("No track with id " + trackId);
 
-    return renderToWav (projects.getEdit(), destFile, bitForTrack (*track));
+    return render::toWav (projects.getEdit(), destFile, render::bitForTrack (*track));
 }
 
 juce::Result Production::exportMix (const juce::File& destFile)
 {
     auto& edit = projects.getEdit();
-    return renderToWav (edit, destFile, te::toBitSet (te::getAllTracks (edit)));
+    return render::toWav (edit, destFile, te::toBitSet (te::getAllTracks (edit)));
 }
 
 juce::Result Production::saveTemplate (const juce::File& destFolder)

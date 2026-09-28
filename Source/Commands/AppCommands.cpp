@@ -17,7 +17,7 @@ namespace
                                pitch ("pitch"), length ("length"), velocity ("velocity"), grid ("grid"),
                                noteId ("noteId"), noteIds ("noteIds"),
                                deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch"),
-                               bpm ("bpm"), file ("file"), numerator ("numerator"), denominator ("denominator");
+                               bpm ("bpm"), file ("file"), name ("name"), numerator ("numerator"), denominator ("denominator");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -252,6 +252,87 @@ namespace
     };
 
     /** A clip's take menu. */
+    /** Alt-drag: a copy at the drop position. */
+    struct CopyClipCommand : ModelCommand
+    {
+        CopyClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.copy", "Copy Clip", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            report (model.copyClip (args[ArgKeys::clipId].toString(), (double) args[ArgKeys::start], args[ArgKeys::trackId].toString()));
+        }
+    };
+
+    /** The top-right corner drag: the clip repeats up to the new end. */
+    struct LoopExtendClipCommand : ModelCommand
+    {
+        LoopExtendClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.loopExtend", "Loop Clip", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            model.loopExtendClip (args[ArgKeys::clipId].toString(), (double) args[ArgKeys::end]);
+        }
+    };
+
+    struct SelectionCommand : ModelCommand
+    {
+        SelectionCommand (const char* id, const char* name, ApplicationModel& m, AppCommandHost& h,
+                          std::function<void (ApplicationModel&, AppCommandHost&)> fn)
+            : ModelCommand (id, name, m, h), action (std::move (fn)) {}
+
+        void execute (const juce::var&) override   { action (model, host); }
+        bool isEnabled() const override             { return ! model.getSelectedClipIds().isEmpty(); }
+
+        std::function<void (ApplicationModel&, AppCommandHost&)> action;
+    };
+
+    /** Delete / Backspace: the selected notes (Piano Roll), else the selected clips. */
+    struct DeleteCommand : ModelCommand
+    {
+        DeleteCommand (ApplicationModel& m, AppCommandHost& h, CommandRegistry& r)
+            : ModelCommand ("edit.delete", "Delete", m, h), registry (r) {}
+
+        void execute (const juce::var&) override
+        {
+            registry.invoke (model.hasSelectedNotes() ? "note.delete" : "clip.delete");
+        }
+
+        bool isEnabled() const override   { return model.hasSelectedNotes() || ! model.getSelectedClipIds().isEmpty(); }
+
+        CommandRegistry& registry;
+    };
+
+    struct RenameClipCommand : ModelCommand
+    {
+        RenameClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.rename", "Rename Clip", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            model.renameClip (args[ArgKeys::clipId].toString(), args[ArgKeys::name].toString());
+        }
+    };
+
+    struct ReverseClipCommand : ModelCommand
+    {
+        ReverseClipCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.reverse", "Reverse", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            auto id = args[ArgKeys::clipId].toString();
+            model.reverseClip (id.isNotEmpty() ? id : model.getSelectedClipId());
+        }
+    };
+
+    struct SetClipColourCommand : ModelCommand
+    {
+        SetClipColourCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.setColour", "Clip Colour", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            model.setClipColour (args[ArgKeys::clipId].toString(), (int) args[ArgKeys::value]);
+        }
+    };
+
     struct SetClipTakeCommand : ModelCommand
     {
         SetClipTakeCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.setTake", "Switch Take", m, h) {}
@@ -506,6 +587,22 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<ResizeClipCommand> (model, host));
     registry.add (std::make_unique<SplitClipCommand> (model, host));
     registry.add (std::make_unique<SetClipTakeCommand> (model, host));
+    registry.add (std::make_unique<CopyClipCommand> (model, host));
+    registry.add (std::make_unique<LoopExtendClipCommand> (model, host));
+    registry.add (std::make_unique<RenameClipCommand> (model, host));
+    registry.add (std::make_unique<ReverseClipCommand> (model, host));
+    registry.add (std::make_unique<SetClipColourCommand> (model, host));
+    registry.add (std::make_unique<SelectionCommand> ("clip.duplicate", "Duplicate", model, host,
+                                                      [] (ApplicationModel& m, AppCommandHost&) { m.duplicateSelectedClips(); }));
+    registry.add (std::make_unique<SelectionCommand> ("clip.consolidate", "Consolidate", model, host,
+                                                      [] (ApplicationModel& m, AppCommandHost& h)
+                                                      {
+                                                          if (auto r = m.consolidateSelectedClips(); r.failed() && h.reportError)
+                                                              h.reportError (r.getErrorMessage());
+                                                      }));
+    registry.add (std::make_unique<DeleteCommand> (model, host, registry));
+    registry.add (std::make_unique<SelectionCommand> ("clip.delete", "Delete", model, host,
+                                                      [] (ApplicationModel& m, AppCommandHost&) { m.deleteSelectedClips(); }));
     registry.add (std::make_unique<AddNoteCommand> (model, host));
     registry.add (std::make_unique<DeleteNotesCommand> (model, host));
     registry.add (std::make_unique<MoveNotesCommand> (model, host));
@@ -681,6 +778,27 @@ juce::var trackColourArgs (const juce::String& trackId, int colourIndex)
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::trackId, trackId);
     args->setProperty (ArgKeys::value, colourIndex);
+    return args;
+}
+
+juce::var clipArgs (const juce::String& clipId)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::clipId, clipId);
+    return args;
+}
+
+juce::var clipRenameArgs (const juce::String& clipId, const juce::String& name)
+{
+    auto args = clipArgs (clipId);
+    args.getDynamicObject()->setProperty (ArgKeys::name, name);
+    return args;
+}
+
+juce::var clipColourArgs (const juce::String& clipId, int colourIndex)
+{
+    auto args = clipArgs (clipId);
+    args.getDynamicObject()->setProperty (ArgKeys::value, colourIndex);
     return args;
 }
 

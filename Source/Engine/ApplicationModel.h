@@ -40,6 +40,10 @@ struct ClipInfo
     int currentTake = -1;   ///< the take playing, or -1
     TrackKind kind = TrackKind::audio;
     std::vector<MidiNoteInfo> notes;
+    bool looping = false;             ///< its content repeats (loop-extend)
+    double loopLengthSeconds = 0;     ///< the repeating part, when looping
+    bool reversed = false;            ///< an audio clip playing backwards
+    int colourIndex = -1;             ///< into the track palette; -1: the track's colour
 };
 
 /** Read-only snapshot of a track, for views. */
@@ -213,6 +217,34 @@ public:
     /** Makes one of a clip's takes (0-based) the one it plays. */
     bool setClipTake (const juce::String& clipId, int takeIndex);
 
+    /** Copies the clip to start at startSeconds on trackId (its own track when
+        empty); a clip only lands on a track of its kind. The copy is selected. */
+    juce::Result copyClip (const juce::String& clipId, double startSeconds, const juce::String& trackId = {});
+
+    /** Duplicates each selected clip right after itself; the copies become the selection. */
+    bool duplicateSelectedClips();
+
+    /** Makes the clip repeat its content (its current length is the loop) up
+        to endSeconds (PRD §8.2, the top-right corner drag). */
+    bool loopExtendClip (const juce::String& clipId, double endSeconds);
+
+    /** Joins the selected clips of one track into one clip spanning them:
+        MIDI clips merge their notes; audio clips render (without the track's
+        plug-ins) to a new file in the Project's Audio folder. Fails with fewer
+        than two clips, clips on several tracks, or mixed kinds. */
+    juce::Result consolidateSelectedClips();
+
+    /** Removes every selected clip. */
+    bool deleteSelectedClips();
+
+    bool renameClip (const juce::String& clipId, const juce::String& name);
+
+    /** Plays an audio clip backwards, or forwards again. False for a MIDI clip. */
+    bool reverseClip (const juce::String& clipId);
+
+    /** The clip's own palette colour, or -1 for its track's. */
+    bool setClipColour (const juce::String& clipId, int colourIndex);
+
     //==============================================================================
     // MIDI notes. Times are seconds from the clip's start. The new note is selected.
     bool addNote (const juce::String& clipId, double startSeconds, double lengthSeconds, int pitch, int velocity);
@@ -244,10 +276,16 @@ public:
 
     //==============================================================================
     // Selection (engine SelectionManager; never undoable)
+    /** A click replaces the selection; Shift adds; Mod toggles (PRD §16.1). */
+    enum class SelectionMode { replace, add, toggle };
+
     void selectTrack (const juce::String& trackId);
-    void selectClip (const juce::String& clipId);
+    void selectClip (const juce::String& clipId, SelectionMode = SelectionMode::replace);
     juce::String getSelectedTrackId() const;
+
+    /** The first selected clip, or empty. */
     juce::String getSelectedClipId() const;
+    juce::StringArray getSelectedClipIds() const;
 
     /** Replaces the note selection. Never an undo step. Ids that don't match a
         note simply aren't shown selected. */

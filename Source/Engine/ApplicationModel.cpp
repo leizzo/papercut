@@ -1,6 +1,7 @@
 #include "ApplicationModel.h"
 #include "ClipWaveformImpl.h"
 #include "ProjectManager.h"
+#include "Render.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -346,6 +347,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         info.sourceLengthSeconds = te::Edit::getMaximumEditEnd().inSeconds();
         info.selected = selectionManager.isSelected (&clip);
         info.kind = TrackKind::midi;
+        describeLoopAndColour (clip, info);
 
         for (auto* note : clip.getSequence().getNotes())
         {
@@ -366,6 +368,25 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         }
 
         return info;
+    }
+
+    void describeLoopAndColour (const te::Clip& clip, ClipInfo& info) const
+    {
+        info.looping = clip.isLooping();
+
+        if (auto* midi = dynamic_cast<const te::MidiClip*> (&clip); midi != nullptr && info.looping)
+        {
+            const auto start = clip.getPosition().getStart();
+            const auto startBeat = edit().tempoSequence.toBeats (start);
+            info.loopLengthSeconds = (edit().tempoSequence.toTime (startBeat + midi->getLoopLengthBeats()) - start).inSeconds();
+        }
+        else if (auto* audio = dynamic_cast<const te::AudioClipBase*> (&clip); audio != nullptr && info.looping)
+        {
+            info.loopLengthSeconds = audio->getLoopLength().inSeconds();
+        }
+
+        if (auto colour = clip.state[trackColourProperty]; colour.isInt())
+            info.colourIndex = juce::jlimit (0, trackPaletteSize - 1, (int) colour);
     }
 
     /** One bar after start, at the Edit's tempo, keeping the beat within the bar. */
@@ -811,6 +832,266 @@ bool ApplicationModel::splitClip (const juce::String& clipId, double timeSeconds
     });
 }
 
+//==============================================================================
+namespace
+{
+    /** A copied MIDI clip's notes get ids of their own, or selecting one would select both. */
+    void renameNoteIds (te::Clip& clip, const juce::Identifier& noteIdProperty, juce::UndoManager* um)
+    {
+        if (auto* midi = dynamic_cast<te::MidiClip*> (&clip))
+            for (auto* note : midi->getSequence().getNotes())
+                note->state.setProperty (noteIdProperty, juce::Uuid().toString(), um);
+    }
+}
+
+juce::Result ApplicationModel::copyClip (const juce::String& clipId, double startSeconds, const juce::String& trackId)
+{
+    auto* clip = impl->findClip (clipId);
+    auto* track = trackId.isEmpty() ? (clip != nullptr ? dynamic_cast<te::AudioTrack*> (clip->getClipTrack()) : nullptr)
+                                    : impl->findTrack (trackId);
+
+    if (clip == nullptr || track == nullptr)
+        return juce::Result::fail ("No such clip or track");
+
+    if (impl->isMidiTrack (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
+        return juce::Result::fail ("A clip only goes on a track of its own kind");
+
+    impl->beginUndoStep ("Copy Clip");
+    auto copy = te::duplicateClip (*clip);
+
+    if (copy == nullptr)
+        return juce::Result::fail ("The engine refused the copy");
+
+    renameNoteIds (*copy, Impl::noteIdProperty, &impl->undoManager());
+    const auto copyId = copy->itemID.toString();
+
+    if (track != copy->getClipTrack())
+        copy->moveTo (*track);
+
+    // Re-parenting may rebuild the clip object; look it up again by ID.
+    if (auto* moved = impl->findClip (copyId))
+    {
+        moved->setStart (te::TimePosition::fromSeconds (std::max (0.0, startSeconds)), false, true);
+        impl->selectionManager.selectOnly (moved);
+    }
+
+    return juce::Result::ok();
+}
+
+bool ApplicationModel::duplicateSelectedClips()
+{
+    auto selected = impl->selectionManager.getItemsOfType<te::Clip>();
+
+    if (selected.isEmpty())
+        return false;
+
+    impl->beginUndoStep ("Duplicate");
+    juce::Array<te::Clip*> copies;
+
+    for (auto* clip : selected)
+    {
+        if (auto copy = te::duplicateClip (*clip))
+        {
+            renameNoteIds (*copy, Impl::noteIdProperty, &impl->undoManager());
+            copy->setStart (clip->getPosition().getEnd(), false, true);
+            copies.add (copy.get());
+        }
+    }
+
+    impl->selectionManager.deselectAll();
+
+    for (auto* copy : copies)
+        impl->selectionManager.addToSelection (copy);
+
+    return ! copies.isEmpty();
+}
+
+bool ApplicationModel::loopExtendClip (const juce::String& clipId, double endSeconds)
+{
+    auto* clip = impl->findClip (clipId);
+
+    if (clip == nullptr)
+        return false;
+
+    const auto pos = clip->getPosition();
+    const auto end = te::TimePosition::fromSeconds (endSeconds);
+
+    if (end <= pos.getStart() || end == pos.getEnd())
+        return false;
+
+    impl->beginUndoStep ("Loop Clip");
+
+    // The clip's current content becomes the loop.
+    if (! clip->isLooping())
+    {
+        if (auto* midi = dynamic_cast<te::MidiClip*> (clip))
+        {
+            const auto startBeat = midi->getOffsetInBeats();
+            midi->setLoopRangeBeats ({ te::BeatPosition() + startBeat, te::BeatPosition() + startBeat + midi->getLengthInBeats() });
+        }
+        else if (auto* audio = dynamic_cast<te::AudioClipBase*> (clip))
+        {
+            audio->setLoopRange ({ te::TimePosition() + pos.getOffset(), pos.getLength() });
+        }
+
+        if (! clip->isLooping())
+            return false;
+    }
+
+    clip->setEnd (end, true);
+    return true;
+}
+
+juce::Result ApplicationModel::consolidateSelectedClips()
+{
+    auto selected = impl->selectionManager.getItemsOfType<te::Clip>();
+
+    if (selected.size() < 2)
+        return juce::Result::fail ("Select two or more clips to consolidate");
+
+    auto* track = dynamic_cast<te::AudioTrack*> (selected.getFirst()->getClipTrack());
+    const auto midi = dynamic_cast<te::MidiClip*> (selected.getFirst()) != nullptr;
+    te::TimeRange range = selected.getFirst()->getPosition().time;
+
+    for (auto* clip : selected)
+    {
+        if (clip->getClipTrack() != track || (dynamic_cast<te::MidiClip*> (clip) != nullptr) != midi)
+            return juce::Result::fail ("Consolidate works on clips of one kind on one track");
+
+        range = range.getUnionWith (clip->getPosition().time);
+    }
+
+    if (track == nullptr)
+        return juce::Result::fail ("Consolidate works on clips of one kind on one track");
+
+    auto& edit = impl->edit();
+    const auto name = selected.getFirst()->getName();
+
+    if (midi)
+    {
+        struct Note { int pitch, velocity; double start, length; };
+        std::vector<Note> notes;
+
+        for (auto* clip : selected)
+        {
+            auto* source = dynamic_cast<te::MidiClip*> (clip);
+            const auto clipStart = source->getPosition().getStart().inSeconds();
+            const auto clipLength = source->getPosition().getLength().inSeconds();
+
+            for (auto* note : source->getSequence().getNotes())
+            {
+                const auto start = impl->localSecondsForNoteBeat (*source, note->getStartBeat().inBeats());
+                const auto end = impl->localSecondsForNoteBeat (*source, note->getEndBeat().inBeats());
+
+                // Only what plays: notes inside the clip's visible part.
+                if (end > start && start >= -1.0e-9 && start < clipLength)
+                    notes.push_back ({ note->getNoteNumber(), note->getVelocity(), clipStart + start,
+                                       std::min (end, clipLength) - start });
+            }
+        }
+
+        impl->beginUndoStep ("Consolidate");
+
+        for (auto* clip : selected)
+            clip->removeFromParent();
+
+        auto merged = track->insertMIDIClip (name, range, nullptr);
+
+        if (merged == nullptr)
+            return juce::Result::fail ("The engine refused the clip");
+
+        for (auto& n : notes)
+        {
+            const auto startBeat = impl->noteBeatForLocalSeconds (*merged, n.start - range.getStart().inSeconds());
+            const auto endBeat = impl->noteBeatForLocalSeconds (*merged, n.start + n.length - range.getStart().inSeconds());
+
+            if (auto* note = merged->getSequence().addNote (n.pitch, te::BeatPosition::fromBeats (startBeat),
+                                                            te::BeatDuration::fromBeats (endBeat - startBeat),
+                                                            n.velocity, 0, &impl->undoManager()))
+                note->state.setProperty (Impl::noteIdProperty, juce::Uuid().toString(), &impl->undoManager());
+        }
+
+        impl->selectionManager.selectOnly (merged.get());
+        return juce::Result::ok();
+    }
+
+    // Audio: render the clips' own audio over their span, then swap them for the file.
+    const auto folder = ProjectManager::getAudioFolder (impl->projectManager.getProjectFolder());
+    const auto file = folder.getChildFile (name + " consolidated.wav").getNonexistentSibling (false);
+
+    if (auto r = render::toWav (edit, file, render::bitForTrack (*track), range, false); r.failed())
+        return r;
+
+    impl->beginUndoStep ("Consolidate");
+
+    for (auto* clip : selected)
+        clip->removeFromParent();
+
+    if (auto r = impl->placeAudioClip (*track, file, range.getStart()); r.failed())
+        return r;
+
+    return juce::Result::ok();
+}
+
+bool ApplicationModel::deleteSelectedClips()
+{
+    auto selected = impl->selectionManager.getItemsOfType<te::Clip>();
+
+    if (selected.isEmpty())
+        return false;
+
+    impl->beginUndoStep ("Delete Clips");
+    impl->selectionManager.deselectAll();
+
+    for (auto* clip : selected)
+        clip->removeFromParent();
+
+    return true;
+}
+
+bool ApplicationModel::renameClip (const juce::String& clipId, const juce::String& name)
+{
+    auto* clip = impl->findClip (clipId);
+    const auto trimmed = name.trim();
+
+    if (clip == nullptr || trimmed.isEmpty() || trimmed == clip->getName())
+        return false;
+
+    impl->beginUndoStep ("Rename Clip");
+    clip->setName (trimmed);
+    return true;
+}
+
+bool ApplicationModel::reverseClip (const juce::String& clipId)
+{
+    auto* audio = dynamic_cast<te::AudioClipBase*> (impl->findClip (clipId));
+
+    if (audio == nullptr)
+        return false;
+
+    impl->beginUndoStep ("Reverse Clip");
+    audio->setIsReversed (! audio->getIsReversed());
+    return true;
+}
+
+bool ApplicationModel::setClipColour (const juce::String& clipId, int colourIndex)
+{
+    auto* clip = impl->findClip (clipId);
+
+    if (clip == nullptr || colourIndex < -1 || colourIndex >= trackPaletteSize
+        || (int) clip->state.getProperty (Impl::trackColourProperty, -1) == colourIndex)
+        return false;
+
+    impl->beginUndoStep ("Set Clip Colour");
+
+    if (colourIndex < 0)
+        clip->state.removeProperty (Impl::trackColourProperty, &impl->undoManager());
+    else
+        clip->state.setProperty (Impl::trackColourProperty, colourIndex, &impl->undoManager());
+
+    return true;
+}
+
 bool ApplicationModel::setClipTake (const juce::String& clipId, int takeIndex)
 {
     // Not WaveAudioClip::setCurrentTake: that only knows takes that are items of a
@@ -1105,12 +1386,40 @@ void ApplicationModel::selectTrack (const juce::String& trackId)
         impl->selectionManager.deselectAll();
 }
 
-void ApplicationModel::selectClip (const juce::String& clipId)
+void ApplicationModel::selectClip (const juce::String& clipId, SelectionMode mode)
 {
-    if (auto* clip = impl->findClip (clipId))
-        impl->selectionManager.selectOnly (clip);
+    auto* clip = impl->findClip (clipId);
+    auto& selection = impl->selectionManager;
+
+    if (clip == nullptr)
+    {
+        if (mode == SelectionMode::replace)
+            selection.deselectAll();
+
+        return;
+    }
+
+    // Tracks and clips aren't selected together.
+    if (mode != SelectionMode::replace)
+        for (auto* track : selection.getItemsOfType<te::AudioTrack>())
+            selection.deselect (track);
+
+    if (mode == SelectionMode::replace)
+        selection.selectOnly (clip);
+    else if (mode == SelectionMode::add || ! selection.isSelected (clip))
+        selection.addToSelection (clip);
     else
-        impl->selectionManager.deselectAll();
+        selection.deselect (clip);
+}
+
+juce::StringArray ApplicationModel::getSelectedClipIds() const
+{
+    juce::StringArray ids;
+
+    for (auto* clip : impl->selectionManager.getItemsOfType<te::Clip>())
+        ids.add (clip->itemID.toString());
+
+    return ids;
 }
 
 juce::String ApplicationModel::getSelectedTrackId() const
@@ -1390,16 +1699,19 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
             if (auto* wave = dynamic_cast<te::WaveAudioClip*> (c))
             {
                 const auto pos = wave->getPosition();
-                info.clips.push_back ({ wave->itemID.toString(),
-                                        wave->getName(),
-                                        pos.getStart().inSeconds(),
-                                        pos.getLength().inSeconds(),
-                                        pos.getOffset().inSeconds(),
-                                        wave->getMaximumLength().inSeconds(),
-                                        wave->getOriginalFile(),
-                                        impl->selectionManager.isSelected (wave),
-                                        Impl::takesOf (*wave).getNumChildren(),
-                                        impl->currentTakeOf (*wave) });
+                ClipInfo clip { wave->itemID.toString(),
+                                wave->getName(),
+                                pos.getStart().inSeconds(),
+                                pos.getLength().inSeconds(),
+                                pos.getOffset().inSeconds(),
+                                wave->getMaximumLength().inSeconds(),
+                                wave->getOriginalFile(),
+                                impl->selectionManager.isSelected (wave),
+                                Impl::takesOf (*wave).getNumChildren(),
+                                impl->currentTakeOf (*wave) };
+                clip.reversed = wave->getIsReversed();
+                impl->describeLoopAndColour (*wave, clip);
+                info.clips.push_back (std::move (clip));
             }
             else if (auto* midi = dynamic_cast<te::MidiClip*> (c))
             {

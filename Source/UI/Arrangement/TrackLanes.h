@@ -15,10 +15,12 @@ class CommandRegistry;
     positions. Clip components are kept by clip ID across model updates so their
     waveforms aren't regenerated.
 
-    Clip gestures: clicking a clip selects it; dragging its body moves it (across
-    lanes too), dragging an edge resizes it. The drag is previewed here and
-    committed on release as one clip.move / clip.resize Command. Right-clicking
-    a clip offers its takes (clip.setTake). Double-clicking a MIDI clip opens it.
+    Clip gestures (PRD §8.2): a click selects a clip (Shift adds, Mod toggles);
+    dragging its body moves it (across lanes too, snapping to beats; Mod
+    bypasses the snap, Alt drops a copy); dragging an edge trims it; dragging
+    its top-right corner loop-extends it. The drag is previewed here and
+    committed on release as one Command. Right-click opens the clip menu with
+    each item's shortcut; double-click opens the Piano Roll or the Editor.
 
     While recording, each recording is drawn in its lane with its waveform
     growing, polled from the model at ~30 Hz like the Playhead.
@@ -49,7 +51,7 @@ public:
     std::function<void (const juce::String& clipId)> onMidiClipOpened, onAudioClipOpened;
 
 private:
-    enum class DragMode { move, resizeStart, resizeEnd };
+    enum class DragMode { move, resizeStart, resizeEnd, loopExtend };
 
     struct Drag
     {
@@ -57,6 +59,7 @@ private:
         ClipInfo original, preview;
         int row = 0;               ///< the preview's row
         double grabSeconds = 0;    ///< timeline position under the pointer at mouse-down
+        bool copy = false;         ///< Alt-drag: a copy lands, the original stays
     };
 
     ApplicationModel& model;
@@ -76,7 +79,10 @@ private:
     DragMode dragModeAt (const ClipComponent&, juce::Point<int>) const;
     int rowOf (const juce::String& clipId) const;
     int rowOfTrack (const juce::String& trackId) const;
-    void showTakeMenu (const ClipInfo&);
+    void showClipMenu (const ClipInfo&);
+    void startRename (const ClipInfo&);
+    double snap (double seconds, bool bypass) const;
+    std::unique_ptr<juce::TextEditor> renameEditor;
 
     void timerCallback() override;
 };

@@ -33,8 +33,10 @@ struct AppCommandHost
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
     track.setInput   track.toggleArm   track.setColour
     clip.add     clip.insertAt  clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
+    clip.copy    clip.loopExtend  clip.rename  clip.reverse  clip.setColour
+    clip.duplicate  clip.consolidate  clip.delete   (these three act on the selected clips)
     note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
-    edit.undo    edit.redo
+    edit.undo    edit.redo    edit.delete
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
     transport.setPosition
     transport.record  transport.toggleLoop  transport.setLoopRange
@@ -60,15 +62,24 @@ juce::var trackColourArgs (const juce::String& trackId, int colourIndex);
     or empty for none. */
 juce::var trackInputArgs (const juce::String& trackId, const juce::String& inputName);
 
-/** Arguments for clip.move: the clip, its new start, and optionally the track to
+/** Arguments for clip.move and clip.copy: the clip, its new start, and optionally the track to
     move it to. Invoked with anything else, clip.move does nothing. */
 juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId = {});
 
 /** Arguments for clip.insertAt: an audio file dropped on a track at a position. */
 juce::var clipInsertAtArgs (const juce::File&, const juce::String& trackId, double startSeconds);
 
-/** Arguments for clip.resize: the clip and its new edges. */
+/** Arguments for clip.resize and clip.loopExtend: the clip and its new edges. */
 juce::var clipResizeArgs (const juce::String& clipId, double startSeconds, double endSeconds);
+
+/** Arguments naming one clip: clip.reverse. */
+juce::var clipArgs (const juce::String& clipId);
+
+/** Arguments for clip.rename. */
+juce::var clipRenameArgs (const juce::String& clipId, const juce::String& name);
+
+/** Arguments for clip.setColour: a palette index, or -1 for the track's colour. */
+juce::var clipColourArgs (const juce::String& clipId, int colourIndex);
 
 /** Arguments for clip.setTake: the clip and a 0-based take index. */
 juce::var clipTakeArgs (const juce::String& clipId, int takeIndex);
