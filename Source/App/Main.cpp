@@ -11,6 +11,7 @@
 #include "Engine/PluginRack.h"
 #include "Engine/Production.h"
 #include "Engine/ProjectManager.h"
+#include "Engine/SamplePreview.h"
 #include "Engine/Session.h"
 #include "Engine/Shaper.h"
 #include "UI/Layout/LayoutSource.h"
@@ -80,6 +81,7 @@ public:
         session = std::make_unique<Session> (*projects);
         automation = std::make_unique<Automation> (*projects);
         shaper = std::make_unique<Shaper> (*projects);
+        preview = std::make_unique<SamplePreview> (*engine);
 
         wireCommandHost();
         registerAppCommands (commands, *model, commandHost);
@@ -92,7 +94,7 @@ public:
         mainWindow = std::make_unique<MainWindow> (getApplicationName(),
             MainComponent::Services { *model, commands, theme, uiState, layoutSource,
                                       engine->describeActiveAudioDevice(),
-                                      reportError, *plugins, *mixer, *session, *automation, *shaper });
+                                      reportError, *plugins, *mixer, *session, *automation, *shaper, *preview });
 
         offerRecovery();
         startTimer (Production::autosaveIntervalMs);
@@ -108,6 +110,7 @@ public:
             model->stop();
 
         model.reset();
+        preview.reset();
         shaper.reset();
         automation.reset();
         session.reset();
@@ -177,6 +180,7 @@ private:
     std::unique_ptr<Session> session;
     std::unique_ptr<Automation> automation;
     std::unique_ptr<Shaper> shaper;
+    std::unique_ptr<SamplePreview> preview;
 
     CommandRegistry commands;
     AppCommandHost commandHost;

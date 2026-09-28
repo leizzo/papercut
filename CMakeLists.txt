@@ -47,7 +47,8 @@ add_library(papercut_engine STATIC
     Source/Engine/Mixer.cpp
     Source/Engine/Session.cpp
     Source/Engine/Automation.cpp
-    Source/Engine/Shaper.cpp)
+    Source/Engine/Shaper.cpp
+    Source/Engine/SamplePreview.cpp)
 
 target_compile_definitions(papercut_engine PUBLIC
     JUCE_STANDALONE_APPLICATION=1
@@ -158,7 +159,8 @@ add_library(papercut_ui STATIC
     Source/UI/Developer/DeveloperOverlay.cpp
     Source/UI/Developer/LayoutWatcher.cpp
     Source/Commands/ProductionCommands.cpp
-    Source/UI/Plugins/PluginBrowser.cpp
+    Source/UI/Browser/Library.cpp
+    Source/UI/Browser/Browser.cpp
     Source/UI/Plugins/InsertStrip.cpp
     Source/UI/Plugins/PluginEditorWindow.cpp
     Source/UI/Mixer/ChannelStrip.cpp
@@ -238,6 +240,7 @@ target_sources(PapercutTests PRIVATE
     Tests/ControlTests.cpp
     Tests/DeviceChainTests.cpp
     Tests/ShellTests.cpp
+    Tests/BrowserTests.cpp
     Tests/Snapshots.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the

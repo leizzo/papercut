@@ -22,6 +22,7 @@ class UIStateStore;
     cmd/ctrl + wheel zooms around the pointer. Clip gestures live in TrackLanes.
 */
 class ArrangementView : public juce::Component,
+                        public juce::DragAndDropTarget,
                         private ApplicationModel::Listener,
                         private ThemeManager::Listener,
                         private juce::ValueTree::Listener
@@ -38,6 +39,13 @@ public:
     void resized() override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     void mouseMagnify (const juce::MouseEvent&, float scaleFactor) override;
+    void paintOverChildren (juce::Graphics&) override;
+
+    // Browser items dropped on a track header or lane (PRD §6.2)
+    bool isInterestedInDragSource (const SourceDetails&) override;
+    void itemDragMove (const SourceDetails&) override;
+    void itemDragExit (const SourceDetails&) override;
+    void itemDropped (const SourceDetails&) override;
 
 private:
     ApplicationModel& model;
@@ -55,6 +63,16 @@ private:
     std::vector<TrackInfo> tracks;
     juce::String shownTrackId;
     juce::String parameterKey { "volume" };
+    CommandRegistry& commands;
+
+    struct DropTarget
+    {
+        int row = -1;
+        bool valid = false;
+    };
+
+    DropTarget dropTarget;
+    DropTarget dropTargetAt (const SourceDetails&) const;
 
     void refresh();
     void syncAutomationTarget();

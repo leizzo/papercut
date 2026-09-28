@@ -29,6 +29,7 @@ struct PluginInfo
     juce::String name, manufacturer, format, path, category;
     bool instrument = false;
     bool midiEffect = false;
+    bool external = false;                      ///< a scanned plug-in (VST3, AU), not a built-in
     PluginChain chain = PluginChain::device;   ///< on a track: which chain it is on
     bool enabled = true;                        ///< false when bypassed
     bool missing = false;                       ///< saved in the project but not installed; audio passes through

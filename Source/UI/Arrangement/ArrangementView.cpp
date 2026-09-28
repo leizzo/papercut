@@ -1,5 +1,7 @@
 #include "ArrangementView.h"
+#include "UI/Browser/Library.h"
 #include "UI/State/UIStateStore.h"
+#include "UI/Theme/Interaction.h"
 
 namespace papercut
 {
@@ -10,14 +12,15 @@ namespace
     constexpr double zoomPerWheelUnit = 4.0;
 }
 
-ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& commands, ThemeManager& tm, UIStateStore& uiState,
+ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, UIStateStore& uiState,
                                   Automation& autoLanes, Shaper& shapers)
     : model (m), automation (autoLanes), themeManager (tm), view (uiState.getState (componentId)),
-      timeline (model, commands, themeManager, view),
-      trackList (commands, themeManager, view),
-      lanes (model, commands, themeManager, view),
-      automationLane (model, automation, commands, themeManager, view),
-      shaperPanel (model, shapers, commands, themeManager)
+      timeline (model, c, themeManager, view),
+      trackList (c, themeManager, view),
+      lanes (model, c, themeManager, view),
+      automationLane (model, automation, c, themeManager, view),
+      shaperPanel (model, shapers, c, themeManager),
+      commands (c)
 {
     setComponentID (componentId);
 
@@ -34,9 +37,9 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& commands
         shaperPanel.setParameterKey (parameterKey);
     };
 
-    for (auto* c : std::initializer_list<juce::Component*> { &timeline, &trackList, &lanes, &playhead,
-                                                             &parameterBox, &shaperPanel, &automationLane })
-        addAndMakeVisible (c);
+    for (auto* child : std::initializer_list<juce::Component*> { &timeline, &trackList, &lanes, &playhead,
+                                                                 &parameterBox, &shaperPanel, &automationLane })
+        addAndMakeVisible (child);
 
     // Clicking a track header or an empty lane selects the track (engine
     // selection; never undoable, never through the UndoManager).
@@ -186,6 +189,72 @@ void ArrangementView::mouseWheelMove (const juce::MouseEvent& e, const juce::Mou
         view.setScrollY (view.getScrollY() - juce::roundToInt (dy * wheelPixelsPerUnit));
         clampVerticalScroll();
     }
+}
+
+ArrangementView::DropTarget ArrangementView::dropTargetAt (const SourceDetails& details) const
+{
+    const auto item = itemFromDrag (details.description);
+    const auto lanePoint = lanes.getLocalPoint (this, details.localPosition);
+    const auto row = view.yToRow (lanePoint.y, themeManager.getMetrics().trackHeight);
+
+    if (! item || ! juce::isPositiveAndBelow (row, (int) tracks.size())
+        || ! (lanes.getBounds().contains (details.localPosition) || trackList.getBounds().contains (details.localPosition)))
+        return {};
+
+    return { row, canDropOnTrack (*item, tracks[(size_t) row].kind) };
+}
+
+bool ArrangementView::isInterestedInDragSource (const SourceDetails& details)
+{
+    return itemFromDrag (details.description).has_value();
+}
+
+void ArrangementView::itemDragMove (const SourceDetails& details)
+{
+    const auto target = dropTargetAt (details);
+
+    if (target.row != dropTarget.row || target.valid != dropTarget.valid)
+    {
+        dropTarget = target;
+        setMouseCursor (target.row >= 0 && ! target.valid ? notAllowedCursor() : juce::MouseCursor::NormalCursor);
+        repaint();
+    }
+}
+
+void ArrangementView::itemDragExit (const SourceDetails&)
+{
+    dropTarget = {};
+    setMouseCursor (juce::MouseCursor::NormalCursor);
+    repaint();
+}
+
+void ArrangementView::itemDropped (const SourceDetails& details)
+{
+    const auto target = dropTargetAt (details);
+    itemDragExit (details);
+
+    if (auto item = itemFromDrag (details.description); item && target.valid)
+    {
+        // Onto a lane: where it was dropped. Onto a header: at the insert marker.
+        const auto x = (float) lanes.getLocalPoint (this, details.localPosition).x;
+        const auto seconds = lanes.getBounds().contains (details.localPosition) ? std::max (0.0, view.xToTime (x))
+                                                                                : model.getInsertMarkerSeconds();
+        dropOnTrack (commands, *item, tracks[(size_t) target.row].id, seconds);
+    }
+}
+
+void ArrangementView::paintOverChildren (juce::Graphics& g)
+{
+    if (dropTarget.row < 0 || ! dropTarget.valid)
+        return;
+
+    // Valid targets get an accent-dim outline (§16.3).
+    const auto rowHeight = themeManager.getMetrics().trackHeight;
+    const auto y = lanes.getY() + view.rowToY (dropTarget.row, rowHeight);
+    g.setColour (themeManager.getTheme().accentDim);
+    g.drawRoundedRectangle (juce::Rectangle<int> (trackList.getX(), y, lanes.getRight() - trackList.getX(), rowHeight)
+                                .toFloat().reduced (1.0f),
+                            themeManager.getTheme().radiusMd, 2.0f);
 }
 
 void ArrangementView::mouseMagnify (const juce::MouseEvent& e, float scaleFactor)

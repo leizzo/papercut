@@ -6,6 +6,7 @@
 #include "Engine/Automation.h"
 #include "Engine/Mixer.h"
 #include "Engine/PluginRack.h"
+#include "Engine/SamplePreview.h"
 #include "Engine/Session.h"
 #include "Engine/Shaper.h"
 #include "UI/Layout/LayoutSource.h"
@@ -40,6 +41,7 @@ struct Snapshots : juce::UnitTest
         Session session { f.projects };
         Automation automation { f.projects };
         Shaper shaper { f.projects };
+        SamplePreview preview { getEngineManager() };
         registerPluginCommands (f.commands, plugins, f.host);
         registerMixerCommands (f.commands, mixer, f.host);
         registerSessionCommands (f.commands, session, f.host);
@@ -62,7 +64,7 @@ struct Snapshots : juce::UnitTest
                                             juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_H", "1000").getIntValue());
         {
             MainComponent main ({ f.model, f.commands, theme, uiState, source, "No audio device", {},
-                                  plugins, mixer, session, automation, shaper },
+                                  plugins, mixer, session, automation, shaper, preview },
                                 commandManager);
             main.setSize (size.x, size.y);
 

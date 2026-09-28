@@ -8,7 +8,8 @@
 #include "UI/Mixer/MixerView.h"
 #include "UI/PianoRoll/PianoRollView.h"
 #include "UI/Plugins/InsertStrip.h"
-#include "UI/Plugins/PluginBrowser.h"
+#include "UI/Browser/Browser.h"
+#include "Engine/SamplePreview.h"
 #include "UI/Plugins/PluginEditorWindow.h"
 #include "UI/Developer/DeveloperOverlay.h"
 #include "UI/Developer/LayoutWatcher.h"
@@ -30,6 +31,7 @@ class LayoutSource;
     Command registry. */
 class MainComponent : public juce::Component,
                       public juce::ApplicationCommandTarget,
+                      public juce::DragAndDropContainer,
                       private ApplicationModel::Listener,
                       private ThemeManager::Listener,
                       private juce::ValueTree::Listener
@@ -49,6 +51,7 @@ public:
         Session& session;
         Automation& automation;
         Shaper& shaper;
+        SamplePreview& preview;
     };
 
     MainComponent (Services, juce::ApplicationCommandManager&);
@@ -74,7 +77,7 @@ private:
     TopBar topBar;
     ArrangementView arrangement;
     PianoRollView pianoRoll;
-    PluginBrowser pluginBrowser;
+    Browser browser;
     InsertStrip insertStrip;
     juce::TextButton editPluginButton { "Edit" };
     SessionView sessionView;

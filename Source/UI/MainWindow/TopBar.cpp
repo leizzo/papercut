@@ -145,10 +145,11 @@ void TopBar::showSignatureMenu()
     juce::PopupMenu menu;
     const auto current = model.getTimeSignature();
 
-    for (auto [n, d] : { std::pair (2, 4), std::pair (3, 4), std::pair (4, 4), std::pair (5, 4), std::pair (6, 8),
+    for (auto sig : { std::pair (2, 4), std::pair (3, 4), std::pair (4, 4), std::pair (5, 4), std::pair (6, 8),
                          std::pair (7, 8), std::pair (9, 8), std::pair (12, 8) })
-        menu.addItem (juce::String (n) + " / " + juce::String (d), true, current.numerator == n && current.denominator == d,
-                      [this, n = n, d = d] { commands.invoke ("transport.setTimeSignature", timeSignatureArgs (n, d)); });
+        menu.addItem (juce::String (sig.first) + " / " + juce::String (sig.second), true,
+                      current.numerator == sig.first && current.denominator == sig.second,
+                      [this, sig] { commands.invoke ("transport.setTimeSignature", timeSignatureArgs (sig.first, sig.second)); });
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&signature));
 }

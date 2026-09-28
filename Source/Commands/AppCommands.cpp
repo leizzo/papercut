@@ -17,7 +17,7 @@ namespace
                                pitch ("pitch"), length ("length"), velocity ("velocity"), grid ("grid"),
                                noteId ("noteId"), noteIds ("noteIds"),
                                deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch"),
-                               bpm ("bpm"), numerator ("numerator"), denominator ("denominator");
+                               bpm ("bpm"), file ("file"), numerator ("numerator"), denominator ("denominator");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -180,6 +180,18 @@ namespace
         void execute (const juce::var&) override
         {
             host.chooseAudioFile ([this] (const juce::File& f) { report (model.insertAudioClip (f)); });
+        }
+    };
+
+    /** A sample dropped from the Browser onto a lane. */
+    struct InsertClipAtCommand : ModelCommand
+    {
+        InsertClipAtCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("clip.insertAt", "Insert Audio Clip", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            report (model.insertAudioClipAt (juce::File (args[ArgKeys::file].toString()), args[ArgKeys::trackId].toString(),
+                                             (double) args[ArgKeys::start]));
         }
     };
 
@@ -477,6 +489,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
                                                             [] (const TrackInfo& t) { return t.armed; }, &ApplicationModel::setTrackArmed));
     registry.add (std::make_unique<SetTrackInputCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
+    registry.add (std::make_unique<InsertClipAtCommand> (model, host));
     registry.add (std::make_unique<AddMidiClipCommand> (model, host));
     registry.add (std::make_unique<MoveClipCommand> (model, host));
     registry.add (std::make_unique<ResizeClipCommand> (model, host));
@@ -640,6 +653,15 @@ juce::var timeSignatureArgs (int numerator, int denominator)
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::numerator, numerator);
     args->setProperty (ArgKeys::denominator, denominator);
+    return args;
+}
+
+juce::var clipInsertAtArgs (const juce::File& file, const juce::String& trackId, double startSeconds)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::file, file.getFullPathName());
+    args->setProperty (ArgKeys::trackId, trackId);
+    args->setProperty (ArgKeys::start, startSeconds);
     return args;
 }
 

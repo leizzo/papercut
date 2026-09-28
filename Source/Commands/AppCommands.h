@@ -32,7 +32,7 @@ struct AppCommandHost
     track.add    track.addMidi   track.remove
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
     track.setInput   track.toggleArm
-    clip.add     clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
+    clip.add     clip.insertAt  clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
     note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
     edit.undo    edit.redo
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
@@ -60,6 +60,9 @@ juce::var trackInputArgs (const juce::String& trackId, const juce::String& input
 /** Arguments for clip.move: the clip, its new start, and optionally the track to
     move it to. Invoked with anything else, clip.move does nothing. */
 juce::var clipMoveArgs (const juce::String& clipId, double startSeconds, const juce::String& trackId = {});
+
+/** Arguments for clip.insertAt: an audio file dropped on a track at a position. */
+juce::var clipInsertAtArgs (const juce::File&, const juce::String& trackId, double startSeconds);
 
 /** Arguments for clip.resize: the clip and its new edges. */
 juce::var clipResizeArgs (const juce::String& clipId, double startSeconds, double endSeconds);

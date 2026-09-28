@@ -177,6 +177,11 @@ public:
         has none. Fails, changing nothing, when that track is a MIDI track. */
     juce::Result insertAudioClip (const juce::File&);
 
+    /** Inserts the file as a clip on that audio track, starting at startSeconds
+        (a drop from the Browser). Fails, changing nothing, on a MIDI track or a
+        file that isn't audio. */
+    juce::Result insertAudioClipAt (const juce::File&, const juce::String& trackId, double startSeconds);
+
     /** Inserts an empty MIDI clip at the playhead, one bar long, on the selected
         MIDI track, or the selected MIDI clip's track, or the first MIDI track
         when nothing is selected. Fails, changing nothing, when the selected

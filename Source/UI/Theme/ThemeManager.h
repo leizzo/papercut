@@ -90,6 +90,7 @@ struct LayoutMetrics
     int toolbarHeight = 0;
     int topBarHeight = 0;
     int inspectorWidth = 0;
+    int browserWidth = 0;        ///< the left Browser (§6.2)
     int stripWidth = 0, stripCompactWidth = 0, stripBusWidth = 0;
 
     int transportHeight = 0;

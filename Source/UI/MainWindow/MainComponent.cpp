@@ -17,7 +17,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       arrangement (services.model, services.commands, services.themeManager, services.uiState,
                    services.automation, services.shaper),
       pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
-      pluginBrowser (services.commands, services.plugins, services.model, services.themeManager),
+      browser (services.commands, services.plugins, services.model, services.themeManager, services.preview,
+               Library::defaultRoot()),
       insertStrip (services.commands, services.plugins, services.model, services.themeManager),
       sessionView (services.model, services.session, services.commands, services.themeManager),
       mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager),
@@ -57,7 +58,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
             pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
     };
 
-    for (auto* c : std::initializer_list<juce::Component*> { &topBar, &pluginBrowser, &insertStrip, &editPluginButton,
+    for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &insertStrip, &editPluginButton,
                                                              &arrangement, &sessionView, &pianoRoll, &mixerView,
                                                              &editorPlaceholder, &pianoRollPlaceholder,
                                                              &developerOverlay, &statusBarHost })
@@ -122,7 +123,7 @@ void MainComponent::resized()
     const auto showBrowser = timeline && shell.isBrowserVisible();
     const auto showDetail = timeline && ! shell.isDetailCollapsed();
 
-    pluginBrowser.setVisible (showBrowser);
+    browser.setVisible (showBrowser);
     insertStrip.setVisible (showDetail);
     editPluginButton.setVisible (showDetail);
     sessionView.setVisible (view == View::session);
@@ -140,7 +141,7 @@ void MainComponent::resized()
     }
 
     if (showBrowser)
-        pluginBrowser.setBounds (r.removeFromLeft (236));
+        browser.setBounds (r.removeFromLeft (metrics.browserWidth));
 
     for (auto* c : std::initializer_list<juce::Component*> { &sessionView, &arrangement, &mixerView, &pianoRoll,
                                                              &pianoRollPlaceholder, &editorPlaceholder })

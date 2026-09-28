@@ -84,7 +84,7 @@ The first milestone chain: engine → audio device → empty Edit → audio trac
 ### Plugins
 
 **Plugin Catalogue**:
-The scanned list of plug-ins the user can insert: name, manufacturer, format, path, category. Scanning runs off the UI thread. Built-in engine plug-ins are in the catalogue without a disk scan.
+The scanned list of plug-ins the user can insert: name, manufacturer, format, path, category. Scanning runs off the UI thread. Built-in instruments and effects are in the catalogue without a disk scan; engine plumbing (fader, meters, aux sends and returns) is not.
 _Avoid_: plugin database (the on-disk cache is an implementation detail)
 
 **Device Chain**:

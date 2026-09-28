@@ -58,13 +58,14 @@ namespace
         return info;
     }
 
+    /** The built-ins a user can put on a track. Engine plumbing (the fader,
+        meters, aux sends and returns, freeze points, patch bays, text) is added
+        by the app where it belongs, never from the catalogue. */
     const juce::Array<PluginInfo>& builtInCatalogue()
     {
         static const auto catalogue = []
         {
             juce::Array<PluginInfo> list;
-            list.add (builtIn<te::VolumeAndPanPlugin> (false));
-            list.add (builtIn<te::LevelMeterPlugin> (false));
             list.add (builtIn<te::EqualiserPlugin> (false));
             list.add (builtIn<te::ReverbPlugin> (false));
             list.add (builtIn<te::CompressorPlugin> (false));
@@ -76,14 +77,6 @@ namespace
             list.add (builtIn<te::SamplerPlugin> (true));
             list.add (builtIn<te::FourOscPlugin> (true));
             list.add (builtIn<te::MidiModifierPlugin> (false));
-            list.add (builtIn<te::MidiPatchBayPlugin> (false));
-            list.add (builtIn<te::PatchBayPlugin> (false));
-            list.add (builtIn<te::AuxSendPlugin> (false));
-            list.add (builtIn<te::AuxReturnPlugin> (false));
-            list.add (builtIn<te::TextPlugin> (false));
-            list.add (builtIn<te::FreezePointPlugin> (false));
-            list.add (builtIn<te::InsertPlugin> (false));
-            list.add (builtIn<te::ChannelMapperPlugin> (false));
             return list;
         }();
 
@@ -109,6 +102,7 @@ namespace
                                                        : desc.createIdentifierString();
         info.category = desc.category;
         info.instrument = desc.isInstrument;
+        info.external = true;
         return info;
     }
 
@@ -128,6 +122,7 @@ namespace
                                                                      : external->desc.createIdentifierString();
             info.category = external->desc.category;
             info.instrument = external->desc.isInstrument;
+            info.external = true;
         }
         else
         {

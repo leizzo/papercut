@@ -280,7 +280,7 @@ struct ThemeManager::Fonts
         { true, 600, "fonts/IBMPlexMono-SemiBold.ttf", {} },
     };
 
-    juce::Result load (const LayoutSource& source)
+    juce::Result load (const LayoutSource& files)
     {
         for (auto& face : faces)
         {
@@ -289,7 +289,7 @@ struct ThemeManager::Fonts
 
             juce::MemoryBlock data;
 
-            if (auto r = source.readData (face.file, data); r.failed())
+            if (auto r = files.readData (face.file, data); r.failed())
                 return r;
 
             face.typeface = juce::Typeface::createSystemTypefaceFor (data.getData(), data.getSize());
@@ -412,7 +412,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "h-control-md", &LayoutMetrics::controlMd }, { "h-control-lg", &LayoutMetrics::controlLg },
         { "h-transport", &LayoutMetrics::transportButton }, { "h-toolbar", &LayoutMetrics::toolbarHeight },
         { "h-topbar", &LayoutMetrics::topBarHeight }, { "w-track-header", &LayoutMetrics::trackHeaderWidth },
-        { "w-inspector", &LayoutMetrics::inspectorWidth }, { "w-strip", &LayoutMetrics::stripWidth },
+        { "w-inspector", &LayoutMetrics::inspectorWidth }, { "w-browser", &LayoutMetrics::browserWidth }, { "w-strip", &LayoutMetrics::stripWidth },
         { "w-strip-compact", &LayoutMetrics::stripCompactWidth }, { "w-strip-bus", &LayoutMetrics::stripBusWidth },
 
         { "transportHeight", &LayoutMetrics::transportHeight }, { "statusBarHeight", &LayoutMetrics::statusBarHeight },
