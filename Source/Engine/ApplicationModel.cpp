@@ -1378,12 +1378,39 @@ bool ApplicationModel::canUndo() const   { return impl->undoManager().canUndo();
 bool ApplicationModel::canRedo() const   { return impl->undoManager().canRedo(); }
 
 //==============================================================================
-void ApplicationModel::selectTrack (const juce::String& trackId)
+void ApplicationModel::selectTrack (const juce::String& trackId, SelectionMode mode)
 {
-    if (auto* track = impl->findTrack (trackId))
-        impl->selectionManager.selectOnly (track);
+    auto* track = impl->findTrack (trackId);
+    auto& selection = impl->selectionManager;
+
+    if (track == nullptr)
+    {
+        if (mode == SelectionMode::replace)
+            selection.deselectAll();
+
+        return;
+    }
+
+    if (mode == SelectionMode::replace)
+    {
+        selection.selectOnly (track);
+        return;
+    }
+
+    // Tracks and clips aren't selected together.
+    for (auto* clip : selection.getItemsOfType<te::Clip>())
+        selection.deselect (clip);
+
+    if (mode == SelectionMode::add || ! selection.isSelected (track))
+        selection.addToSelection (track);
     else
-        impl->selectionManager.deselectAll();
+        selection.deselect (track);
+}
+
+void ApplicationModel::deselectAll()
+{
+    impl->selectionManager.deselectAll();
+    selectNotes ({});
 }
 
 void ApplicationModel::selectClip (const juce::String& clipId, SelectionMode mode)

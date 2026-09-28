@@ -15,6 +15,7 @@
 #include "UI/Developer/LayoutWatcher.h"
 #include "UI/Session/SessionView.h"
 #include "UI/State/ShellState.h"
+#include "Toasts.h"
 #include "TopBar.h"
 
 namespace papercut
@@ -55,6 +56,9 @@ public:
     };
 
     MainComponent (Services, juce::ApplicationCommandManager&);
+
+    /** A toast at the bottom centre (PRD §16.7). undoable offers Undo (edit.undo). */
+    void showToast (const juce::String& message, bool undoable, bool isError = false);
     ~MainComponent() override;
 
     void paint (juce::Graphics&) override;
@@ -93,12 +97,15 @@ private:
 
     Placeholder editorPlaceholder, pianoRollPlaceholder;
     DeveloperOverlay developerOverlay;
+    Toasts toasts;
+    juce::TooltipWindow tooltips { this, 600 };
     std::unique_ptr<LayoutWatcher> layoutWatch;
     std::unique_ptr<LayoutWatcher> themeWatch;
     std::unique_ptr<PluginEditorWindow> pluginEditor;
 
     void updateStatusBar();
     void registerArrangementZoomCommands();
+    void registerEscapeCommand();
     void showMenu (const juce::String& name, juce::Rectangle<int> screenArea);
     void openPianoRollForSelection();
     void mouseDown (const juce::MouseEvent&) override;

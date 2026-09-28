@@ -32,7 +32,7 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
 
     /** Called with the row index under a click (may be out of range). */
-    std::function<void (int row)> onRowClicked;
+    std::function<void (int row, juce::ModifierKeys)> onRowClicked;
 
 private:
     CommandRegistry& commands;

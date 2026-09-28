@@ -33,6 +33,12 @@ public:
 
     void setTracks (const std::vector<TrackInfo>&);
 
+    /** Scrolls when p (lane coordinates) is near an edge, during a drag. */
+    void autoScrollAt (juce::Point<int> p);
+
+    /** Drops a clip drag in progress, leaving the clip where it was (Esc). */
+    void cancelDrag();
+
     /** Re-positions every clip from the view state (after zoom/scroll). */
     void layoutClips();
 
@@ -48,7 +54,7 @@ public:
     void mouseUp (const juce::MouseEvent&) override;
 
     /** Called with the row index under a click on an empty lane (may be out of range). */
-    std::function<void (int row)> onRowClicked;
+    std::function<void (int row, juce::ModifierKeys)> onRowClicked;
 
     /** Double-click on a MIDI clip (Piano Roll) or an audio clip (Editor). */
     std::function<void (const juce::String& clipId)> onMidiClipOpened, onAudioClipOpened;

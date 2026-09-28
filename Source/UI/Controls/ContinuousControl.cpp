@@ -270,6 +270,16 @@ void ContinuousControl::closeTextEntry (bool commit)
     repaint();
 }
 
+juce::String ContinuousControl::getTooltip()
+{
+    auto name = juce::SettableTooltipClient::getTooltip();
+
+    if (name.isEmpty())
+        name = getTitle();
+
+    return name.isEmpty() ? model.getText() : name + ": " + model.getText();
+}
+
 void ContinuousControl::paintOverChildren (juce::Graphics& g)
 {
     if (hasKeyboardFocus (false))

@@ -94,7 +94,7 @@ public:
         mainWindow = std::make_unique<MainWindow> (getApplicationName(),
             MainComponent::Services { *model, commands, theme, uiState, layoutSource,
                                       engine->describeActiveAudioDevice(),
-                                      reportError, *plugins, *mixer, *session, *automation, *shaper, *preview });
+                                      commandHost.reportError, *plugins, *mixer, *session, *automation, *shaper, *preview });
 
         offerRecovery();
         startTimer (Production::autosaveIntervalMs);
@@ -218,7 +218,20 @@ private:
 
         commandHost.captureUIState = [this] { return uiState.toVar(); };
         commandHost.restoreUIState = [this] (const juce::var& v) { uiState.restore (v); };
-        commandHost.reportError = reportError;
+        // Errors are toasts, not modal dialogs (PRD §16.7); before the window exists, a dialog.
+        commandHost.reportError = [this] (const juce::String& message)
+        {
+            if (mainWindow != nullptr)
+                mainWindow->showToast (message, false, true);
+            else
+                reportError (message);
+        };
+
+        commandHost.notify = [this] (const juce::String& message, bool undoable)
+        {
+            if (mainWindow != nullptr)
+                mainWindow->showToast (message, undoable);
+        };
     }
 
     static void reportError (const juce::String& message)

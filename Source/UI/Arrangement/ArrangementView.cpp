@@ -44,7 +44,7 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, Theme
 
     // Clicking a track header or an empty lane selects the track (engine
     // selection; never undoable, never through the UndoManager).
-    trackList.onRowClicked = lanes.onRowClicked = [this] (int row) { selectRow (row); };
+    trackList.onRowClicked = lanes.onRowClicked = [this] (int row, juce::ModifierKeys mods) { selectRow (row, mods); };
     lanes.onMidiClipOpened = [this] (const juce::String& id) { if (onMidiClipOpened) onMidiClipOpened (id); };
     lanes.onAudioClipOpened = [this] (const juce::String& id) { if (onAudioClipOpened) onAudioClipOpened (id); };
 
@@ -230,9 +230,11 @@ void ArrangementView::clampVerticalScroll()
         view.setScrollY (maxScroll);
 }
 
-void ArrangementView::selectRow (int row)
+void ArrangementView::selectRow (int row, juce::ModifierKeys mods)
 {
-    model.selectTrack (juce::isPositiveAndBelow (row, (int) tracks.size()) ? tracks[(size_t) row].id : juce::String());
+    using Mode = ApplicationModel::SelectionMode;
+    const auto mode = mods.isShiftDown() ? Mode::add : mods.isCommandDown() ? Mode::toggle : Mode::replace;
+    model.selectTrack (juce::isPositiveAndBelow (row, (int) tracks.size()) ? tracks[(size_t) row].id : juce::String(), mode);
 }
 
 void ArrangementView::valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&)
@@ -299,6 +301,9 @@ bool ArrangementView::isInterestedInDragSource (const SourceDetails& details)
 
 void ArrangementView::itemDragMove (const SourceDetails& details)
 {
+    if (lanes.getBounds().contains (details.localPosition))
+        lanes.autoScrollAt (lanes.getLocalPoint (this, details.localPosition));
+
     const auto target = dropTargetAt (details);
 
     if (target.row != dropTarget.row || target.valid != dropTarget.valid)
@@ -320,6 +325,13 @@ void ArrangementView::itemDropped (const SourceDetails& details)
 {
     const auto target = dropTargetAt (details);
     itemDragExit (details);
+
+    // An invalid lane (a sample on a MIDI track) refuses with a shake.
+    if (target.row >= 0 && ! target.valid)
+    {
+        rejectWithShake (lanes, "Samples go on audio tracks");
+        return;
+    }
 
     if (auto item = itemFromDrag (details.description); item && target.valid)
     {

@@ -51,6 +51,12 @@ MainWindow::~MainWindow()
     clearContentComponent();
 }
 
+void MainWindow::showToast (const juce::String& message, bool undoable, bool isError)
+{
+    if (auto* main = dynamic_cast<MainComponent*> (getContentComponent()))
+        main->showToast (message, undoable, isError);
+}
+
 void MainWindow::closeButtonPressed()
 {
     juce::JUCEApplication::getInstance()->systemRequestedQuit();

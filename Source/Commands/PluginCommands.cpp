@@ -114,7 +114,11 @@ namespace
 
         void execute (const juce::var& args) override
         {
-            report (rack.moveToDeviceChain (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString()));
+            const auto result = rack.moveToDeviceChain (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString());
+            report (result);
+
+            if (result.wasOk() && host.notify)
+                host.notify ("Moved to the track chain", true);
         }
     };
 

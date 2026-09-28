@@ -16,6 +16,9 @@ public:
 
     void closeButtonPressed() override;
 
+    /** See MainComponent::showToast. */
+    void showToast (const juce::String& message, bool undoable, bool isError = false);
+
 private:
     juce::ApplicationCommandManager commandManager;
     juce::StringArray menuNames;

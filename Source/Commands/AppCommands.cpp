@@ -141,6 +141,12 @@ namespace
     };
 
     /** A track header's input menu. */
+    struct DeselectAllCommand : ModelCommand
+    {
+        DeselectAllCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("edit.deselectAll", "Deselect All", m, h) {}
+        void execute (const juce::var&) override   { model.deselectAll(); }
+    };
+
     /** Selects a track in every view (a mixer strip click). Never undoable. */
     struct SelectTrackCommand : ModelCommand
     {
@@ -588,6 +594,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<SetTrackInputCommand> (model, host));
     registry.add (std::make_unique<SetTrackColourCommand> (model, host));
     registry.add (std::make_unique<SelectTrackCommand> (model, host));
+    registry.add (std::make_unique<DeselectAllCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
     registry.add (std::make_unique<InsertClipAtCommand> (model, host));
     registry.add (std::make_unique<AddMidiClipCommand> (model, host));
@@ -605,8 +612,17 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<SelectionCommand> ("clip.consolidate", "Consolidate", model, host,
                                                       [] (ApplicationModel& m, AppCommandHost& h)
                                                       {
-                                                          if (auto r = m.consolidateSelectedClips(); r.failed() && h.reportError)
-                                                              h.reportError (r.getErrorMessage());
+                                                          const auto count = m.getSelectedClipIds().size();
+
+                                                          if (auto r = m.consolidateSelectedClips(); r.failed())
+                                                          {
+                                                              if (h.reportError)
+                                                                  h.reportError (r.getErrorMessage());
+                                                          }
+                                                          else if (h.notify)
+                                                          {
+                                                              h.notify ("Consolidated " + juce::String (count) + " clips into one", true);
+                                                          }
                                                       }));
     registry.add (std::make_unique<DeleteCommand> (model, host, registry));
     registry.add (std::make_unique<SelectionCommand> ("clip.delete", "Delete", model, host,

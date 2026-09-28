@@ -24,6 +24,9 @@ struct AppCommandHost
     std::function<void (const juce::var&)> restoreUIState;
 
     std::function<void (const juce::String& message)> reportError;
+
+    /** A non-obvious outcome worth a toast (PRD §16.7); undoable offers Undo. */
+    std::function<void (const juce::String& message, bool undoable)> notify;
 };
 
 /** Registers every model-facing Command:
@@ -36,7 +39,7 @@ struct AppCommandHost
     clip.copy    clip.loopExtend  clip.rename  clip.reverse  clip.setColour
     clip.duplicate  clip.consolidate  clip.delete   (these three act on the selected clips)
     note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
-    edit.undo    edit.redo    edit.delete
+    edit.undo    edit.redo    edit.delete   edit.deselectAll
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
     transport.setPosition
     transport.record  transport.toggleLoop  transport.setLoopRange

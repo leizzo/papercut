@@ -195,7 +195,13 @@ struct DetailView::Chain : juce::Component,
                 || (itemFromDrag (d.description) && itemFromDrag (d.description)->kind == LibraryItem::Kind::plugin));
     }
 
-    void itemDragMove (const SourceDetails& d) override   { dropIndex = indexAt (d.localPosition.x); repaint(); }
+    void itemDragMove (const SourceDetails& d) override
+    {
+        dropIndex = indexAt (d.localPosition.x);
+        const auto inView = owner.chainView.getLocalPoint (this, d.localPosition);
+        owner.chainView.autoScroll (inView.x, inView.y, 30, 16);
+        repaint();
+    }
     void itemDragExit (const SourceDetails&) override     { dropIndex = -1; repaint(); }
 
     void itemDropped (const SourceDetails& d) override

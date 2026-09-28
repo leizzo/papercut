@@ -77,6 +77,9 @@ public:
     void paintOverChildren (juce::Graphics&) override;
     std::unique_ptr<juce::AccessibilityHandler> createAccessibilityHandler() override;
 
+    /** Name and current value with its unit (PRD §16.6). */
+    juce::String getTooltip() override;
+
 protected:
     ThemeManager& themeManager;
 

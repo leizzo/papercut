@@ -1,6 +1,7 @@
 #include "TopBar.h"
 #include "Commands/AppCommands.h"
 #include "Commands/ApplicationCommandTable.h"
+#include "UI/Controls/Menus.h"
 
 namespace papercut
 {
@@ -76,6 +77,13 @@ TopBar::TopBar (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, Shell
     signature.setNumeric (true);
     signature.setTooltip ("Time signature");
     signature.onClick = [this] { showSignatureMenu(); };
+
+    prev.setTooltip (tooltipFor ("Return to Start", "transport.returnToStart"));
+    record.setTooltip (tooltipFor ("Record (Shift: no count-in)", "transport.record"));
+    play.setTooltip (tooltipFor ("Play", "transport.togglePlay"));
+    stop.setTooltip (tooltipFor ("Stop (twice: return to start)", "transport.togglePlay"));
+    metronome.setTooltip (tooltipFor ("Metronome", "transport.toggleMetronome"));
+    follow.setTooltip (tooltipFor ("Follow", "view.toggleFollow"));
 
     prev.onClick = [this] { commands.invoke ("transport.returnToStart"); };
     // There is no count-in yet, so Shift-click records the same way.

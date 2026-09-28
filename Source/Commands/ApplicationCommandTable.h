@@ -27,4 +27,7 @@ juce::PopupMenu createCommandMenu (juce::ApplicationCommandManager&, const juce:
 
 const ApplicationCommandEntry* findApplicationCommand (juce::CommandID);
 
+/** The default shortcut bound to a Command, or an invalid KeyPress if none. */
+juce::KeyPress findShortcut (const juce::String& commandId);
+
 } // namespace papercut

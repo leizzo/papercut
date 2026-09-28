@@ -279,7 +279,10 @@ public:
     /** A click replaces the selection; Shift adds; Mod toggles (PRD §16.1). */
     enum class SelectionMode { replace, add, toggle };
 
-    void selectTrack (const juce::String& trackId);
+    void selectTrack (const juce::String& trackId, SelectionMode = SelectionMode::replace);
+
+    /** Clears every selection: tracks, clips and notes (Esc). */
+    void deselectAll();
     void selectClip (const juce::String& clipId, SelectionMode = SelectionMode::replace);
     juce::String getSelectedTrackId() const;
 

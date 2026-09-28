@@ -26,13 +26,15 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
                  services.uiState.getState ("mixer")),
       editorPlaceholder (services.themeManager, "The audio Editor arrives with M4. Double-click an audio clip then."),
       pianoRollPlaceholder (services.themeManager, "Select a MIDI clip, or double-click one, to edit its notes."),
-      developerOverlay (services.themeManager)
+      developerOverlay (services.themeManager),
+      toasts (services.themeManager)
 {
     // Every Command a layout or the menus may name must be registered before they build.
     registerPrimitives (factory, services.commands, services.themeManager);
     registerDeveloperCommands (services.commands, layouts, services.themeManager, services.reportError);
     registerShellCommands (services.commands, shell);
     registerArrangementZoomCommands();
+    registerEscapeCommand();
 
     layouts.onError = services.reportError;
     statusBarHost.onBuilt = [this] { updateStatusBar(); };
@@ -76,6 +78,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
                                                              &editorPlaceholder, &pianoRollPlaceholder,
                                                              &developerOverlay, &statusBarHost })
         addChildComponent (c);
+
+    addAndMakeVisible (toasts);
 
     topBar.setVisible (true);
     developerOverlay.setVisible (services.layoutSource.isDevMode());
@@ -130,6 +134,33 @@ void MainComponent::registerArrangementZoomCommands()
     add ("arrange.zoomToSong", "Zoom to Song", &ArrangementView::zoomToSong);
 }
 
+void MainComponent::registerEscapeCommand()
+{
+    struct EscapeCommand : Command
+    {
+        explicit EscapeCommand (MainComponent& o) : Command ("ui.escape", "Clear Selection"), owner (o) {}
+
+        /** Esc (PRD §16.1): closes popovers and menus, cancels a drag, clears the selection. */
+        void execute (const juce::var&) override
+        {
+            juce::PopupMenu::dismissAllActiveMenus();
+            owner.arrangement.cancelDrag();
+            owner.services.commands.invoke ("edit.deselectAll");
+        }
+
+        MainComponent& owner;
+    };
+
+    services.commands.add (std::make_unique<EscapeCommand> (*this));
+}
+
+void MainComponent::showToast (const juce::String& message, bool undoable, bool isError)
+{
+    toasts.show (message, undoable ? std::function<void()> ([this] { services.commands.invoke ("edit.undo"); })
+                                   : std::function<void()>(),
+                 isError);
+}
+
 void MainComponent::Placeholder::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
@@ -147,6 +178,7 @@ void MainComponent::resized()
     using View = ShellState::View;
     auto& metrics = services.themeManager.getMetrics();
     auto r = getLocalBounds();
+    toasts.setBounds (r);
     topBar.setBounds (r.removeFromTop (metrics.topBarHeight));
 
     if (statusBarHost.isVisible())

@@ -151,6 +151,8 @@ add_library(papercut_ui STATIC
     Source/UI/Controls/ContinuousControl.cpp
     Source/UI/Controls/Controls.cpp
     Source/UI/Controls/Icons.cpp
+    Source/UI/Controls/Menus.cpp
+    Source/UI/MainWindow/Toasts.cpp
     Source/UI/Layout/LayoutSource.cpp
     Source/UI/Layout/ComponentFactory.cpp
     Source/UI/Layout/Primitives.cpp

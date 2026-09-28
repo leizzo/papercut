@@ -37,6 +37,8 @@ public:
 
     ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&, Automation&, Shaper&, ShellState&);
 
+    void cancelDrag()   { lanes.cancelDrag(); }
+
     void zoomIn()    { zoomBy (2.0); }
     void zoomOut()   { zoomBy (0.5); }
 
@@ -100,7 +102,7 @@ private:
     void refresh();
     void syncAutomationTarget();
     void clampVerticalScroll();
-    void selectRow (int row);
+    void selectRow (int row, juce::ModifierKeys);
     void styleParameterBox();
 
     void modelChanged() override        { refresh(); }

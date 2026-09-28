@@ -191,6 +191,32 @@ struct ClipOperationTests : juce::UnitTest
             f.invoke ("edit.undo");
             expectEquals (f.audioClip().name, juce::String ("tone"));
         }
+
+        beginTest ("Tracks select the same way: Shift adds, Mod toggles; the first is the selected track");
+        {
+            Clips f;
+            using Mode = ApplicationModel::SelectionMode;
+            f.model.selectTrack (f.track (0).id);
+            f.model.selectTrack (f.track (1).id, Mode::add);
+            expect (f.track (0).selected && f.track (1).selected);
+            f.model.selectTrack (f.track (0).id, Mode::toggle);
+            expect (! f.track (0).selected && f.track (1).selected);
+            expectEquals (f.model.getSelectedTrackId(), f.track (1).id);
+        }
+
+        beginTest ("edit.deselectAll clears clips, tracks and notes, outside undo");
+        {
+            Clips f;
+            f.model.selectClip (f.audioClip().id);
+            f.model.selectNotes ({ f.midiClip().notes[0].id });
+            const auto couldUndo = f.model.canUndo();
+
+            f.invoke ("edit.deselectAll");
+            expect (f.model.getSelectedClipIds().isEmpty());
+            expect (f.model.getSelectedTrackId().isEmpty());
+            expect (! f.model.hasSelectedNotes());
+            expect (f.model.canUndo() == couldUndo);
+        }
     }
 };
 

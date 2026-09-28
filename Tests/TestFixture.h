@@ -32,7 +32,7 @@ struct Fixture
 
     // Stand-in for the UI State store.
     juce::var uiState;
-    juce::StringArray errors;
+    juce::StringArray errors, notifications;
 
     juce::TemporaryFile scratch { juce::String() };
     juce::File scratchDir() const   { return scratch.getFile(); }

@@ -1,0 +1,29 @@
+#include "Menus.h"
+#include "Commands/ApplicationCommandTable.h"
+
+namespace papercut
+{
+
+juce::PopupMenu::Item commandItem (CommandRegistry& commands, const juce::String& commandId, const juce::var& args,
+                                   const juce::String& label)
+{
+    auto* command = commands.find (commandId);
+    juce::PopupMenu::Item item (label.isNotEmpty() ? label : command != nullptr ? command->getName() : commandId);
+    item.setEnabled (command != nullptr && command->isEnabled());
+    item.setAction ([&commands, commandId, args] { commands.invoke (commandId, args); });
+
+    if (auto key = findShortcut (commandId); key.isValid())
+        item.shortcutKeyDescription = key.getTextDescriptionWithIcons();
+
+    return item;
+}
+
+juce::String tooltipFor (const juce::String& name, const juce::String& commandId)
+{
+    if (auto key = findShortcut (commandId); key.isValid())
+        return name + " (" + key.getTextDescriptionWithIcons() + ")";
+
+    return name;
+}
+
+} // namespace papercut

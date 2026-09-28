@@ -66,7 +66,7 @@ void TrackList::paint (juce::Graphics& g)
 void TrackList::mouseDown (const juce::MouseEvent& e)
 {
     if (onRowClicked)
-        onRowClicked (view.yToRow (e.y, view.getLaneHeight (themeManager.getMetrics().trackHeight)));
+        onRowClicked (view.yToRow (e.y, view.getLaneHeight (themeManager.getMetrics().trackHeight)), e.mods);
 }
 
 } // namespace papercut

@@ -27,6 +27,7 @@ namespace
         ApplicationCommandEntry { 0x2001, "edit.undo",               "Edit",    'Z',                            cmd },
         ApplicationCommandEntry { 0x2002, "edit.redo",               "Edit",    'Z',                            cmd | shift },
         ApplicationCommandEntry { 0x2006, "clip.split",              "Edit",    'E',                            cmd },
+        ApplicationCommandEntry { 0x200c, "ui.escape",               "Edit",    juce::KeyPress::escapeKey,      0 },
         ApplicationCommandEntry { 0x200a, "clip.duplicate",          "Edit",    'D',                            cmd },
         ApplicationCommandEntry { 0x200b, "clip.consolidate",        "Edit",    'J',                            cmd },
         ApplicationCommandEntry { 0x2009, "edit.delete",             "Edit",    juce::KeyPress::deleteKey,      0 },
@@ -105,6 +106,15 @@ const ApplicationCommandEntry* findApplicationCommand (juce::CommandID id)
             return &e;
 
     return nullptr;
+}
+
+juce::KeyPress findShortcut (const juce::String& commandId)
+{
+    for (auto& e : table)
+        if (commandId == e.commandId && e.keyCode != 0)
+            return juce::KeyPress (e.keyCode, juce::ModifierKeys (e.modifiers), 0);
+
+    return {};
 }
 
 } // namespace papercut

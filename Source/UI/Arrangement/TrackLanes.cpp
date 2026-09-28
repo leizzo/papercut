@@ -1,5 +1,6 @@
 #include "TrackLanes.h"
 #include "Commands/AppCommands.h"
+#include "UI/Controls/Menus.h"
 #include "UI/PianoRoll/BeatGrid.h"
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
@@ -78,6 +79,34 @@ void TrackLanes::layoutClips()
                                        .getSmallestIntegerContainer()
                                        .reduced (0, metrics.spaceSm));
         }
+    }
+}
+
+void TrackLanes::autoScrollAt (juce::Point<int> p)
+{
+    // Near an edge the view scrolls, faster the closer the pointer gets (PRD §16.3).
+    constexpr int zone = 30;
+    constexpr float maxStep = 24.0f;
+
+    auto speed = [] (int distanceIn) { return maxStep * (float) (zone - juce::jlimit (0, zone, distanceIn)) / (float) zone; };
+
+    if (p.x < zone)
+        view.setScrollSeconds (view.getScrollSeconds() - speed (p.x) / view.getPixelsPerSecond());
+    else if (p.x > getWidth() - zone)
+        view.setScrollSeconds (view.getScrollSeconds() + speed (getWidth() - p.x) / view.getPixelsPerSecond());
+
+    if (p.y < zone)
+        view.setScrollY (view.getScrollY() - juce::roundToInt (speed (p.y)));
+    else if (p.y > getHeight() - zone)
+        view.setScrollY (view.getScrollY() + juce::roundToInt (speed (getHeight() - p.y)));
+}
+
+void TrackLanes::cancelDrag()
+{
+    if (drag)
+    {
+        drag.reset();
+        layoutClips();
     }
 }
 
@@ -211,13 +240,10 @@ double TrackLanes::snap (double seconds, bool bypass) const
 void TrackLanes::showClipMenu (const ClipInfo& clip)
 {
     auto& theme = themeManager.getTheme();
-    const auto cmd = juce::ModifierKeys::commandModifier;
 
-    auto item = [] (const juce::String& text, juce::KeyPress key, std::function<void()> action, bool enabled = true)
+    auto item = [] (const juce::String& text, std::function<void()> action)
     {
-        auto i = juce::PopupMenu::Item (text).setEnabled (enabled).setAction (std::move (action));
-        i.shortcutKeyDescription = key.isValid() ? key.getTextDescriptionWithIcons() : juce::String();
-        return i;
+        return juce::PopupMenu::Item (text).setAction (std::move (action));
     };
 
     juce::PopupMenu colours;
@@ -230,21 +256,18 @@ void TrackLanes::showClipMenu (const ClipInfo& clip)
                              .setAction ([this, id = clip.id, i] { commands.invoke ("clip.setColour", clipColourArgs (id, i)); }));
 
     juce::PopupMenu menu;
-    menu.addItem (item ("Rename", {}, [this, clip] { startRename (clip); }));
+    menu.addItem (item ("Rename", [this, clip] { startRename (clip); }));
     menu.addSubMenu ("Colour", colours);
     menu.addSeparator();
-    menu.addItem (item ("Duplicate", juce::KeyPress ('d', cmd, 0), [this] { commands.invoke ("clip.duplicate"); }));
-    menu.addItem (item ("Split", juce::KeyPress ('e', cmd, 0), [this] { commands.invoke ("clip.split"); },
-                        model.canSplitClip (clip.id, model.getTransportPositionSeconds())));
-    menu.addItem (item ("Consolidate", juce::KeyPress ('j', cmd, 0), [this] { commands.invoke ("clip.consolidate"); },
-                        model.getSelectedClipIds().size() > 1));
+    menu.addItem (commandItem (commands, "clip.duplicate"));
+    menu.addItem (commandItem (commands, "clip.split", {}, "Split"));
+    menu.addItem (commandItem (commands, "clip.consolidate").setEnabled (model.getSelectedClipIds().size() > 1));
 
     if (clip.kind == TrackKind::audio)
-        menu.addItem (item (clip.reversed ? "Play Forwards" : "Reverse", {},
+        menu.addItem (item (clip.reversed ? "Play Forwards" : "Reverse",
                             [this, id = clip.id] { commands.invoke ("clip.reverse", clipArgs (id)); }));
     else
-        menu.addItem (item ("Quantize", juce::KeyPress ('q'),
-                            [this, id = clip.id] { commands.invoke ("note.quantize", noteQuantizeArgs (id, "1/16")); }));
+        menu.addItem (commandItem (commands, "note.quantize", noteQuantizeArgs (clip.id, "1/16"), "Quantize"));
 
     if (clip.numTakes > 0)
     {
@@ -258,7 +281,7 @@ void TrackLanes::showClipMenu (const ClipInfo& clip)
     }
 
     menu.addSeparator();
-    menu.addItem (item ("Delete", juce::KeyPress (juce::KeyPress::deleteKey), [this] { commands.invoke ("clip.delete"); }));
+    menu.addItem (commandItem (commands, "edit.delete"));
     menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
@@ -368,13 +391,15 @@ void TrackLanes::mouseDown (const juce::MouseEvent& e)
     }
 
     if (onRowClicked)
-        onRowClicked (view.yToRow (e.y, laneHeight()));
+        onRowClicked (view.yToRow (e.y, laneHeight()), e.mods);
 }
 
 void TrackLanes::mouseDrag (const juce::MouseEvent& e)
 {
     if (! drag || tracks.empty())
         return;
+
+    autoScrollAt (e.getPosition());
 
     const auto pixelsPerSecond = view.getPixelsPerSecond();
     // Through the view state, so a scroll or zoom mid-drag keeps the clip under the pointer.
