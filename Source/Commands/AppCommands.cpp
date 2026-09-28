@@ -1,4 +1,5 @@
 #include "AppCommands.h"
+#include "TapTempo.h"
 
 #include "Engine/ApplicationModel.h"
 
@@ -15,7 +16,8 @@ namespace
                                take ("take"), position ("position"),
                                pitch ("pitch"), length ("length"), velocity ("velocity"), grid ("grid"),
                                noteId ("noteId"), noteIds ("noteIds"),
-                               deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch");
+                               deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch"),
+                               bpm ("bpm"), numerator ("numerator"), denominator ("denominator");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -397,6 +399,48 @@ namespace
         void execute (const juce::var&) override   { model.returnToStart(); }
     };
 
+    struct SetTempoCommand : ModelCommand
+    {
+        SetTempoCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.setTempo", "Set Tempo", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            if (auto bpm = args[ArgKeys::bpm]; bpm.isDouble() || bpm.isInt())
+                model.setTempo (bpm, (bool) args[ArgKeys::continuesGesture]);
+        }
+    };
+
+    /** `T`: sets the tempo from the last few taps. */
+    struct TapTempoCommand : ModelCommand
+    {
+        TapTempoCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.tapTempo", "Tap Tempo", m, h) {}
+
+        void execute (const juce::var&) override
+        {
+            if (auto bpm = taps.tap (juce::Time::getMillisecondCounterHiRes() / 1000.0); bpm > 0)
+                model.setTempo (bpm);
+        }
+
+        TapTempo taps;
+    };
+
+    struct SetTimeSignatureCommand : ModelCommand
+    {
+        SetTimeSignatureCommand (ApplicationModel& m, AppCommandHost& h)
+            : ModelCommand ("transport.setTimeSignature", "Set Time Signature", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            model.setTimeSignature ((int) args[ArgKeys::numerator], (int) args[ArgKeys::denominator]);
+        }
+    };
+
+    struct ToggleMetronomeCommand : ModelCommand
+    {
+        ToggleMetronomeCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.toggleMetronome", "Metronome", m, h) {}
+        void execute (const juce::var&) override   { model.setMetronomeOn (! model.isMetronomeOn()); }
+    };
+
     /** A click on the timeline ruler. */
     struct SetPositionCommand : ModelCommand
     {
@@ -451,6 +495,10 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<PlayCommand> (model, host));
     registry.add (std::make_unique<StopCommand> (model, host));
     registry.add (std::make_unique<TogglePlayCommand> (model, host, registry));
+    registry.add (std::make_unique<SetTempoCommand> (model, host));
+    registry.add (std::make_unique<TapTempoCommand> (model, host));
+    registry.add (std::make_unique<SetTimeSignatureCommand> (model, host));
+    registry.add (std::make_unique<ToggleMetronomeCommand> (model, host));
     registry.add (std::make_unique<ReturnToStartCommand> (model, host));
     registry.add (std::make_unique<SetPositionCommand> (model, host));
     registry.add (std::make_unique<RecordCommand> (model, host));
@@ -576,6 +624,22 @@ juce::var noteQuantizeArgs (const juce::String& clipId, const juce::String& grid
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::clipId, clipId);
     args->setProperty (ArgKeys::grid, grid);
+    return args;
+}
+
+juce::var tempoArgs (double bpm, bool continuesGesture)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::bpm, bpm);
+    args->setProperty (ArgKeys::continuesGesture, continuesGesture);
+    return args;
+}
+
+juce::var timeSignatureArgs (int numerator, int denominator)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::numerator, numerator);
+    args->setProperty (ArgKeys::denominator, denominator);
     return args;
 }
 

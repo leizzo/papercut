@@ -331,13 +331,10 @@ juce::Font ThemeManager::getFont (float scale) const
 
 juce::Font ThemeManager::font (const TypeStyle& style) const
 {
-    auto options = juce::FontOptions().withPointHeight (style.size)
-                                      .withKerningFactor (style.size > 0 ? style.tracking / style.size : 0.0f);
-
-    if (auto typeface = fonts->find (style.mono, style.weight))
-        options = options.withTypeface (typeface);
-
-    return juce::Font (options);
+    auto typeface = fonts->find (style.mono, style.weight);
+    return juce::Font ((typeface != nullptr ? juce::FontOptions (typeface) : juce::FontOptions())
+                           .withPointHeight (style.size)
+                           .withKerningFactor (style.size > 0 ? style.tracking / style.size : 0.0f));
 }
 
 juce::Font ThemeManager::numberFont (const TypeStyle& style) const

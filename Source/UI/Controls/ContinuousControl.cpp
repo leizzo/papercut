@@ -428,16 +428,21 @@ ValueField::ValueField (ThemeManager& tm, ContinuousValue::Spec spec, juce::Stri
     setTitle (caption);
 }
 
+float ValueField::getFocusRadius() const
+{
+    return raised ? themeManager.getTheme().radiusLg : themeManager.getTheme().radiusMd;
+}
+
 void ValueField::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
     const auto stacked = caption.isNotEmpty();
-    const auto radius = stacked ? 5.0f : theme.radiusMd;
+    const auto radius = stacked ? 5.0f : getFocusRadius();
     const auto bounds = getLocalBounds().toFloat();
 
-    g.setColour (theme.bgSlot);
+    g.setColour (raised ? (isMouseOverOrDragging() ? theme.bgHover : theme.bgElevated) : theme.bgSlot);
     g.fillRoundedRectangle (bounds, radius);
-    g.setColour (isMouseOverOrDragging() ? theme.border : theme.borderSoft);
+    g.setColour (raised || isMouseOverOrDragging() ? theme.border : theme.borderSoft);
     g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
 
     if (isEditingText())
@@ -450,13 +455,25 @@ void ValueField::paint (juce::Graphics& g)
                         r.removeFromTop (juce::roundToInt (theme.caption.size) + 2), juce::Justification::centredLeft,
                         theme.textDim);
         r.removeFromTop (3);
-        drawNumber (g, themeManager, getModel().getText(), TypeStyle { 13.0f, true, 500 }, r,
+        drawNumber (g, themeManager, getModel().getText(), valueStyle.value_or (TypeStyle { 13.0f, true, 500 }), r,
                     juce::Justification::centredLeft, theme.textPrimary);
         return;
     }
 
-    drawNumber (g, themeManager, getModel().getText(), theme.body, getLocalBounds().reduced (8, 0),
-                juce::Justification::centred, theme.textPrimary);
+    const auto style = valueStyle.value_or (theme.body);
+    const auto valueFont = themeManager.numberFont (style);
+    const auto suffixStyle = TypeStyle { theme.caption.size, false, 400 };
+    const auto valueWidth = juce::GlyphArrangement::getStringWidthInt (valueFont, getModel().getText());
+    const auto suffixWidth = suffix.isEmpty() ? 0 : 6 + juce::GlyphArrangement::getStringWidthInt (themeManager.font (suffixStyle), suffix);
+    auto r = getLocalBounds().withSizeKeepingCentre (valueWidth + suffixWidth, getHeight());
+
+    g.setColour (theme.textPrimary);
+    g.setFont (valueFont);
+    g.drawText (getModel().getText(), r.removeFromLeft (valueWidth), juce::Justification::centredLeft, false);
+
+    if (suffix.isNotEmpty())
+        drawStyledText (g, themeManager, suffix, suffixStyle, r.withTrimmedLeft (6), juce::Justification::centredLeft,
+                        theme.textDim);
 }
 
 } // namespace papercut

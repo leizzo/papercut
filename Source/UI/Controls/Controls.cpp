@@ -56,10 +56,15 @@ Button::Button (ThemeManager& tm, const juce::String& text, Variant v, std::opti
     setButtonText (text);
 }
 
+juce::Font Button::labelFont() const
+{
+    return numeric ? themeManager.numberFont (TypeStyle { 13.0f, true, 400 }) : buttonFont (themeManager);
+}
+
 int Button::getIdealWidth() const
 {
     auto& metrics = themeManager.getMetrics();
-    const auto label = textWidth (buttonFont (themeManager), getButtonText());
+    const auto label = textWidth (labelFont(), getButtonText());
     return 2 * metrics.spaceLg + label + (icon ? 12 + metrics.spaceSm : 0);
 }
 
@@ -95,7 +100,7 @@ void Button::paintButton (juce::Graphics& g, bool, bool down)
 
     fillAndStroke (g, bounds, radius, colours.fill, stroke);
 
-    const auto font = buttonFont (themeManager);
+    const auto font = labelFont();
     auto content = getLocalBounds().reduced (metrics.spaceLg, 0);
     const auto labelWidth = textWidth (font, getButtonText());
     const auto contentWidth = labelWidth + (icon ? 12 + metrics.spaceSm : 0);

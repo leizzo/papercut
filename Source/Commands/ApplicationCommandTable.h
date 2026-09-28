@@ -19,6 +19,12 @@ struct ApplicationCommandEntry
 
 std::span<const ApplicationCommandEntry> getApplicationCommandTable();
 
+/** The menus, in order: File Edit Create View Options Help (PRD §6.1). */
+std::span<const char* const> getMenuNames();
+
+/** One menu's items, with their shortcuts, from the table. */
+juce::PopupMenu createCommandMenu (juce::ApplicationCommandManager&, const juce::String& menuName);
+
 const ApplicationCommandEntry* findApplicationCommand (juce::CommandID);
 
 } // namespace papercut

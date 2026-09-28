@@ -52,6 +52,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         auto result = fn();
         attach();
         openGestureKey = {};
+        insertMarkerSeconds = 0;
         notifyChanged();
         return result;
     }
@@ -395,6 +396,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     te::SelectionManager selectionManager { projectManager.getEdit().engine };
     juce::ValueTree editState;
     juce::String openGestureKey;   ///< the gesture whose undo step is still open, if any
+    double insertMarkerSeconds = 0;
     juce::ListenerList<ApplicationModel::Listener> listeners;
 
     void notifyChanged()    { triggerAsyncUpdate(); }
@@ -1090,13 +1092,25 @@ bool ApplicationModel::hasSelectedNotes() const
 //==============================================================================
 void ApplicationModel::play()
 {
-    impl->edit().getTransport().play (false);
+    auto& transport = impl->transport();
+    const auto from = ! transport.isPlaying() && isLooping() ? getLoopRange().start : impl->insertMarkerSeconds;
+
+    transport.setPosition (te::TimePosition::fromSeconds (from));
+
+    if (! transport.isPlaying())
+        transport.play (false);
 }
 
 void ApplicationModel::stop()
 {
     if (! isRecording())
     {
+        if (! isPlaying())
+        {
+            returnToStart();
+            return;
+        }
+
         impl->transport().stop (false, false);
         return;
     }
@@ -1105,6 +1119,75 @@ void ApplicationModel::stop()
     impl->beginUndoStep ("Record");
     impl->transport().stop (false, false);
     impl->removeDuplicateTakes();
+}
+
+double ApplicationModel::getInsertMarkerSeconds() const
+{
+    return impl->insertMarkerSeconds;
+}
+
+bool ApplicationModel::isMetronomeOn() const
+{
+    return impl->edit().clickTrackEnabled.get();
+}
+
+void ApplicationModel::setMetronomeOn (bool on)
+{
+    impl->edit().clickTrackEnabled = on;
+    impl->notifyChanged();
+}
+
+float ApplicationModel::getCpuUsage() const
+{
+    return impl->edit().engine.getDeviceManager().getCpuUsage();
+}
+
+//==============================================================================
+double ApplicationModel::getTempo() const
+{
+    return impl->edit().tempoSequence.getTempo (0)->getBpm();
+}
+
+bool ApplicationModel::setTempo (double bpm, bool continuesGesture)
+{
+    auto* tempo = impl->edit().tempoSequence.getTempo (0);
+    const auto clamped = juce::jlimit (minTempo, maxTempo, bpm);
+
+    if (tempo == nullptr || juce::exactlyEqual (tempo->getBpm(), clamped))
+        return false;
+
+    impl->beginGestureStep ("Set Tempo", "tempo", continuesGesture);
+    tempo->setBpm (clamped);
+    return true;
+}
+
+TimeSignature ApplicationModel::getTimeSignature() const
+{
+    auto* sig = impl->edit().tempoSequence.getTimeSig (0);
+    return sig != nullptr ? TimeSignature { sig->numerator.get(), sig->denominator.get() } : TimeSignature {};
+}
+
+bool ApplicationModel::setTimeSignature (int numerator, int denominator)
+{
+    auto* sig = impl->edit().tempoSequence.getTimeSig (0);
+    const auto validDenominator = denominator == 1 || denominator == 2 || denominator == 4 || denominator == 8 || denominator == 16;
+
+    if (sig == nullptr || numerator < 1 || numerator > 32 || ! validDenominator
+        || (sig->numerator.get() == numerator && sig->denominator.get() == denominator))
+        return false;
+
+    impl->beginUndoStep ("Set Time Signature");
+    sig->numerator = numerator;
+    sig->denominator = denominator;
+    return true;
+}
+
+BarsBeats ApplicationModel::toBarsBeats (double seconds) const
+{
+    const auto bb = impl->edit().tempoSequence.toBarsAndBeats (te::TimePosition::fromSeconds (std::max (0.0, seconds)));
+    const auto beat = bb.getWholeBeats();
+    const auto sixteenth = (int) std::floor (bb.getFractionalBeats().inBeats() * 4.0 + 1.0e-9);
+    return { bb.bars + 1, beat + 1, juce::jlimit (0, 3, sixteenth) + 1 };
 }
 
 juce::Result ApplicationModel::record()
@@ -1134,6 +1217,7 @@ void ApplicationModel::returnToStart()
         stop();
 
     impl->edit().getTransport().setPosition (te::TimePosition());
+    impl->insertMarkerSeconds = 0;
 }
 
 bool ApplicationModel::setTransportPosition (double seconds)
@@ -1141,7 +1225,8 @@ bool ApplicationModel::setTransportPosition (double seconds)
     if (isRecording())
         return false;
 
-    impl->edit().getTransport().setPosition (te::TimePosition::fromSeconds (std::max (0.0, seconds)));
+    impl->insertMarkerSeconds = std::max (0.0, seconds);
+    impl->edit().getTransport().setPosition (te::TimePosition::fromSeconds (impl->insertMarkerSeconds));
     return true;
 }
 

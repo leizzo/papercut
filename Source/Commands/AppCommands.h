@@ -38,6 +38,7 @@ struct AppCommandHost
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
     transport.setPosition
     transport.record  transport.toggleLoop  transport.setLoopRange
+    transport.setTempo  transport.tapTempo  transport.setTimeSignature  transport.toggleMetronome
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
 
@@ -88,5 +89,11 @@ juce::var loopRangeArgs (double startSeconds, double endSeconds);
 
 /** Arguments for transport.setPosition: where the playhead moves, in seconds. */
 juce::var transportPositionArgs (double seconds);
+
+/** Arguments for transport.setTempo; continuesGesture joins a drag into one undo step. */
+juce::var tempoArgs (double bpm, bool continuesGesture = false);
+
+/** Arguments for transport.setTimeSignature. */
+juce::var timeSignatureArgs (int numerator, int denominator);
 
 } // namespace papercut

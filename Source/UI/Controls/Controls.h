@@ -41,9 +41,15 @@ public:
     /** Width that fits the label and icon at the design's padding. */
     int getIdealWidth() const;
 
+    /** The label is a number (a time signature): draw it mono (§15.2). */
+    void setNumeric (bool b)   { numeric = b; repaint(); }
+
 private:
     Variant variant;
     std::optional<Icon> icon;
+    bool numeric = false;
+
+    juce::Font labelFont() const;
 };
 
 /** `IconButton/Transport` (34 square, radius-xl), `IconButton/Transport Active`

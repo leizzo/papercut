@@ -3,6 +3,7 @@
 #include "UI/Developer/DeveloperCommands.h"
 #include "UI/Layout/LayoutSource.h"
 #include "UI/Layout/Primitives.h"
+#include "UI/State/UIStateStore.h"
 
 namespace papercut
 {
@@ -10,7 +11,9 @@ namespace papercut
 MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     : services (std::move (s)),
       commandManager (cm),
+      shell (services.uiState.getState ("shell")),
       layouts (services.layoutSource, factory, services.uiState),
+      topBar (services.model, services.commands, services.themeManager, shell),
       arrangement (services.model, services.commands, services.themeManager, services.uiState,
                    services.automation, services.shaper),
       pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
@@ -18,20 +21,35 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       insertStrip (services.commands, services.plugins, services.model, services.themeManager),
       sessionView (services.model, services.session, services.commands, services.themeManager),
       mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager),
+      editorPlaceholder (services.themeManager, "The audio Editor arrives with M4. Double-click an audio clip then."),
+      pianoRollPlaceholder (services.themeManager, "Select a MIDI clip, or double-click one, to edit its notes."),
       developerOverlay (services.themeManager)
 {
-    // Every Command a layout may name must be registered before layouts build.
+    // Every Command a layout or the menus may name must be registered before they build.
     registerPrimitives (factory, services.commands, services.themeManager);
     registerDeveloperCommands (services.commands, layouts, services.themeManager, services.reportError);
+    registerShellCommands (services.commands, shell);
 
     layouts.onError = services.reportError;
     statusBarHost.onBuilt = [this] { updateStatusBar(); };
-
-    layouts.addHost (transportHost);
     layouts.addHost (statusBarHost);
 
-    arrangement.onMidiClipOpened = [this] (const juce::String& id) { pianoRoll.openClip (id); };
-    pianoRoll.onOpenStateChanged = [this] { resized(); };
+    topBar.onMenu = [this] (const juce::String& name, juce::Rectangle<int> area) { showMenu (name, area); };
+
+    arrangement.onMidiClipOpened = [this] (const juce::String& id)
+    {
+        pianoRoll.openClip (id);
+        shell.setView (ShellState::View::pianoRoll);
+    };
+
+    // Closing the Piano Roll returns to the timeline it was opened from.
+    pianoRoll.onOpenStateChanged = [this]
+    {
+        if (! pianoRoll.isOpen() && shell.getView() == ShellState::View::pianoRoll)
+            shell.setView (shell.getLastTimelineView());
+
+        resized();
+    };
 
     editPluginButton.onClick = [this]
     {
@@ -39,18 +57,15 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
             pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
     };
 
-    addAndMakeVisible (transportHost);
-    addAndMakeVisible (pluginBrowser);
-    addAndMakeVisible (insertStrip);
-    addAndMakeVisible (editPluginButton);
-    addAndMakeVisible (arrangement);
-    addAndMakeVisible (sessionView);
-    addAndMakeVisible (pianoRoll);
-    addAndMakeVisible (mixerView);
-    addAndMakeVisible (developerOverlay);
-    addAndMakeVisible (statusBarHost);
+    for (auto* c : std::initializer_list<juce::Component*> { &topBar, &pluginBrowser, &insertStrip, &editPluginButton,
+                                                             &arrangement, &sessionView, &pianoRoll, &mixerView,
+                                                             &editorPlaceholder, &pianoRollPlaceholder,
+                                                             &developerOverlay, &statusBarHost })
+        addChildComponent (c);
 
+    topBar.setVisible (true);
     developerOverlay.setVisible (services.layoutSource.isDevMode());
+    statusBarHost.setVisible (services.layoutSource.isDevMode());
     addMouseListener (this, true);
 
     if (auto dir = services.layoutSource.getDevDirectory(); dir != juce::File())
@@ -63,55 +78,105 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
 
     services.model.addListener (this);
     services.themeManager.addListener (this);
+    shell.getState().addListener (this);
     themeChanged();
 }
 
 MainComponent::~MainComponent()
 {
+    shell.getState().removeListener (this);
     services.themeManager.removeListener (this);
     services.model.removeListener (this);
 }
 
+void MainComponent::Placeholder::paint (juce::Graphics& g)
+{
+    auto& theme = themeManager.getTheme();
+    g.fillAll (theme.bgDeep);
+    drawStyledText (g, themeManager, text, theme.body, getLocalBounds(), juce::Justification::centred, theme.textDim);
+}
+
 void MainComponent::paint (juce::Graphics& g)
 {
-    auto& theme = services.themeManager.getTheme();
-    g.fillAll (theme.background);
-    g.setColour (theme.panel);
-    g.fillRect (transportHost.getBounds());
-    g.fillRect (statusBarHost.getBounds());
+    g.fillAll (services.themeManager.getTheme().bgDeep);
 }
 
 void MainComponent::resized()
 {
+    using View = ShellState::View;
     auto& metrics = services.themeManager.getMetrics();
     auto r = getLocalBounds();
-    transportHost.setBounds (r.removeFromTop (metrics.transportHeight));
-    statusBarHost.setBounds (r.removeFromBottom (metrics.statusBarHeight));
+    topBar.setBounds (r.removeFromTop (metrics.topBarHeight));
+
+    if (statusBarHost.isVisible())
+        statusBarHost.setBounds (r.removeFromBottom (metrics.statusBarHeight));
 
     if (developerOverlay.isVisible())
         developerOverlay.setBounds (r.removeFromBottom (metrics.trackControlHeight * 5));
 
-    const auto mixerHeight = metrics.trackHeight * 3;
-    const auto sessionHeight = metrics.trackHeight * 2 + metrics.trackControlHeight;
-    mixerView.setBounds (r.removeFromBottom (mixerHeight));
+    const auto view = shell.getView();
+    const auto timeline = view == View::session || view == View::arrange;
+    const auto pianoRollOpen = pianoRoll.isOpen();
 
-    auto left = r.removeFromLeft (metrics.trackHeaderWidth);
-    editPluginButton.setBounds (left.removeFromBottom (metrics.trackControlHeight));
-    insertStrip.setBounds (left.removeFromBottom (metrics.trackHeight));
-    pluginBrowser.setBounds (left);
+    // The Browser and the detail view belong to Session and Arrange (§6.2, §6.3).
+    const auto showBrowser = timeline && shell.isBrowserVisible();
+    const auto showDetail = timeline && ! shell.isDetailCollapsed();
 
-    const auto editingNotes = pianoRoll.isOpen();
-    arrangement.setVisible (! editingNotes);
-    sessionView.setVisible (! editingNotes);
-    pianoRoll.setVisible (editingNotes);
+    pluginBrowser.setVisible (showBrowser);
+    insertStrip.setVisible (showDetail);
+    editPluginButton.setVisible (showDetail);
+    sessionView.setVisible (view == View::session);
+    arrangement.setVisible (view == View::arrange);
+    mixerView.setVisible (view == View::mixer);
+    pianoRoll.setVisible (view == View::pianoRoll && pianoRollOpen);
+    pianoRollPlaceholder.setVisible (view == View::pianoRoll && ! pianoRollOpen);
+    editorPlaceholder.setVisible (view == View::editor);
 
-    if (editingNotes)
-        pianoRoll.setBounds (r);
-    else
+    if (showDetail)
     {
-        sessionView.setBounds (r.removeFromBottom (sessionHeight));
-        arrangement.setBounds (r);
+        auto detail = r.removeFromBottom (shell.getDetailHeight());
+        editPluginButton.setBounds (detail.removeFromRight (metrics.trackHeaderWidth / 2).removeFromTop (metrics.trackControlHeight));
+        insertStrip.setBounds (detail);
     }
+
+    if (showBrowser)
+        pluginBrowser.setBounds (r.removeFromLeft (236));
+
+    for (auto* c : std::initializer_list<juce::Component*> { &sessionView, &arrangement, &mixerView, &pianoRoll,
+                                                             &pianoRollPlaceholder, &editorPlaceholder })
+        c->setBounds (r);
+}
+
+void MainComponent::valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&)
+{
+    if (shell.getView() == ShellState::View::pianoRoll && ! pianoRoll.isOpen())
+        openPianoRollForSelection();
+
+    resized();
+    commandManager.commandStatusChanged();
+}
+
+void MainComponent::openPianoRollForSelection()
+{
+    const auto clipId = services.model.getSelectedClipId();
+
+    for (auto& track : services.model.getTracks())
+        for (auto& clip : track.clips)
+            if (clip.id == clipId && clip.kind == TrackKind::midi)
+                pianoRoll.openClip (clipId);
+}
+
+void MainComponent::showMenu (const juce::String& name, juce::Rectangle<int> screenArea)
+{
+    juce::PopupMenu menu;
+
+    if (name.isEmpty())
+        for (auto* menuName : getMenuNames())
+            menu.addSubMenu (menuName, createCommandMenu (commandManager, menuName));
+    else
+        menu = createCommandMenu (commandManager, name);
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (screenArea));
 }
 
 void MainComponent::updateStatusBar()

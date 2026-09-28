@@ -13,20 +13,26 @@
 #include "UI/Developer/DeveloperOverlay.h"
 #include "UI/Developer/LayoutWatcher.h"
 #include "UI/Session/SessionView.h"
+#include "UI/State/ShellState.h"
+#include "TopBar.h"
 
 namespace papercut
 {
 
 class LayoutSource;
 
-/** The MainWindow's content: JSON-driven Transport and StatusBar around the
-    hand-coded Arrangement, or the Piano Roll when a MIDI clip is open. Also the
+/** The MainWindow's content (PRD §5–6): the top bar, then the view the shell
+    shows. Session and Arrange sit between the Browser (left) and the detail
+    view (bottom); Mixer, Piano Roll and Editor fill the window. Views are kept
+    alive while hidden, so each keeps its scroll and zoom. In Developer Mode a
+    JSON status bar and the developer overlay sit at the bottom. Also the
     ApplicationCommandTarget that routes menus and keyboard shortcuts into the
-    Command registry (ADR-0006). */
+    Command registry. */
 class MainComponent : public juce::Component,
                       public juce::ApplicationCommandTarget,
                       private ApplicationModel::Listener,
-                      private ThemeManager::Listener
+                      private ThemeManager::Listener,
+                      private juce::ValueTree::Listener
 {
 public:
     struct Services
@@ -61,10 +67,11 @@ private:
     Services services;
     juce::ApplicationCommandManager& commandManager;
 
+    ShellState shell;
     ComponentFactory factory;
     LayoutManager layouts;
-    LayoutHost transportHost { "transport", "layouts/transport.json" };
     LayoutHost statusBarHost { "statusbar", "layouts/statusbar.json" };
+    TopBar topBar;
     ArrangementView arrangement;
     PianoRollView pianoRoll;
     PluginBrowser pluginBrowser;
@@ -72,13 +79,27 @@ private:
     juce::TextButton editPluginButton { "Edit" };
     SessionView sessionView;
     MixerView mixerView;
+
+    /** A view that isn't built yet, or has nothing to show. */
+    struct Placeholder : juce::Component
+    {
+        Placeholder (ThemeManager& tm, juce::String t) : themeManager (tm), text (std::move (t)) {}
+        void paint (juce::Graphics&) override;
+        ThemeManager& themeManager;
+        juce::String text;
+    };
+
+    Placeholder editorPlaceholder, pianoRollPlaceholder;
     DeveloperOverlay developerOverlay;
     std::unique_ptr<LayoutWatcher> layoutWatch;
     std::unique_ptr<LayoutWatcher> themeWatch;
     std::unique_ptr<PluginEditorWindow> pluginEditor;
 
     void updateStatusBar();
+    void showMenu (const juce::String& name, juce::Rectangle<int> screenArea);
+    void openPianoRollForSelection();
     void mouseDown (const juce::MouseEvent&) override;
+    void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
 
     void modelChanged() override;
     void themeChanged() override;

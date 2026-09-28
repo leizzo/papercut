@@ -32,8 +32,12 @@ int main (int argc, char** argv)
     // Optional argument: run only the suites whose name contains it.
     juce::Array<juce::UnitTest*> selected;
 
-    for (auto* t : juce::UnitTest::getTestsInCategory ("Papercut"))
-        if (argc < 2 || t->getName().containsIgnoreCase (argv[1]))
+    // "--snapshot [name]" renders the UI to PNGs instead (Tests/Snapshots.cpp).
+    const auto snapshot = argc >= 2 && juce::String (argv[1]) == "--snapshot";
+    const auto filter = snapshot ? (argc >= 3 ? juce::String (argv[2]) : juce::String()) : (argc >= 2 ? juce::String (argv[1]) : juce::String());
+
+    for (auto* t : juce::UnitTest::getTestsInCategory (snapshot ? "Snapshot" : "Papercut"))
+        if (filter.isEmpty() || t->getName().containsIgnoreCase (filter))
             selected.add (t);
 
     runner.runTests (selected);

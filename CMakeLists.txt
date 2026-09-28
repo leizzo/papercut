@@ -113,7 +113,6 @@ juce_add_binary_data(papercut_resources
     HEADER_NAME PapercutResources.h
     NAMESPACE PapercutResources
     SOURCES
-        UI/layouts/transport.json
         UI/layouts/statusbar.json
         UI/themes/dark.json
         UI/themes/light.json
@@ -142,6 +141,7 @@ papercut_use_engine_without_tracktion(papercut_commands)
 add_library(papercut_ui STATIC
     Source/UI/State/UIStateStore.cpp
     Source/UI/State/ArrangementViewState.cpp
+    Source/UI/State/ShellState.cpp
     Source/UI/Theme/ThemeManager.cpp
     Source/UI/Theme/Interaction.cpp
     Source/UI/Controls/ValueFormat.cpp
@@ -182,6 +182,7 @@ add_library(papercut_ui STATIC
     Source/UI/PianoRoll/NoteGrid.cpp
     Source/UI/PianoRoll/VelocityEditor.cpp
     Source/UI/PianoRoll/PianoRollView.cpp
+    Source/UI/MainWindow/TopBar.cpp
     Source/UI/MainWindow/MainComponent.cpp
     Source/UI/MainWindow/MainWindow.cpp)
 papercut_use_engine_without_tracktion(papercut_ui)
@@ -235,7 +236,9 @@ target_sources(PapercutTests PRIVATE
     Tests/ShaperTests.cpp
     Tests/ThemeTests.cpp
     Tests/ControlTests.cpp
-    Tests/DeviceChainTests.cpp)
+    Tests/DeviceChainTests.cpp
+    Tests/ShellTests.cpp
+    Tests/Snapshots.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the
 # full include path, Tracktion included.

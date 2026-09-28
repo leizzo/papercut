@@ -3,6 +3,8 @@
 #include "ContinuousValue.h"
 #include "UI/Theme/Interaction.h"
 
+#include <optional>
+
 namespace papercut
 {
 
@@ -148,13 +150,25 @@ class ValueField : public ContinuousControl
 public:
     ValueField (ThemeManager&, ContinuousValue::Spec, juce::String caption = {});
 
+    /** The value's type style (default fs-body; numbers are drawn mono). */
+    void setValueStyle (const TypeStyle& s)   { valueStyle = s; repaint(); }
+
+    /** A dim unit after the value, e.g. "BPM". */
+    void setSuffix (juce::String s)           { suffix = std::move (s); repaint(); }
+
+    /** A top-bar field: bg-elevated with a border, radius-lg, instead of a well. */
+    void setRaised (bool b)                   { raised = b; repaint(); }
+
     void paint (juce::Graphics&) override;
 
 protected:
     juce::Rectangle<int> getReadoutBounds() const override   { return getLocalBounds(); }
+    float getFocusRadius() const override;
 
 private:
-    juce::String caption;
+    juce::String caption, suffix;
+    std::optional<TypeStyle> valueStyle;
+    bool raised = false;
 };
 
 } // namespace papercut

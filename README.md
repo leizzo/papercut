@@ -44,5 +44,5 @@ Tests/            Headless tests over the Command registry / Application Model s
 
 In Debug builds, layouts and theme are read from `UI/` in the source tree. Edit a file, then:
 
-- **Reload Layout** — Cmd+Alt+L: rebuilds only the regions whose layout file changed
-- **Reload Theme** — Cmd+Alt+T: re-styles in place
+- **Reload Layout** — Cmd+Alt+Shift+L: rebuilds only the regions whose layout file changed
+- **Reload Theme** — Cmd+Alt+Shift+T: re-styles in place

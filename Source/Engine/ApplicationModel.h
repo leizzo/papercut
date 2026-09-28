@@ -72,6 +72,18 @@ struct TimeRangeSeconds
     double start = 0, end = 0;
 };
 
+/** A timeline position as bars.beats.sixteenths, each counted from 1. */
+struct BarsBeats
+{
+    int bar = 1, beat = 1, sixteenth = 1;
+};
+
+/** The Edit's time signature, e.g. 6 / 8. */
+struct TimeSignature
+{
+    int numerator = 4, denominator = 4;
+};
+
 /** The facade over the current Edit (ADR-0001).
 
     Exposes app-level operations and read-only snapshots; owns no track or clip
@@ -231,11 +243,42 @@ public:
     bool hasSelectedNotes() const;
 
     //==============================================================================
+    // Tempo and time signature (Engine Undo), at the start of the Edit
+    double getTempo() const;
+
+    /** Clamped to [minTempo, maxTempo]; continuesGesture as for setTrackVolume. */
+    bool setTempo (double bpm, bool continuesGesture = false);
+
+    static constexpr double minTempo = 20.0, maxTempo = 300.0;   ///< the engine's tempo range
+
+    TimeSignature getTimeSignature() const;
+
+    /** numerator 1..32; denominator 1, 2, 4, 8 or 16. Returns false otherwise, or if unchanged. */
+    bool setTimeSignature (int numerator, int denominator);
+
+    /** Where a timeline position falls in bars, beats and sixteenths. */
+    BarsBeats toBarsBeats (double seconds) const;
+
+    //==============================================================================
     // Transport (never undoable)
+
+    /** Stopped: plays from the loop start when looping, else from the insert
+        marker. Playing: restarts from the insert marker (PRD §6.1). */
     void play();
 
-    /** Stops; a recording in progress becomes clips on its tracks, as one undo step. */
+    /** Stops, keeping the position; stopping while stopped returns to the start.
+        A recording in progress becomes clips on its tracks, as one undo step. */
     void stop();
+
+    /** Where the user last put the playhead (setTransportPosition); Play starts here. */
+    double getInsertMarkerSeconds() const;
+
+    /** The metronome (the engine's click track). Never undoable. */
+    bool isMetronomeOn() const;
+    void setMetronomeOn (bool);
+
+    /** The audio engine's CPU load, 0..1. */
+    float getCpuUsage() const;
 
     /** Plays and records every armed track's input. While looping, each pass
         through the loop becomes a take of one clip. Fails, doing nothing, if no
@@ -245,11 +288,12 @@ public:
     /** The engine won't loop-record a shorter loop. */
     static constexpr double minLoopRecordingSeconds = 2.0;
 
-    /** Ends a recording in progress first, as stop() does. */
+    /** Moves the playhead and the insert marker to 0. Ends a recording in
+        progress first, as stop() does. */
     void returnToStart();
 
-    /** Moves the playhead; play starts from here. Clamped at 0.
-        Does nothing, and returns false, while recording. */
+    /** Moves the playhead and the insert marker; play starts from here. Clamped
+        at 0. Does nothing, and returns false, while recording. */
     bool setTransportPosition (double seconds);
 
     bool isPlaying() const;
