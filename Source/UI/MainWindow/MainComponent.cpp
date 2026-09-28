@@ -338,6 +338,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
             info.addDefaultKeypress (binding.keyCode, juce::ModifierKeys (binding.modifiers));
 
     info.setActive (command->isEnabled());
+    info.setTicked (command->isTicked());
 }
 
 bool MainComponent::perform (const InvocationInfo& invocation)

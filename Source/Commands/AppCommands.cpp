@@ -19,7 +19,8 @@ namespace
                                pitch ("pitch"), length ("length"), velocity ("velocity"), grid ("grid"),
                                noteId ("noteId"), noteIds ("noteIds"),
                                deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch"),
-                               bpm ("bpm"), file ("file"), name ("name"), argument ("argument"), numerator ("numerator"), denominator ("denominator");
+                               bpm ("bpm"), file ("file"), name ("name"), argument ("argument"), numerator ("numerator"), denominator ("denominator"),
+                               countIn ("countIn");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -606,7 +607,13 @@ namespace
     struct RecordCommand : ModelCommand
     {
         RecordCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.record", "Record", m, h) {}
-        void execute (const juce::var&) override   { report (model.record()); }
+
+        /** Counts in when the count-in is on, unless args say countIn: false (Shift-click Rec). */
+        void execute (const juce::var& args) override
+        {
+            const auto* obj = args.getDynamicObject();
+            report (model.record (obj == nullptr || ! obj->hasProperty (ArgKeys::countIn) || (bool) args[ArgKeys::countIn]));
+        }
     };
 
     struct ToggleLoopCommand : ModelCommand
@@ -674,6 +681,14 @@ namespace
     {
         ToggleMetronomeCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.toggleMetronome", "Metronome", m, h) {}
         void execute (const juce::var&) override   { model.setMetronomeOn (! model.isMetronomeOn()); }
+        bool isTicked() const override              { return model.isMetronomeOn(); }
+    };
+
+    struct ToggleCountInCommand : ModelCommand
+    {
+        ToggleCountInCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.toggleCountIn", "Count-in (2 Bars)", m, h) {}
+        void execute (const juce::var&) override   { model.setCountInOn (! model.isCountInOn()); }
+        bool isTicked() const override              { return model.isCountInOn(); }
     };
 
     /** A click on the timeline ruler. */
@@ -769,6 +784,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<TapTempoCommand> (model, host));
     registry.add (std::make_unique<SetTimeSignatureCommand> (model, host));
     registry.add (std::make_unique<ToggleMetronomeCommand> (model, host));
+    registry.add (std::make_unique<ToggleCountInCommand> (model, host));
     registry.add (std::make_unique<ReturnToStartCommand> (model, host));
     registry.add (std::make_unique<SetPositionCommand> (model, host));
     registry.add (std::make_unique<RecordCommand> (model, host));
@@ -826,6 +842,13 @@ juce::var clipTakeArgs (const juce::String& clipId, int takeIndex)
     auto args = new juce::DynamicObject();
     args->setProperty (ArgKeys::clipId, clipId);
     args->setProperty (ArgKeys::take, takeIndex);
+    return args;
+}
+
+juce::var recordArgs (bool withCountIn)
+{
+    auto args = new juce::DynamicObject();
+    args->setProperty (ArgKeys::countIn, withCountIn);
     return args;
 }
 

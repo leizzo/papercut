@@ -178,7 +178,7 @@ void MixerView::refresh()
     const auto tracks = model.getTracks();
     const auto returns = mixer.getReturns();
     const auto buses = mixer.getBuses();
-    const auto inputs = model.getAudioInputs();
+    const auto audioInputs = model.getAudioInputs(), midiInputs = model.getMidiInputs();
 
     trackOrder.clear();
     returnOrder.clear();
@@ -193,7 +193,7 @@ void MixerView::refresh()
         stripState.sends = mixer.getSends (track.id);
         stripState.inserts = plugins.getChain (track.id, PluginChain::mixer);
         stripState.deviceChain = plugins.getChain (track.id, PluginChain::device);
-        stripState.inputs = inputs;
+        stripState.inputs = track.kind == TrackKind::midi ? midiInputs : audioInputs;
 
         for (auto& bus : buses)
             if (std::find (bus.childTrackIds.begin(), bus.childTrackIds.end(), track.id) != bus.childTrackIds.end())

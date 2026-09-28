@@ -10,14 +10,18 @@ TrackList::TrackList (CommandRegistry& c, ThemeManager& tm, ArrangementViewState
 {
 }
 
-void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::StringArray& inputs)
+void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::StringArray& audioInputs,
+                           const juce::StringArray& midiInputs)
 {
     tracks = newTracks;
-    currentInputs = inputs;
+    currentAudioInputs = audioInputs;
+    currentMidiInputs = midiInputs;
     std::map<juce::String, std::unique_ptr<TrackHeader>> kept;
 
     for (auto& track : tracks)
     {
+        const auto& inputs = track.kind == TrackKind::midi ? midiInputs : audioInputs;
+
         if (auto existing = headers.find (track.id); existing != headers.end())
         {
             kept[track.id] = std::move (existing->second);
@@ -28,7 +32,7 @@ void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::
             header->onToggleAutomation = [this, id = track.id]
             {
                 view.setAutomationShown (id, ! view.isAutomationShown (id));
-                setTracks (tracks, currentInputs);
+                setTracks (tracks, currentAudioInputs, currentMidiInputs);
             };
             addAndMakeVisible (*header);
             kept[track.id] = std::move (header);

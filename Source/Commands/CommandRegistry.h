@@ -30,6 +30,9 @@ public:
     /** Whether invoking now would do anything (menus grey out disabled Commands). */
     virtual bool isEnabled() const   { return true; }
 
+    /** A toggle's state: menus tick the Command while it is on. */
+    virtual bool isTicked() const    { return false; }
+
 private:
     const juce::String id, name;
 

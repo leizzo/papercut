@@ -28,11 +28,14 @@ namespace
         return spec;
     }
 
+    /** m:ss.s; a count-in before the start reads -m:ss.s. */
     juce::String clockText (double seconds)
     {
+        const auto sign = seconds < -0.05 ? juce::String ("-") : juce::String();
+        seconds = std::abs (seconds);
         const auto minutes = (int) (seconds / 60.0);
         const auto rest = seconds - minutes * 60.0;
-        return juce::String (minutes) + ":" + (rest < 10.0 ? "0" : "") + juce::String (rest, 1);
+        return sign + juce::String (minutes) + ":" + (rest < 10.0 ? "0" : "") + juce::String (rest, 1);
     }
 
     juce::String barsBeatsText (const BarsBeats& p)
@@ -86,8 +89,11 @@ TopBar::TopBar (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, Shell
     follow.setTooltip (tooltipFor ("Follow", "view.toggleFollow"));
 
     prev.onClick = [this] { commands.invoke ("transport.returnToStart"); };
-    // There is no count-in yet, so Shift-click records the same way.
-    record.onClick = [this] { commands.invoke ("transport.record"); };
+    // Shift-click records at once, skipping the count-in.
+    record.onClick = [this]
+    {
+        commands.invoke ("transport.record", recordArgs (! juce::ModifierKeys::getCurrentModifiers().isShiftDown()));
+    };
     record.setIconColour (themeManager.getTheme().rec);
     record.setActiveColour (themeManager.getTheme().rec);
     automationArm.setOutlineWhenActive (true);

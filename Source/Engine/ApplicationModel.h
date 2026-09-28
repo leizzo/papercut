@@ -163,18 +163,27 @@ public:
     bool setTrackSolo (const juce::String& trackId, bool solo);
 
     //==============================================================================
-    // Audio inputs (never undoable)
+    // Inputs (never undoable). An audio track records from an audio input, a
+    // MIDI track from a MIDI input.
 
     /** The engine's enabled audio inputs, by name. */
     juce::StringArray getAudioInputs() const;
 
+    /** The engine's enabled MIDI inputs, by name ("All MIDI Ins" first). */
+    juce::StringArray getMidiInputs() const;
+
+    /** The inputs a track of this kind records from. */
+    juce::StringArray getInputs (TrackKind kind) const   { return kind == TrackKind::midi ? getMidiInputs() : getAudioInputs(); }
+
     /** Makes the named input the track's only one; an empty name removes the
-        track's input, which also disarms it. Returns false for an unknown track
-        or input, or if nothing changed. */
+        track's input, which also disarms it. Returns false for an unknown track,
+        an input of the other kind, or if nothing changed. */
     bool setTrackInput (const juce::String& trackId, const juce::String& inputName);
 
     /** Arms or disarms a track. Arming a track without an input first gives it
-        the first audio input; it fails if there is none. */
+        the first input of its kind; it fails if there is none. A return track
+        never arms. A MIDI track records notes into a MIDI clip and, while armed,
+        plays what comes in through its instrument. */
     bool setTrackArmed (const juce::String& trackId, bool armed);
 
     /** The engine's fader range; minVolumeDb is silence. */
@@ -310,7 +319,8 @@ public:
     /** numerator 1..32; denominator 1, 2, 4, 8 or 16. Returns false otherwise, or if unchanged. */
     bool setTimeSignature (int numerator, int denominator);
 
-    /** Where a timeline position falls in bars, beats and sixteenths. */
+    /** Where a timeline position falls in bars, beats and sixteenths. Before the
+        start (a count-in) the bars run 0, -1, ... back from bar 1. */
     BarsBeats toBarsBeats (double seconds) const;
 
     //==============================================================================
@@ -331,13 +341,21 @@ public:
     bool isMetronomeOn() const;
     void setMetronomeOn (bool);
 
+    /** A 2-bar count-in before recording: the engine's own count-in, with the
+        click sounding through it whatever the metronome. Off by default; an
+        engine setting (kept across sessions), not part of the Project. */
+    bool isCountInOn() const;
+    void setCountInOn (bool);
+
     /** The audio engine's CPU load, 0..1. */
     float getCpuUsage() const;
 
-    /** Plays and records every armed track's input. While looping, each pass
-        through the loop becomes a take of one clip. Fails, doing nothing, if no
-        track is armed or the loop is shorter than minLoopRecordingSeconds. */
-    juce::Result record();
+    /** Plays and records every armed track's input. With the count-in on, and
+        withCountIn, it first counts in 2 bars; recording starts at the playhead
+        either way. While looping, each pass through the loop becomes a take of
+        one clip. Fails, doing nothing, if no track is armed or the loop is
+        shorter than minLoopRecordingSeconds. */
+    juce::Result record (bool withCountIn = true);
 
     /** The engine won't loop-record a shorter loop. */
     static constexpr double minLoopRecordingSeconds = 2.0;

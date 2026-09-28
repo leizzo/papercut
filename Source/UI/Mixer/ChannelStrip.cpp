@@ -302,7 +302,7 @@ void ChannelStrip::setState (const StripState& next)
     setTitle (state.track.name);
     setTooltip (state.track.name);
 
-    // Input choices: "No Input" then each audio input.
+    // Input choices: "No Input" then each input of the track's kind.
     input.clear (juce::dontSendNotification);
     input.addItem ("No Input", 1);
 
@@ -311,7 +311,7 @@ void ChannelStrip::setState (const StripState& next)
 
     input.setSelectedItemIndex (state.track.input.isEmpty() ? 0 : state.inputs.indexOf (state.track.input) + 1,
                                 juce::dontSendNotification);
-    input.setEnabled (state.track.kind == TrackKind::audio && ! state.isReturn);
+    input.setEnabled (! state.isReturn);
 
     pan.setValue (state.track.pan);
     faderSection.setVolume (state.track.volumeDb, colour);
@@ -319,7 +319,7 @@ void ChannelStrip::setState (const StripState& next)
     mute.setToggleState (state.track.muted, juce::dontSendNotification);
     solo.setToggleState (state.track.solo, juce::dontSendNotification);
     arm.setToggleState (state.track.armed, juce::dontSendNotification);
-    arm.setVisible (! state.isReturn && state.track.kind == TrackKind::audio);
+    arm.setVisible (! state.isReturn);
 
     rebuildSends();
     rebuildInsertSlots();

@@ -47,6 +47,7 @@ struct AppCommandHost
     transport.record  transport.toggleLoop  transport.setLoopRange
     transport.loopSelection  transport.playFromSelection
     transport.setTempo  transport.tapTempo  transport.setTimeSignature  transport.toggleMetronome
+    transport.toggleCountIn
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
 
@@ -106,6 +107,9 @@ juce::var noteVelocityArgs (const juce::String& clipId, int velocity, bool conti
 
 /** Arguments for note.quantize. grid is "1/4", "1/8" or "1/16". */
 juce::var noteQuantizeArgs (const juce::String& clipId, const juce::String& grid);
+
+/** Arguments for transport.record: withCountIn false records at once (Shift-click Rec). */
+juce::var recordArgs (bool withCountIn);
 
 /** Arguments for transport.setLoopRange, which also turns looping on. */
 juce::var loopRangeArgs (double startSeconds, double endSeconds);

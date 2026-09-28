@@ -173,23 +173,44 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     //==============================================================================
     te::TransportControl& transport() const   { return edit().getTransport(); }
 
-    /** The Edit's audio inputs. Allocates the playback context, which owns them. */
-    juce::Array<te::InputDeviceInstance*> audioInputs() const
+    TrackKind kindOf (const te::Track& track) const   { return isMidiTrack (track) ? TrackKind::midi : TrackKind::audio; }
+
+    static bool isReturnTrack (const te::AudioTrack& track)
+    {
+        return ! track.pluginList.getPluginsOfType<te::AuxReturnPlugin>().isEmpty();
+    }
+
+    /** The Edit's inputs a track of this kind records from: audio inputs, or
+        physical and virtual MIDI inputs. Allocates the playback context, which owns them. */
+    juce::Array<te::InputDeviceInstance*> inputsFor (TrackKind kind) const
     {
         transport().ensureContextAllocated();
         juce::Array<te::InputDeviceInstance*> inputs;
 
         if (auto* context = edit().getCurrentPlaybackContext())
             for (auto* input : context->getAllInputs())
-                if (input->getInputDevice().getDeviceType() == te::InputDevice::waveDevice)
+            {
+                const auto type = input->getInputDevice().getDeviceType();
+                const auto midi = type == te::InputDevice::physicalMidiDevice || type == te::InputDevice::virtualMidiDevice;
+
+                if (kind == TrackKind::midi ? midi : type == te::InputDevice::waveDevice)
                     inputs.add (input);
+            }
 
         return inputs;
     }
 
-    te::InputDeviceInstance* findInput (const juce::String& name) const
+    /** Every input any track records from, audio then MIDI. */
+    juce::Array<te::InputDeviceInstance*> recordingInputs() const
     {
-        for (auto* input : audioInputs())
+        auto inputs = inputsFor (TrackKind::audio);
+        inputs.addArray (inputsFor (TrackKind::midi));
+        return inputs;
+    }
+
+    te::InputDeviceInstance* findInput (TrackKind kind, const juce::String& name) const
+    {
+        for (auto* input : inputsFor (kind))
             if (input->getInputDevice().getName() == name)
                 return input;
 
@@ -199,7 +220,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     /** The input a track records from (a track has at most one). */
     te::InputDeviceInstance* inputOf (const te::AudioTrack& track) const
     {
-        return inputOf (track, audioInputs());
+        return inputOf (track, recordingInputs());
     }
 
     te::InputDeviceInstance* inputOf (const te::AudioTrack& track, const juce::Array<te::InputDeviceInstance*>& inputs) const
@@ -631,7 +652,17 @@ juce::StringArray ApplicationModel::getAudioInputs() const
 {
     juce::StringArray names;
 
-    for (auto* input : impl->audioInputs())
+    for (auto* input : impl->inputsFor (TrackKind::audio))
+        names.add (input->getInputDevice().getName());
+
+    return names;
+}
+
+juce::StringArray ApplicationModel::getMidiInputs() const
+{
+    juce::StringArray names;
+
+    for (auto* input : impl->inputsFor (TrackKind::midi))
         names.add (input->getInputDevice().getName());
 
     return names;
@@ -641,7 +672,7 @@ bool ApplicationModel::setTrackInput (const juce::String& trackId, const juce::S
 {
     auto* track = impl->findTrack (trackId);
     auto* current = track != nullptr ? impl->inputOf (*track) : nullptr;
-    auto* input = inputName.isEmpty() ? nullptr : impl->findInput (inputName);
+    auto* input = inputName.isEmpty() || track == nullptr ? nullptr : impl->findInput (impl->kindOf (*track), inputName);
 
     if (track == nullptr || input == current || (input == nullptr && inputName.isNotEmpty()))
         return false;
@@ -663,13 +694,13 @@ bool ApplicationModel::setTrackArmed (const juce::String& trackId, bool armed)
 {
     auto* track = impl->findTrack (trackId);
 
-    if (track == nullptr)
+    if (track == nullptr || (armed && Impl::isReturnTrack (*track)))
         return false;
 
     auto* input = impl->inputOf (*track);
 
     if (input == nullptr && armed)
-        if (setTrackInput (trackId, getAudioInputs()[0]))
+        if (setTrackInput (trackId, getInputs (impl->kindOf (*track))[0]))
             input = impl->inputOf (*track);
 
     if (input == nullptr || input->isRecordingEnabled (track->itemID) == armed)
@@ -1534,6 +1565,17 @@ void ApplicationModel::setMetronomeOn (bool on)
     impl->notifyChanged();
 }
 
+bool ApplicationModel::isCountInOn() const
+{
+    return impl->edit().getCountInMode() != te::Edit::CountIn::none;
+}
+
+void ApplicationModel::setCountInOn (bool on)
+{
+    impl->edit().setCountInMode (on ? te::Edit::CountIn::twoBar : te::Edit::CountIn::none);
+    impl->notifyChanged();
+}
+
 float ApplicationModel::getCpuUsage() const
 {
     return impl->edit().engine.getDeviceManager().getCpuUsage();
@@ -1581,13 +1623,26 @@ bool ApplicationModel::setTimeSignature (int numerator, int denominator)
 
 BarsBeats ApplicationModel::toBarsBeats (double seconds) const
 {
-    const auto bb = impl->edit().tempoSequence.toBarsAndBeats (te::TimePosition::fromSeconds (std::max (0.0, seconds)));
+    auto& tempo = impl->edit().tempoSequence;
+
+    // Before the start there is no tempo map to read: count back in the first bar's metre.
+    if (seconds < 0.0)
+    {
+        const auto beatsPerBar = (double) tempo.getTimeSig (0)->numerator;
+        const auto beats = tempo.toBeats (te::TimePosition::fromSeconds (seconds)).inBeats();
+        const auto bar = std::floor (beats / beatsPerBar);
+        const auto inBar = beats - bar * beatsPerBar;
+        const auto sixteenth = (int) std::floor ((inBar - std::floor (inBar)) * 4.0 + 1.0e-9);
+        return { (int) bar + 1, (int) std::floor (inBar) + 1, juce::jlimit (0, 3, sixteenth) + 1 };
+    }
+
+    const auto bb = tempo.toBarsAndBeats (te::TimePosition::fromSeconds (seconds));
     const auto beat = bb.getWholeBeats();
     const auto sixteenth = (int) std::floor (bb.getFractionalBeats().inBeats() * 4.0 + 1.0e-9);
     return { bb.bars + 1, beat + 1, juce::jlimit (0, 3, sixteenth) + 1 };
 }
 
-juce::Result ApplicationModel::record()
+juce::Result ApplicationModel::record (bool withCountIn)
 {
     // The engine checks these too, but only tells its UIBehaviour.
     auto tracks = getTracks();
@@ -1602,7 +1657,16 @@ juce::Result ApplicationModel::record()
                                    + juce::String (minLoopRecordingSeconds) + " seconds long");
 
     if (! isRecording())
+    {
+        // The engine reads the count-in as it starts; skipping it (Shift-click Rec) leaves the setting alone.
+        const auto countIn = impl->edit().getCountInMode();
+
+        if (! withCountIn)
+            impl->edit().setCountInMode (te::Edit::CountIn::none);
+
         impl->transport().record (false);
+        impl->edit().setCountInMode (countIn);
+    }
 
     return juce::Result::ok();
 }
@@ -1696,7 +1760,7 @@ int ApplicationModel::getBeatsPerBar (double seconds) const
 std::vector<TrackInfo> ApplicationModel::getTracks() const
 {
     std::vector<TrackInfo> tracks;
-    const auto inputs = impl->audioInputs();
+    const auto inputs = impl->recordingInputs();
 
     for (auto* t : te::getAudioTracks (impl->edit()))
     {
@@ -1708,7 +1772,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         info.colourIndex = impl->colourOf (*t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
-        info.isReturn = ! t->pluginList.getPluginsOfType<te::AuxReturnPlugin>().isEmpty();
+        info.isReturn = Impl::isReturnTrack (*t);
 
         if (auto* input = impl->inputOf (*t, inputs))
         {
@@ -1802,7 +1866,9 @@ std::unique_ptr<ClipWaveform> ApplicationModel::createRecordingWaveform (const j
     auto* track = impl->findTrack (trackId);
     auto* input = track != nullptr ? impl->inputOf (*track) : nullptr;
 
-    if (input == nullptr || ! input->isRecording (track->itemID))
+    // A MIDI recording has no waveform.
+    if (input == nullptr || ! input->isRecording (track->itemID)
+        || input->getInputDevice().getDeviceType() != te::InputDevice::waveDevice)
         return nullptr;
 
     auto thumbnail = impl->edit().engine.getRecordingThumbnailManager().getThumbnailFor (input->getRecordingFile (track->itemID));

@@ -1,4 +1,5 @@
 #include "TestFixture.h"
+#include "Engine/Mixer.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -24,22 +25,33 @@ struct HostedAudio
         io.initialise (params);
         io.prepareToPlay (sampleRate, blockSize);
         deviceManager.dispatchPendingUpdates();
+
     }
 
+    // The hosted interface stays for the whole run: the engine keeps the first
+    // hosted MIDI input it made (a rescan reuses devices by name), and only the
+    // interface that made it feeds it.
     ~HostedAudio()
     {
         deviceManager.deviceManager.closeAudioDevice();
-        deviceManager.removeHostedAudioDeviceInterface();
     }
 
-    /** Runs the engine for this long with a sine wave on every input. */
-    void process (double seconds)
+    /** Runs the engine for this long with a sine wave on every input and,
+        with playNotes, a short middle C at the start of every other block on the
+        MIDI input. Returns the output's peak. */
+    float process (double seconds, bool playNotes = false)
     {
-        const auto total = (int) (seconds * sampleRate);
-        juce::MidiBuffer midi;
+        float outputPeak = 0.0f;
 
-        for (int done = 0; done < total; done += blockSize)
+        const auto total = (int) (seconds * sampleRate);
+
+        for (int done = 0, index = 0; done < total; done += blockSize, ++index)
         {
+            juce::MidiBuffer midi;
+
+            if (playNotes)
+                midi.addEvent (index % 2 == 0 ? juce::MidiMessage::noteOn (1, 60, 0.8f) : juce::MidiMessage::noteOff (1, 60), 0);
+
             juce::AudioBuffer<float> block (2, std::min (blockSize, total - done));
 
             for (int ch = 0; ch < block.getNumChannels(); ++ch)
@@ -47,7 +59,10 @@ struct HostedAudio
                     block.setSample (ch, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * 440.0 * (done + i) / sampleRate));
 
             io.processBlock (block, midi);
+            outputPeak = std::max (outputPeak, block.getMagnitude (0, block.getNumSamples()));
         }
+
+        return outputPeak;
     }
 
     static constexpr double sampleRate = 44100.0;
@@ -73,12 +88,20 @@ struct RecordingTests : juce::UnitTest
         /** Lets the engine rebuild its playback graph after input changes. */
         void settle()   { projects.getEdit().dispatchPendingUpdatesSynchronously(); }
 
+        /** Arming changes what the graph monitors; the engine rebuilds it on the message loop. */
+        void rebuildGraph()
+        {
+            settle();
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (200);
+            settle();
+        }
+
         /** Records for this long onto the armed tracks, then stops. */
-        void recordFor (double seconds)
+        void recordFor (double seconds, bool playNotes = false)
         {
             settle();
             invoke ("transport.record");
-            process (seconds);
+            process (seconds, playNotes);
             invoke ("transport.stop");
         }
 
@@ -227,6 +250,165 @@ struct RecordingTests : juce::UnitTest
 
             f.invoke ("edit.redo");
             expectEquals ((int) f.track().clips.size(), 1);
+        }
+
+        beginTest ("MIDI inputs are listed; arming a MIDI track gives it the first MIDI input");
+        {
+            RecordingFixture f;
+            f.invoke ("track.addMidi");
+            const auto midi = f.trackId (1);
+            expect (! f.model.getMidiInputs().isEmpty());
+
+            f.invoke ("track.toggleArm", trackArgs (midi));
+            expect (f.track (1).armed);
+            expectEquals (f.track (1).input, f.model.getMidiInputs()[0]);
+        }
+
+        beginTest ("A track only takes inputs of its own kind");
+        {
+            RecordingFixture f;
+            f.invoke ("track.addMidi");
+
+            f.invoke ("track.setInput", trackInputArgs (f.trackId (1), f.model.getAudioInputs()[0]));
+            expect (f.track (1).input.isEmpty());
+
+            f.invoke ("track.setInput", trackInputArgs (f.trackId (0), f.model.getMidiInputs()[0]));
+            expect (f.track (0).input.isEmpty());
+
+            const auto midiInputs = f.model.getMidiInputs();
+            const auto last = midiInputs[midiInputs.size() - 1];
+            f.invoke ("track.setInput", trackInputArgs (f.trackId (1), last));
+            expectEquals (f.track (1).input, last);
+        }
+
+        beginTest ("Recording an armed MIDI track writes its notes into a MIDI clip, as one undo step");
+        {
+            RecordingFixture f;
+            f.invoke ("track.addMidi");
+            f.invoke ("track.setInput", trackInputArgs (f.trackId (1), "MIDI Input"));   // the hosted device's input
+            f.invoke ("track.toggleArm", trackArgs (f.trackId (1)));
+            const auto steps = f.undoDepth();
+
+            f.recordFor (1.0, true);
+
+            const auto clips = f.track (1).clips;
+            expectEquals ((int) clips.size(), 1);
+
+            if (clips.size() == 1)
+            {
+                expect (clips[0].kind == TrackKind::midi);
+                expect (! clips[0].notes.empty());
+                expectEquals (clips[0].notes.front().pitch, 60);
+            }
+
+            expectEquals (f.undoDepth(), steps + 1);
+            f.invoke ("edit.undo");
+            expect (f.track (1).clips.empty());
+        }
+
+        beginTest ("An armed MIDI track plays what comes in through its instrument; a disarmed one doesn't");
+        {
+            RecordingFixture f;
+            f.invoke ("track.addMidi");
+            const auto midi = f.trackId (1);
+            f.invoke ("track.setInput", trackInputArgs (midi, "MIDI Input"));
+            f.rebuildGraph();
+            expect (f.process (0.5, true) < 1.0e-4f);
+
+            f.invoke ("track.toggleArm", trackArgs (midi));
+            f.rebuildGraph();
+            expect (f.process (0.5, true) > 1.0e-3f);
+        }
+
+        beginTest ("Count-in is off by default; transport.toggleCountIn turns a 2-bar count-in on and off");
+        {
+            RecordingFixture f;
+            f.deviceManager.engine.getPropertyStorage().removeProperty (te::SettingID::countInMode);
+            expect (! f.model.isCountInOn());
+
+            f.invoke ("transport.toggleCountIn");
+            expect (f.model.isCountInOn());
+            expect (f.projects.getEdit().getCountInMode() == te::Edit::CountIn::twoBar);
+
+            f.invoke ("transport.toggleCountIn");
+            expect (! f.model.isCountInOn());
+        }
+
+        beginTest ("With the count-in on, Rec counts in 2 bars before recording from the playhead");
+        {
+            RecordingFixture f;
+            f.model.setCountInOn (true);
+            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.settle();
+
+            // The engine starts half a beat before the 2 bars, so the first click isn't clipped.
+            const auto countIn = f.model.beatsToSeconds (2.0 * f.model.getBeatsPerBar (0.0) + 0.5);
+            f.invoke ("transport.record");
+            f.process (0.5);
+            expect (f.model.getTransportPositionSeconds() < 0.0, "the playhead counts in before the start");
+
+            f.process (countIn - 0.5 + 1.0);
+            f.invoke ("transport.stop");
+            f.model.setCountInOn (false);
+
+            const auto clips = f.track().clips;
+            expectEquals ((int) clips.size(), 1);
+
+            if (clips.size() == 1)
+            {
+                expectWithinAbsoluteError (clips[0].startSeconds, 0.0, 1e-6);
+                expectWithinAbsoluteError (clips[0].lengthSeconds, 1.0, 0.1);
+            }
+        }
+
+        beginTest ("Shift-click Rec (countIn: false) records at once, and leaves the count-in on");
+        {
+            RecordingFixture f;
+            f.model.setCountInOn (true);
+            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.settle();
+
+            f.invoke ("transport.record", recordArgs (false));
+            f.process (1.0);
+            f.invoke ("transport.stop");
+            expect (f.model.isCountInOn());
+            f.model.setCountInOn (false);
+
+            const auto clips = f.track().clips;
+            expectEquals ((int) clips.size(), 1);
+
+            if (clips.size() == 1)
+                expectWithinAbsoluteError (clips[0].lengthSeconds, 1.0, 0.05);
+        }
+
+        beginTest ("Stopping during the count-in records nothing");
+        {
+            RecordingFixture f;
+            f.model.setCountInOn (true);
+            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            const auto steps = f.undoDepth();
+            f.settle();
+
+            f.invoke ("transport.record");
+            f.process (1.0);
+            f.invoke ("transport.stop");
+            f.model.setCountInOn (false);
+
+            expect (f.track().clips.empty());
+            expect (! f.model.isRecording());
+            expectEquals (f.undoDepth(), steps);
+        }
+
+        beginTest ("A return track never arms");
+        {
+            RecordingFixture f;
+            Mixer mixer { f.projects };
+            expect (mixer.addReturn ("Return").wasOk());
+            const auto returnTrack = f.trackId (1);
+            expect (f.track (1).isReturn);
+
+            f.invoke ("track.toggleArm", trackArgs (returnTrack));
+            expect (! f.track (1).armed);
         }
 
         beginTest ("Returning to the start while recording ends the recording as its own undo step");

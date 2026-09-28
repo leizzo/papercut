@@ -168,6 +168,22 @@ struct TransportCommandTests : juce::UnitTest
             expectEquals (p.sixteenth, 2);
         }
 
+        beginTest ("Before the start (a count-in), bars count back from 1: 0, -1, ...");
+        {
+            Fixture f;
+            f.invoke ("transport.setTempo", tempoArgs (120.0));
+
+            auto p = f.model.toBarsBeats (-0.5);   // the last beat before bar 1
+            expectEquals (p.bar, 0);
+            expectEquals (p.beat, 4);
+            expectEquals (p.sixteenth, 1);
+
+            p = f.model.toBarsBeats (-4.0);        // two bars before
+            expectEquals (p.bar, -1);
+            expectEquals (p.beat, 1);
+            expectEquals (p.sixteenth, 1);
+        }
+
         beginTest ("transport.toggleMetronome switches the click, outside undo");
         {
             Fixture f;

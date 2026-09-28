@@ -18,8 +18,8 @@ class TrackList : public juce::Component
 public:
     TrackList (CommandRegistry&, ThemeManager&, ArrangementViewState&);
 
-    /** inputs: the audio inputs a track can record from. */
-    void setTracks (const std::vector<TrackInfo>&, const juce::StringArray& inputs);
+    /** The inputs a track can record from: audio inputs for an audio track, MIDI inputs for a MIDI track. */
+    void setTracks (const std::vector<TrackInfo>&, const juce::StringArray& audioInputs, const juce::StringArray& midiInputs);
 
     /** Re-positions every header from the view state (after scroll). */
     void layoutHeaders();
@@ -39,7 +39,7 @@ private:
     ThemeManager& themeManager;
     ArrangementViewState& view;
     std::vector<TrackInfo> tracks;
-    juce::StringArray currentInputs;
+    juce::StringArray currentAudioInputs, currentMidiInputs;
     std::map<juce::String, std::unique_ptr<TrackHeader>> headers;
 };
 

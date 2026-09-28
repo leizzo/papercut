@@ -113,7 +113,7 @@ void ArrangementView::refresh()
 {
     updateZoomLimits();
     tracks = model.getTracks();
-    trackList.setTracks (tracks, model.getAudioInputs());
+    trackList.setTracks (tracks, model.getAudioInputs(), model.getMidiInputs());
     lanes.setTracks (tracks);
     timeline.repaint();   // the loop
     clampVerticalScroll();

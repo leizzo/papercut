@@ -9,8 +9,9 @@ namespace papercut
 class CommandRegistry;
 
 /** One track's header (PRD §8.1, §8.4): fold chevron, colour dot, name, and
-    Arm / Solo / Mute / Auto. The right-click menu sets the colour and, on an
-    audio track, the input. Volume and pan live in the mixer.
+    Arm / Solo / Mute / Auto (a return has no Arm). The right-click menu sets
+    the colour and the input: audio inputs on an audio track, MIDI inputs on a
+    MIDI track. Volume and pan live in the mixer.
 
     States: armed, solo and muted fill their buttons; Auto shows a lime tint
     and turns the chevron down; a selected header is bg-elevated with an
@@ -19,7 +20,7 @@ class CommandRegistry;
 class TrackHeader : public juce::Component
 {
 public:
-    /** inputs: the audio inputs a track can record from. */
+    /** inputs: the inputs the track can record from (of its kind). */
     TrackHeader (CommandRegistry&, ThemeManager&, const TrackInfo&, const juce::StringArray& inputs);
 
     const TrackInfo& getTrack() const noexcept   { return track; }

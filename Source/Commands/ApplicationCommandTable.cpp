@@ -70,6 +70,7 @@ namespace
         ApplicationCommandEntry { 0x3006, "transport.loopSelection", "Options" },
         ApplicationCommandEntry { 0x300a, "transport.toggleLoop",    "Options" },
         ApplicationCommandEntry { 0x3007, "transport.toggleMetronome", "Options" },
+        ApplicationCommandEntry { 0x300b, "transport.toggleCountIn", "Options" },
         ApplicationCommandEntry { 0x3008, "transport.tapTempo",      "Options" },
         ApplicationCommandEntry { 0x7009, "view.toggleFollow",       "Options" },
         ApplicationCommandEntry { 0x6001, "plugin.scan",             "Options" },

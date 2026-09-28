@@ -22,7 +22,7 @@ struct StripState
     std::vector<SendInfo> sends;
     std::vector<PluginInfo> inserts;         ///< the mixer inserts
     std::vector<PluginInfo> deviceChain;     ///< read-only, for the Track chain row
-    juce::StringArray inputs;                ///< audio inputs the track can record from
+    juce::StringArray inputs;                ///< inputs of the track's kind it can record from
     juce::String output = "Master";          ///< where it goes
     bool isReturn = false;                   ///< returns have no sends and no arm
     juce::String returnLetter;               ///< A..D on a return
