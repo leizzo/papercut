@@ -2,6 +2,10 @@
 
 **English** · [Türkçe](#türkçe)
 
+<p align="center">
+  <img src="docs/images/hero.png" alt="Papercut — sound design in racks, mixing on a real console. The arrangement view with the sidechain source picker and the send editor." width="100%">
+</p>
+
 A dark, dense, keyboard-friendly desktop DAW for electronic producers and mix engineers.
 
 > **Status: alpha.** Papercut is in early development. The current release is
@@ -14,6 +18,24 @@ A dark, dense, keyboard-friendly desktop DAW for electronic producers and mix en
 Papercut takes you from idea to structure to mix in a single window. Its core principle:
 **sound design lives in the device chain, mixing lives in the mixer** — two separate chains, with a
 signal path you can always see.
+
+## Design preview
+
+> These images come from the product design ([`design/papercut.pen`](design/papercut.pen)) and show
+> where Papercut is heading. Several features in them belong to later milestones — see the
+> [roadmap](#roadmap) for what's in v0.1.0 today.
+
+### A console, not a list
+
+<img src="docs/images/mixer.png" alt="Papercut mixer: rack chain link, post-chain mixer inserts, sends with FX / PRE / POST taps, send pan and polarity, returns A–D and a loudness-metered master." width="100%">
+
+### Native devices inline. Plug-ins in a window.
+
+<img src="docs/images/devices.png" alt="Native EQ Eight and Compressor cards edited inline, a third-party plug-in opened in its own floating window, and a compressor sidechained from the kick." width="100%">
+
+### From the first loop to the final bounce
+
+<img src="docs/images/workflow.png" alt="Scale-aware piano roll, audio clip envelopes with their own loop, folders and bus channels, and arrangement automation." width="100%">
 
 ## What you can do today (v0.1.0)
 
@@ -84,6 +106,10 @@ Papercut's source code is released under the [MIT License](LICENSE).
 
 [English](#papercut) · **Türkçe**
 
+<p align="center">
+  <img src="docs/images/hero.png" alt="Papercut — ses tasarımı rack'lerde, miks gerçek bir konsolda. Sidechain kaynak seçici ve send editörüyle arrangement görünümü." width="100%">
+</p>
+
 Elektronik müzik prodüktörleri ve miks mühendisleri için koyu temalı, yoğun ve klavye dostu bir
 masaüstü DAW.
 
@@ -97,6 +123,24 @@ masaüstü DAW.
 Papercut, fikirden yapıya, yapıdan mikse tek bir pencerede ilerlemenizi sağlar. Temel ilkesi:
 **ses tasarımı cihaz zincirinde, miks mikserde yapılır** — iki ayrı zincir ve her zaman görebildiğiniz
 bir sinyal yolu.
+
+## Tasarım önizlemesi
+
+> Bu görseller ürün tasarımından ([`design/papercut.pen`](design/papercut.pen)) alınmıştır ve
+> Papercut'ın nereye gittiğini gösterir. İçlerindeki bazı özellikler sonraki kilometre taşlarına
+> aittir — v0.1.0'da bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
+
+### Liste değil, konsol
+
+<img src="docs/images/mixer.png" alt="Papercut mikseri: rack zinciri bağlantısı, zincir sonrası mikser insert'leri, FX / PRE / POST send'ler, send pan ve faz, A–D return kanalları ve loudness ölçümlü master." width="100%">
+
+### Yerleşik cihazlar kartta. Eklentiler kendi penceresinde.
+
+<img src="docs/images/devices.png" alt="Kart üzerinde düzenlenen yerleşik EQ Eight ve Compressor, kendi penceresinde açılan üçüncü parti eklenti ve kick ile sidechain'lenen kompresör." width="100%">
+
+### İlk döngüden son bounce'a
+
+<img src="docs/images/workflow.png" alt="Gam destekli piano roll, kendi döngüsüne sahip ses klibi zarfları, klasörler ve bus kanalları, arrangement otomasyonu." width="100%">
 
 ## Bugün neler yapabilirsiniz (v0.1.0)
 
