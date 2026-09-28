@@ -32,7 +32,7 @@ struct Shadow
     int radius = 0;
 };
 
-/** Visual style only: colours, corner radii, fonts, shadows (ADR-0005). Never geometry.
+/** Visual style only: colours, corner radii, fonts, shadows. Never geometry.
 
     The design-system tokens (PRD §15) come first. The older semantic entries
     after them (background, panel, clip, ...) usually name a token in the theme
@@ -50,6 +50,9 @@ struct Theme
 
     /** clip-drums, clip-bass, clip-chords, clip-pads, clip-arp, clip-vocal, clip-fx. */
     std::array<juce::Colour, 7> trackPalette;
+
+    /** A track palette colour by index, clamped to the palette. */
+    juce::Colour trackColour (int index) const   { return trackPalette[(size_t) juce::jlimit (0, (int) trackPalette.size() - 1, index)]; }
 
     /** return-a .. return-d. */
     std::array<juce::Colour, 4> returnColours;
@@ -78,7 +81,7 @@ struct Theme
     float fontSize = 0;
 };
 
-/** UI geometry (ADR-0005). Components read sizes from here, never hard-code them. */
+/** UI geometry. Components read sizes from here, never hard-code them. */
 struct LayoutMetrics
 {
     // Spacing scale (§15.3): space-2xs .. space-3xl
@@ -117,7 +120,7 @@ struct LayoutMetrics
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys
     ("colors", "type", "radius", "elevation" and "style" for the Theme,
-    "metrics" for geometry — ADR-0005) and applies the Theme to the app's
+    "metrics" for geometry) and applies the Theme to the app's
     LookAndFeel.
 
     A colour may name another colour of the same file with "$name". A file may

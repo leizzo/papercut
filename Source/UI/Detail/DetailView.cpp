@@ -290,7 +290,7 @@ void DetailView::refresh()
         if (track.id != trackId)
             continue;
 
-        colour = theme.trackPalette[(size_t) juce::jlimit (0, (int) theme.trackPalette.size() - 1, track.colourIndex)];
+        colour = theme.trackColour (track.colourIndex);
         clipPanel->colour = colour;
         const auto midi = track.kind == TrackKind::midi;
 

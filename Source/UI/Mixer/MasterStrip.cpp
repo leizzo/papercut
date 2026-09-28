@@ -8,28 +8,11 @@ namespace papercut
 
 namespace
 {
-    ContinuousValue::Spec panSpec()
-    {
-        ContinuousValue::Spec spec;
-        spec.minimum = -1.0;
-        spec.maximum = 1.0;
-        spec.format = ValueFormat::pan();
-        return spec;
-    }
 
-    ContinuousValue::Spec gainSpec()
-    {
-        ContinuousValue::Spec spec;
-        spec.minimum = ApplicationModel::minVolumeDb;
-        spec.maximum = ApplicationModel::maxVolumeDb;
-        spec.format = ValueFormat::decibels (ApplicationModel::minVolumeDb);
-        spec.wheelStep = 0.5;
-        return spec;
-    }
 }
 
 MasterStrip::MasterStrip (CommandRegistry& c, ThemeManager& tm)
-    : commands (c), themeManager (tm), pan (tm, panSpec(), "Pan", true), gain (tm, gainSpec()), fader (tm), meter (tm)
+    : commands (c), themeManager (tm), pan (tm, panKnobSpec(), "Pan", true), gain (tm, gainReadoutSpec()), fader (tm), meter (tm)
 {
     setTitle ("Master");
     pan.setDialSize (22);

@@ -22,6 +22,25 @@ namespace
     }
 }
 
+ContinuousValue::Spec panKnobSpec()
+{
+    ContinuousValue::Spec spec;
+    spec.minimum = -1.0;
+    spec.maximum = 1.0;
+    spec.format = ValueFormat::pan();
+    return spec;
+}
+
+ContinuousValue::Spec gainReadoutSpec()
+{
+    ContinuousValue::Spec spec;
+    spec.minimum = FaderLaw::floorDb;
+    spec.maximum = 6.0;
+    spec.format = ValueFormat::decibels (FaderLaw::floorDb);
+    spec.wheelStep = 0.5;
+    return spec;
+}
+
 float yForDb (juce::Rectangle<float> travel, double db)
 {
     return travel.getY() + (float) FaderLaw::dbToTravel (db) * travel.getHeight();
@@ -102,16 +121,17 @@ StereoMeter::StereoMeter (ThemeManager& tm) : themeManager (tm)
 
 void StereoMeter::setLevel (StereoLevel level, double elapsedSeconds)
 {
-    const std::array<double, 2> next { ballistics[0].update (level.left, elapsedSeconds),
-                                       ballistics[1].update (level.right, elapsedSeconds) };
+    const std::array<double, 2> raw { level.left, level.right };
     auto changed = false;
 
     for (size_t i = 0; i < 2; ++i)
     {
+        // The bar follows the mode's ballistics; the peak hold always sees the true peak.
+        const auto shown = ballistics[i].update (raw[i], elapsedSeconds);
         const auto before = holds[i].get();
-        holds[i].update (next[i], elapsedSeconds);
-        changed = changed || std::abs (next[i] - levels[i]) > 0.1 || std::abs (holds[i].get() - before) > 0.05;
-        levels[i] = next[i];
+        holds[i].update (raw[i], elapsedSeconds);
+        changed = changed || std::abs (shown - levels[i]) > 0.1 || std::abs (holds[i].get() - before) > 0.05;
+        levels[i] = shown;
     }
 
     if (changed)

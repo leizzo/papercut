@@ -77,7 +77,7 @@ void TrackHeader::paint (juce::Graphics& g)
               title.removeFromLeft (11).toFloat().withSizeKeepingCentre (11.0f, 11.0f), theme.textDim);
     title.removeFromLeft (8);
 
-    const auto colour = theme.trackPalette[(size_t) juce::jlimit (0, (int) theme.trackPalette.size() - 1, track.colourIndex)];
+    const auto colour = theme.trackColour (track.colourIndex);
     g.setColour (colour);
     g.fillRoundedRectangle (title.removeFromLeft (9).withSizeKeepingCentre (9, 9).toFloat(), 3.0f);
     title.removeFromLeft (8);

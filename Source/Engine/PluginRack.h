@@ -58,7 +58,7 @@ struct PluginParameter
 
     A new plug-in goes at the end of its chain. On a MIDI track, inserting an
     instrument into the device chain removes the built-in synth in the same
-    undo step and leaves papercutKind as "midi" (ADR-0011). Mixer inserts take
+    undo step and leaves papercutKind as "midi". Mixer inserts take
     effects only (no instruments, no MIDI effects), at most maxMixerInserts.
 
     Undo is Engine Undo: Ctrl+Z is edit.undo(). A call that would change nothing

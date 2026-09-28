@@ -67,8 +67,7 @@ void TrackLanes::layoutClips()
             const auto row = dragged ? drag->row : (int) trackRow;
 
             it->second->setClip (clip);
-            const auto& palette = themeManager.getTheme().trackPalette;
-            it->second->setTrackLook (clip.colourIndex >= 0 ? palette[(size_t) juce::jmin (clip.colourIndex, (int) palette.size() - 1)]
+            it->second->setTrackLook (clip.colourIndex >= 0 ? themeManager.getTheme().trackColour (clip.colourIndex)
                                                             : trackColour (tracks[trackRow]),
                                       tracks[trackRow].muted);
 
@@ -117,8 +116,7 @@ int TrackLanes::laneHeight() const
 
 juce::Colour TrackLanes::trackColour (const TrackInfo& track) const
 {
-    auto& palette = themeManager.getTheme().trackPalette;
-    return palette[(size_t) juce::jlimit (0, (int) palette.size() - 1, track.colourIndex)];
+    return themeManager.getTheme().trackColour (track.colourIndex);
 }
 
 void TrackLanes::paint (juce::Graphics& g)

@@ -64,6 +64,12 @@ private:
     std::array<MeterBallistics, 2> ballistics;
 };
 
+/** A pan knob: -1..1, shown as L30 / C / R20. */
+ContinuousValue::Spec panKnobSpec();
+
+/** A gain readout to type into: -inf..+6 dB. */
+ContinuousValue::Spec gainReadoutSpec();
+
 /** Where the fader law puts a dB value in an area, as a y. */
 float yForDb (juce::Rectangle<float> travel, double db);
 

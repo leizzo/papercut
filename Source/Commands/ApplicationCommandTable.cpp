@@ -141,6 +141,7 @@ namespace
         KeyBinding { "track.toggleSoloSelected",  'S',                 0,                 timeline | mixerView },
         KeyBinding { "arrange.zoomIn",            '=',                 0,                 arrangeView },
         KeyBinding { "arrange.zoomIn",            '+',                 0,                 arrangeView },
+        KeyBinding { "arrange.zoomIn",            '+',                 shift,             arrangeView },   // + typed as Shift+=
         KeyBinding { "arrange.zoomOut",           '-',                 0,                 arrangeView },
         KeyBinding { "arrange.zoomToSelection",   'Z',                 0,                 arrangeView },
         KeyBinding { "arrange.zoomToSong",        'Z',                 shift,             arrangeView },

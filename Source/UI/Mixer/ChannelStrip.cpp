@@ -16,24 +16,7 @@ namespace
     /** Signal-flow stages, as the mixer toolbar names them. */
     enum Stage { trackChainStage, insertsStage, sendsStage, faderStage };
 
-    ContinuousValue::Spec panSpec()
-    {
-        ContinuousValue::Spec spec;
-        spec.minimum = -1.0;
-        spec.maximum = 1.0;
-        spec.format = ValueFormat::pan();
-        return spec;
-    }
 
-    ContinuousValue::Spec gainSpec()
-    {
-        ContinuousValue::Spec spec;
-        spec.minimum = ApplicationModel::minVolumeDb;
-        spec.maximum = ApplicationModel::maxVolumeDb;
-        spec.format = ValueFormat::decibels (ApplicationModel::minVolumeDb);
-        spec.wheelStep = 0.5;
-        return spec;
-    }
 
     juce::String twoDigits (int n)   { return n < 10 ? "0" + juce::String (n) : juce::String (n); }
 }
@@ -50,7 +33,7 @@ struct ChannelStrip::SendRow : juce::Component
 
     static ContinuousValue::Spec sendSpec()
     {
-        auto spec = gainSpec();
+        auto spec = gainReadoutSpec();
         spec.toProportion = [] (double db) { return 1.0 - FaderLaw::dbToTravel (db); };
         spec.fromProportion = [] (double p) { return FaderLaw::travelToDb (1.0 - p); };
         return spec;
@@ -90,7 +73,7 @@ struct ChannelStrip::SendRow : juce::Component
 //==============================================================================
 ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
     : commands (c), themeManager (tm),
-      pan (tm, panSpec(), "Pan", true), gain (tm, gainSpec()), fader (tm), meter (tm),
+      pan (tm, panKnobSpec(), "Pan", true), gain (tm, gainReadoutSpec()), fader (tm), meter (tm),
       mute (tm, TrackButton::Kind::mute), solo (tm, TrackButton::Kind::solo), arm (tm, TrackButton::Kind::arm)
 {
     input.setTitle ("Input");
@@ -315,9 +298,8 @@ void ChannelStrip::itemDropped (const SourceDetails& details)
 void ChannelStrip::setState (const StripState& next)
 {
     state = next;
-    auto& palette = themeManager.getTheme().trackPalette;
     colour = state.isReturn ? themeManager.getTheme().returnColours[0]
-                            : palette[(size_t) juce::jlimit (0, (int) palette.size() - 1, state.track.colourIndex)];
+                            : themeManager.getTheme().trackColour (state.track.colourIndex);
 
     setTitle (state.track.name);
     setTooltip (state.track.name);
