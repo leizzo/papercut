@@ -72,6 +72,10 @@ then open `Papercut.app`.
 
 Found a bug or have an idea? [Open an issue](https://github.com/leizzo/papercut/issues).
 
+## License
+
+Papercut's source code is released under the [MIT License](LICENSE).
+
 ---
 
 <a id="türkçe"></a>
@@ -153,6 +157,10 @@ bölümüne bakın), ardından `Papercut.app`'i açın.
 
 Bir hata mı buldunuz ya da bir fikriniz mi var? [Issue açın](https://github.com/leizzo/papercut/issues).
 
+## Lisans
+
+Papercut'ın kaynak kodu [MIT Lisansı](LICENSE) ile yayımlanmıştır.
+
 ---
 
 <a id="for-developers"></a>
@@ -217,3 +225,9 @@ In Debug builds, layouts and theme are read from `UI/` in the source tree. Edit 
 Issues are tracked on [GitHub](https://github.com/leizzo/papercut/issues). Releases follow
 [Semantic Versioning](https://semver.org); each PRD milestone ships as a minor release until 1.0.0 —
 see [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Papercut's own code is [MIT](LICENSE). The pinned dependencies keep their own licenses: JUCE (AGPLv3 or
+commercial), Tracktion Engine (GPLv3 or commercial) and GIN (BSD-3-Clause). A distributed Papercut
+binary must also satisfy those terms.
