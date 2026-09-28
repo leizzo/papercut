@@ -15,16 +15,15 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       shell (services.uiState.getState ("shell")),
       layouts (services.layoutSource, factory, services.uiState),
       topBar (services.model, services.commands, services.themeManager, shell),
-      arrangement (services.model, services.commands, services.themeManager, services.uiState,
-                   services.automation, services.shaper, shell),
+      arrangement (services.model, services.commands, services.themeManager, services.uiState, shell),
       pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
       browser (services.commands, services.plugins, services.model, services.themeManager, services.preview,
                Library::defaultRoot()),
       detailView (services.model, services.plugins, services.commands, services.themeManager, shell,
                   services.uiState.getState ("detail")),
-      sessionView (services.model, services.session, services.commands, services.themeManager),
       mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager,
                  services.uiState.getState ("mixer")),
+      sessionPlaceholder (services.themeManager, "The Session view arrives with M5."),
       editorPlaceholder (services.themeManager, "The audio Editor arrives with M4. Double-click an audio clip then."),
       pianoRollPlaceholder (services.themeManager, "Select a MIDI clip, or double-click one, to edit its notes."),
       developerOverlay (services.themeManager),
@@ -37,6 +36,9 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     registerArrangementZoomCommands();
     registerEscapeCommand();
     registerPianoRollCommands();
+
+    if (services.layoutSource.isDevMode())
+        registerDeveloperOverlayCommand();
 
     layouts.onError = services.reportError;
     statusBarHost.onBuilt = [this] { updateStatusBar(); };
@@ -76,7 +78,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     };
 
     for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &detailView,
-                                                             &arrangement, &sessionView, &pianoRoll, &mixerView,
+                                                             &arrangement, &sessionPlaceholder, &pianoRoll, &mixerView,
                                                              &editorPlaceholder, &pianoRollPlaceholder,
                                                              &developerOverlay, &statusBarHost })
         addChildComponent (c);
@@ -84,8 +86,6 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     addAndMakeVisible (toasts);
 
     topBar.setVisible (true);
-    developerOverlay.setVisible (services.layoutSource.isDevMode());
-    statusBarHost.setVisible (services.layoutSource.isDevMode());
     addMouseListener (this, true);
 
     if (auto dir = services.layoutSource.getDevDirectory(); dir != juce::File())
@@ -156,6 +156,30 @@ void MainComponent::registerEscapeCommand()
     services.commands.add (std::make_unique<EscapeCommand> (*this));
 }
 
+void MainComponent::registerDeveloperOverlayCommand()
+{
+    struct ToggleOverlayCommand : Command
+    {
+        explicit ToggleOverlayCommand (MainComponent& o) : Command ("dev.toggleOverlay", "Developer Overlay"), owner (o) {}
+
+        void execute (const juce::var&) override   { owner.toggleDeveloperOverlay(); }
+
+        MainComponent& owner;
+    };
+
+    services.commands.add (std::make_unique<ToggleOverlayCommand> (*this));
+}
+
+void MainComponent::toggleDeveloperOverlay()
+{
+    // The status bar and inspector are not part of the design, so they stay hidden until asked for.
+    const auto show = ! developerOverlay.isVisible();
+    developerOverlay.setVisible (show);
+    statusBarHost.setVisible (show);
+    updateStatusBar();
+    resized();
+}
+
 void MainComponent::showToast (const juce::String& message, bool undoable, bool isError)
 {
     toasts.show (message, undoable ? std::function<void()> ([this] { services.commands.invoke ("edit.undo"); })
@@ -199,7 +223,7 @@ void MainComponent::resized()
 
     browser.setVisible (showBrowser);
     detailView.setVisible (showDetail);
-    sessionView.setVisible (view == View::session);
+    sessionPlaceholder.setVisible (view == View::session);
     arrangement.setVisible (view == View::arrange);
     mixerView.setVisible (view == View::mixer);
     pianoRoll.setVisible (view == View::pianoRoll && pianoRollOpen);
@@ -214,7 +238,7 @@ void MainComponent::resized()
     if (showBrowser)
         browser.setBounds (r.removeFromLeft (metrics.browserWidth));
 
-    for (auto* c : std::initializer_list<juce::Component*> { &sessionView, &arrangement, &mixerView, &pianoRoll,
+    for (auto* c : std::initializer_list<juce::Component*> { &sessionPlaceholder, &arrangement, &mixerView, &pianoRoll,
                                                              &pianoRollPlaceholder, &editorPlaceholder })
         c->setBounds (r);
 }

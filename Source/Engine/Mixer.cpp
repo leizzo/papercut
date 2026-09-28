@@ -77,16 +77,6 @@ namespace
                                                                         ApplicationModel::maxVolumeDb, db));
     }
 
-    /** The engine snaps pans inside this window to centre. */
-    float snappedPan (double pan)
-    {
-        auto p = (float) juce::jlimit (-1.0, 1.0, pan);
-
-        if (p >= -0.005f && p <= 0.005f)
-            p = 0.0f;
-
-        return p;
-    }
 
     /** Makes a still-default value explicit, without undo, so undoing the first
         real change restores it instead of removing the property (ADR-0009). */
@@ -477,10 +467,7 @@ MasterInfo Mixer::getMaster() const
     if (plugin->volParam != nullptr)
         syncParameter (*plugin->volParam, plugin->volume);
 
-    if (plugin->panParam != nullptr)
-        syncParameter (*plugin->panParam, plugin->pan);
-
-    return { dbFromFader (plugin->volume.get()), plugin->pan.get() };
+    return { dbFromFader (plugin->volume.get()) };
 }
 
 bool Mixer::setMasterVolume (double db, bool continuesGesture)
@@ -504,26 +491,6 @@ bool Mixer::setMasterVolume (double db, bool continuesGesture)
     return plugin->volume.get() != before;
 }
 
-bool Mixer::setMasterPan (double pan, bool continuesGesture)
-{
-    auto* plugin = masterFader (projects.getEdit());
-
-    if (plugin == nullptr || plugin->panParam == nullptr)
-        return false;
-
-    const auto target = snappedPan (pan);
-    pinVolumeDefaults (*plugin);
-    syncParameter (*plugin->panParam, plugin->pan);
-
-    const auto before = plugin->pan.get();
-
-    if (before == target)
-        return false;
-
-    beginGestureStep ("Set Master Pan", "Set Master Pan", continuesGesture);
-    plugin->setPan (target);
-    return plugin->pan.get() != before;
-}
 
 
 } // namespace papercut

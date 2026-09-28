@@ -104,7 +104,7 @@ An audio track whose plug-ins start with an aux return. Sends on other tracks ro
 A submix folder track. Tracks inside it sum through the folder before the master.
 
 **Master**:
-The Edit's master track. Its volume and pan are the master fader, separate from any track fader.
+The Edit's master track. Its volume is the master fader, separate from any track fader. The master has no pan (PRD §10.2).
 
 ### Automation
 

@@ -173,11 +173,6 @@ add_library(papercut_ui STATIC
     Source/UI/Mixer/ChannelStrip.cpp
     Source/UI/Mixer/MasterStrip.cpp
     Source/UI/Mixer/MixerView.cpp
-    Source/UI/Session/SceneHeader.cpp
-    Source/UI/Session/SlotComponent.cpp
-    Source/UI/Session/SessionView.cpp
-    Source/UI/Arrangement/AutomationLane.cpp
-    Source/UI/Arrangement/ShaperPanel.cpp
     Source/UI/Arrangement/ArrangementView.cpp
     Source/UI/Arrangement/TimelineHeader.cpp
     Source/UI/Arrangement/TrackList.cpp

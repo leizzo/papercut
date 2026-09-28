@@ -71,7 +71,7 @@ struct Snapshots : juce::UnitTest
                                             juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_H", "1000").getIntValue());
         {
             MainComponent main ({ f.model, f.commands, theme, uiState, source, "No audio device", {},
-                                  plugins, mixer, session, automation, shaper, preview },
+                                  plugins, mixer, preview },
                                 commandManager);
             main.setSize (size.x, size.y);
 

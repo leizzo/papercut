@@ -58,6 +58,7 @@ namespace
         ApplicationCommandEntry { 0x5009, "theme.use",               "View" },
         ApplicationCommandEntry { 0x4001, "dev.reloadLayout",        "View" },
         ApplicationCommandEntry { 0x4002, "dev.reloadTheme",         "View" },
+        ApplicationCommandEntry { 0x4003, "dev.toggleOverlay",       "View" },
 
         ApplicationCommandEntry { 0x3001, "transport.togglePlay",    "Options" },
         ApplicationCommandEntry { 0x3009, "transport.playFromSelection", "Options" },
@@ -136,6 +137,7 @@ namespace
         KeyBinding { "plugin.scan",               'P',                 cmd | shift,       anyView },
         KeyBinding { "dev.reloadLayout",          'L',                 cmd | alt | shift, anyView },
         KeyBinding { "dev.reloadTheme",           'T',                 cmd | alt | shift, anyView },
+        KeyBinding { "dev.toggleOverlay",         'D',                 cmd | alt | shift, anyView },
 
         // Only in the view in front
         KeyBinding { "track.toggleSoloSelected",  'S',                 0,                 timeline | mixerView },

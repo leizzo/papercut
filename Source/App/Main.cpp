@@ -94,7 +94,7 @@ public:
         mainWindow = std::make_unique<MainWindow> (getApplicationName(),
             MainComponent::Services { *model, commands, theme, uiState, layoutSource,
                                       engine->describeActiveAudioDevice(),
-                                      commandHost.reportError, *plugins, *mixer, *session, *automation, *shaper, *preview });
+                                      commandHost.reportError, *plugins, *mixer, *preview });
 
         offerRecovery();
         startTimer (Production::autosaveIntervalMs);

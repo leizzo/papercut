@@ -14,32 +14,16 @@ namespace
 }
 
 ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, UIStateStore& uiState,
-                                  Automation& autoLanes, Shaper& shapers, ShellState& s)
-    : model (m), automation (autoLanes), themeManager (tm), view (uiState.getState (componentId)),
+                                  ShellState& s)
+    : model (m), themeManager (tm), view (uiState.getState (componentId)),
       timeline (model, c, themeManager, view),
       trackList (c, themeManager, view),
       lanes (model, c, themeManager, view),
-      automationLane (model, automation, c, themeManager, view),
-      shaperPanel (model, shapers, c, themeManager),
       commands (c), shell (s)
 {
     setComponentID (componentId);
 
-    parameterBox.onChange = [this]
-    {
-        const auto row = parameterBox.getSelectedItemIndex();
-        const auto targets = automation.getTargets (shownTrackId);
-
-        if (! juce::isPositiveAndBelow (row, (int) targets.size()))
-            return;
-
-        parameterKey = targets[(size_t) row].key;
-        automationLane.setTarget (shownTrackId, parameterKey);
-        shaperPanel.setParameterKey (parameterKey);
-    };
-
-    for (auto* child : std::initializer_list<juce::Component*> { &timeline, &trackList, &lanes, &playhead,
-                                                                 &parameterBox, &shaperPanel, &automationLane })
+    for (auto* child : std::initializer_list<juce::Component*> { &timeline, &trackList, &lanes, &playhead })
         addAndMakeVisible (child);
 
     // Clicking a track header or an empty lane selects the track (engine
@@ -51,7 +35,6 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, Theme
     model.addListener (this);
     themeManager.addListener (this);
     view.getState().addListener (this);
-    styleParameterBox();
     refresh();
     startTimerHz (30);
 }
@@ -132,54 +115,8 @@ void ArrangementView::refresh()
     tracks = model.getTracks();
     trackList.setTracks (tracks, model.getAudioInputs());
     lanes.setTracks (tracks);
-    syncAutomationTarget();
     timeline.repaint();   // the loop
     clampVerticalScroll();
-}
-
-void ArrangementView::syncAutomationTarget()
-{
-    auto trackId = model.getSelectedTrackId();
-
-    if (trackId.isEmpty() && ! tracks.empty())
-        trackId = tracks.front().id;
-
-    if (trackId != shownTrackId)
-    {
-        shownTrackId = trackId;
-        parameterKey = "volume";
-        shaperPanel.setTrack (trackId, parameterKey);
-    }
-
-    const auto targets = automation.getTargets (trackId);
-    parameterBox.clear (juce::dontSendNotification);
-    auto selectedId = 0;
-
-    for (int i = 0; i < (int) targets.size(); ++i)
-    {
-        parameterBox.addItem (targets[(size_t) i].name, i + 1);
-
-        if (targets[(size_t) i].key == parameterKey)
-            selectedId = i + 1;
-    }
-
-    if (selectedId == 0 && ! targets.empty())
-    {
-        parameterKey = targets.front().key;
-        selectedId = 1;
-        shaperPanel.setParameterKey (parameterKey);
-    }
-
-    parameterBox.setSelectedId (selectedId, juce::dontSendNotification);
-    automationLane.setTarget (trackId, parameterKey);
-}
-
-void ArrangementView::styleParameterBox()
-{
-    auto& theme = themeManager.getTheme();
-    parameterBox.setColour (juce::ComboBox::backgroundColourId, theme.background);
-    parameterBox.setColour (juce::ComboBox::textColourId, theme.text);
-    parameterBox.setColour (juce::ComboBox::outlineColourId, theme.gridLine);
 }
 
 void ArrangementView::paint (juce::Graphics& g)
@@ -200,15 +137,6 @@ void ArrangementView::resized()
 {
     auto& metrics = themeManager.getMetrics();
     auto r = getLocalBounds();
-    const auto strip = juce::jlimit (metrics.trackHeight * 2,
-                                      shaperPanel.getPreferredHeight() + metrics.timelineHeight,
-                                      juce::jmax (metrics.trackHeight * 2, r.getHeight() / 3));
-    auto bottom = r.removeFromBottom (strip);
-    auto bottomLeft = bottom.removeFromLeft (metrics.trackHeaderWidth);
-    parameterBox.setBounds (bottomLeft.removeFromTop (metrics.timelineHeight).reduced (metrics.inset, 0));
-    shaperPanel.setBounds (bottomLeft);
-    automationLane.setBounds (bottom);
-
     auto left = r.removeFromLeft (metrics.trackHeaderWidth);
     left.removeFromTop (metrics.timelineHeight);
 

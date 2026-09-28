@@ -1,8 +1,6 @@
 #pragma once
 
-#include "AutomationLane.h"
 #include "Playhead.h"
-#include "ShaperPanel.h"
 #include "TimelineHeader.h"
 #include "TrackLanes.h"
 #include "TrackList.h"
@@ -35,7 +33,7 @@ class ArrangementView : public juce::Component,
 public:
     static constexpr const char* componentId = "arrangement";
 
-    ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&, Automation&, Shaper&, ShellState&);
+    ArrangementView (ApplicationModel&, CommandRegistry&, ThemeManager&, UIStateStore&, ShellState&);
 
     void cancelDrag()   { lanes.cancelDrag(); }
 
@@ -66,7 +64,6 @@ public:
 
 private:
     ApplicationModel& model;
-    Automation& automation;
     ThemeManager& themeManager;
     ArrangementViewState view;
 
@@ -74,12 +71,7 @@ private:
     TrackList trackList;
     TrackLanes lanes;
     Playhead playhead { model, themeManager, view };
-    AutomationLane automationLane;
-    ShaperPanel shaperPanel;
-    juce::ComboBox parameterBox;
     std::vector<TrackInfo> tracks;
-    juce::String shownTrackId;
-    juce::String parameterKey { "volume" };
     CommandRegistry& commands;
     ShellState& shell;
     bool followPaused = false, wasPlaying = false;
@@ -100,13 +92,11 @@ private:
     DropTarget dropTargetAt (const SourceDetails&) const;
 
     void refresh();
-    void syncAutomationTarget();
     void clampVerticalScroll();
     void selectRow (int row, juce::ModifierKeys);
-    void styleParameterBox();
 
     void modelChanged() override        { refresh(); }
-    void themeChanged() override        { trackList.applyTheme(); styleParameterBox(); repaint(); }
+    void themeChanged() override        { trackList.applyTheme(); repaint(); }
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
 };
 

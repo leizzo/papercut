@@ -44,7 +44,6 @@ struct StereoLevel
 struct MasterInfo
 {
     double volumeDb = 0;
-    double pan = 0;
 };
 
 /** Facade over the current Edit's returns, sends, submix buses and master fader
@@ -52,7 +51,7 @@ struct MasterInfo
     on every call. Nothing above this layer sees a Tracktion header.
 
     Undoable (Engine Undo): adding a return, a send or a bus, moving a track into
-    a bus, send gain, and master volume and pan. A continued fader drag
+    a bus, send gain, and master volume. A continued fader drag
     (continuesGesture) joins the previous step when that step is still the same
     gesture. A call that changes nothing returns false and opens no undo step.
 
@@ -107,7 +106,6 @@ public:
 
     /** Master fader, not a track fader. continuesGesture as for setSendGain. */
     bool setMasterVolume (double db, bool continuesGesture = false);
-    bool setMasterPan (double pan, bool continuesGesture = false);
 
 private:
     struct MeterState;

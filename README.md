@@ -46,3 +46,4 @@ In Debug builds, layouts and theme are read from `UI/` in the source tree. Edit 
 
 - **Reload Layout** — Cmd+Alt+Shift+L: rebuilds only the regions whose layout file changed
 - **Reload Theme** — Cmd+Alt+Shift+T: re-styles in place
+- **Developer Overlay** — Cmd+Alt+Shift+D: shows the status bar and component inspector (hidden by default; the design has neither)

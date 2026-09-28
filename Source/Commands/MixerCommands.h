@@ -17,7 +17,6 @@ struct AppCommandHost;
     mixer.addBus           name
     mixer.moveToBus        trackId, busTrackId
     mixer.setMasterVolume  value, continuesGesture
-    mixer.setMasterPan     value, continuesGesture
 */
 void registerMixerCommands (CommandRegistry&, Mixer&, AppCommandHost&);
 
@@ -41,8 +40,5 @@ juce::var moveToBusArgs (const juce::String& trackId, const juce::String& busTra
 
 /** Arguments for mixer.setMasterVolume. continuesGesture as for sendGainArgs. */
 juce::var masterVolumeArgs (double db, bool continuesGesture = false);
-
-/** Arguments for mixer.setMasterPan (-1 left to 1 right); continuesGesture as for masterVolumeArgs. */
-juce::var masterPanArgs (double pan, bool continuesGesture = false);
 
 } // namespace papercut

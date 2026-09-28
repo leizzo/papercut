@@ -123,16 +123,6 @@ namespace
         }
     };
 
-    struct SetMasterPanCommand : MixerCommand
-    {
-        SetMasterPanCommand (Mixer& m, AppCommandHost& h) : MixerCommand ("mixer.setMasterPan", "Set Master Pan", m, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            if (args[ArgKeys::value].isDouble() || args[ArgKeys::value].isInt())
-                mixer.setMasterPan (args[ArgKeys::value], (bool) args[ArgKeys::continuesGesture]);
-        }
-    };
 }
 
 void registerMixerCommands (CommandRegistry& registry, Mixer& mixer, AppCommandHost& host)
@@ -144,7 +134,6 @@ void registerMixerCommands (CommandRegistry& registry, Mixer& mixer, AppCommandH
     registry.add (std::make_unique<AddBusCommand> (mixer, host));
     registry.add (std::make_unique<MoveToBusCommand> (mixer, host));
     registry.add (std::make_unique<SetMasterVolumeCommand> (mixer, host));
-    registry.add (std::make_unique<SetMasterPanCommand> (mixer, host));
 }
 
 juce::var returnArgs (const juce::String& name)
@@ -202,11 +191,6 @@ juce::var masterVolumeArgs (double db, bool continuesGesture)
     args->setProperty ("value", db);
     args->setProperty ("continuesGesture", continuesGesture);
     return args;
-}
-
-juce::var masterPanArgs (double pan, bool continuesGesture)
-{
-    return masterVolumeArgs (pan, continuesGesture);
 }
 
 } // namespace papercut

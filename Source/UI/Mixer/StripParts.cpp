@@ -5,7 +5,10 @@ namespace papercut
 
 namespace
 {
-    constexpr int capWidth = 26, capHeight = 38, scaleWidth = 28;
+    constexpr int capWidth = 26, capHeight = 38, scaleWidth = 28, readoutHeight = 20, readoutGap = 8, meterGap = 3;
+
+    /** Peaks above this are drawn red: near clipping. */
+    constexpr double clipWarningDb = -1.5;
     constexpr double scaleMarks[] = { 6.0, 0.0, -6.0, -12.0, -24.0, -36.0, FaderLaw::floorDb };
 
     ContinuousValue::Spec faderSpec()
@@ -165,7 +168,6 @@ void StereoMeter::mouseDown (const juce::MouseEvent&)
 void StereoMeter::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
-    constexpr float wellWidth = 7.0f;
     const auto bounds = getLocalBounds().toFloat();
     const auto gap = juce::jmax (1.0f, bounds.getWidth() - 2.0f * wellWidth);
 
@@ -194,10 +196,98 @@ void StereoMeter::paint (juce::Graphics& g)
         if (peak > FaderLaw::floorDb)
         {
             const auto y = yForDb (well, peak);
-            g.setColour (peak > -1.5 ? theme.meterHigh : peak > -12.0 ? theme.meterMid : theme.meterLow);
+            g.setColour (peak > clipWarningDb ? theme.meterHigh : peak > -12.0 ? theme.meterMid : theme.meterLow);
             g.fillRect (well.withY (y - 1.0f).withHeight (2.0f));
         }
     }
+}
+
+//==============================================================================
+FaderSection::FaderSection (ThemeManager& tm, Geometry g)
+    : themeManager (tm), geometry (g), gain (tm, gainReadoutSpec()), fader (tm), meter (tm)
+{
+    setInterceptsMouseClicks (false, true);
+
+    auto changeVolume = [this] (double db, bool continues) { if (onVolumeChange) onVolumeChange (db, continues); };
+    fader.onChange = changeVolume;
+    gain.onChange = changeVolume;
+    gain.setTitle ("Gain");
+    gain.setTooltip ("Gain: click to type");
+    gain.setDoubleClickEdits (false);
+
+    meter.setWellWidth (geometry.meterWellWidth);
+    meter.onPeaksReset = [this] { repaint (peakReadout); };
+
+    for (auto* child : std::initializer_list<juce::Component*> { &gain, &fader, &meter })
+        addAndMakeVisible (child);
+}
+
+void FaderSection::setVolume (double db, juce::Colour colour)
+{
+    fader.setValue (db);
+    fader.setColour (colour);
+    gain.setValue (db);
+}
+
+void FaderSection::setLevel (StereoLevel level, double elapsedSeconds)
+{
+    const auto peakBefore = meter.getPeakDb();
+    meter.setLevel (level, elapsedSeconds);
+
+    if (std::abs (meter.getPeakDb() - peakBefore) > 0.05)
+        repaint (peakReadout);
+}
+
+void FaderSection::resetPeaks()
+{
+    meter.resetPeaks();
+    repaint (peakReadout);
+}
+
+void FaderSection::paint (juce::Graphics& g)
+{
+    auto& theme = themeManager.getTheme();
+    const auto peak = meter.getPeakDb();
+    g.setColour (theme.bgSlot);
+    g.fillRoundedRectangle (peakReadout.toFloat(), theme.radiusMd);
+    drawNumber (g, themeManager, peak <= FaderLaw::floorDb ? juce::String (juce::CharPointer_UTF8 ("-\xe2\x88\x9e")) : juce::String (peak, 1),
+                TypeStyle { 10.0f, true, 400 }, peakReadout, juce::Justification::centred,
+                peak > clipWarningDb ? theme.meterHigh : theme.textSecondary);
+}
+
+void FaderSection::resized()
+{
+    using namespace StripMetrics;
+    auto r = getLocalBounds().reduced (padX, sectionPadY);
+
+    auto readouts = r.removeFromTop (readoutHeight);
+    gain.setBounds (readouts.removeFromLeft ((readouts.getWidth() - rowGap) / 2));
+    readouts.removeFromLeft (rowGap);
+    peakReadout = readouts;
+    r.removeFromTop (readoutGap);
+
+    // The meter at the right edge; the fader from the left, its track where the design puts it.
+    const auto meterWidth = juce::roundToInt (2.0f * geometry.meterWellWidth) + meterGap;
+    auto meterColumn = r.removeFromRight (meterWidth);
+    fader.setBounds (r.removeFromLeft (juce::jmin (geometry.faderWidth, r.getWidth())));
+    meter.setBounds (meterColumn.withY (fader.getY() + fader.getTravelBounds().getY())
+                                .withHeight (fader.getTravelBounds().getHeight()));
+}
+
+void FaderSection::mouseDown (const juce::MouseEvent& e)
+{
+    if (peakReadout.contains (e.getPosition()))
+        resetPeaks();
+}
+
+void paintColourBar (juce::Graphics& g, juce::Rectangle<float> strip, float radius, juce::Colour colour)
+{
+    juce::Graphics::ScopedSaveState save (g);
+    juce::Path shape;
+    shape.addRoundedRectangle (strip, radius);
+    g.reduceClipRegion (shape);
+    g.setColour (colour);
+    g.fillRect (strip.withHeight ((float) StripMetrics::colourBarHeight));
 }
 
 } // namespace papercut

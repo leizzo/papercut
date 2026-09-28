@@ -9,9 +9,13 @@ namespace papercut
 
 namespace
 {
-    constexpr int padX = 10, sectionPadY = 8, labelHeight = 11, rowGap = 4, slotHeight = 19, selectHeight = 20,
-                  chainLinkHeight = 22, flowHeight = 10, sendHeight = 18, panHeight = 50, readoutHeight = 20,
-                  buttonHeight = 20, meterWidth = 17;
+    using namespace StripMetrics;
+
+    constexpr int labelHeight = 11, slotHeight = 19, selectHeight = 20, chainLinkHeight = 22, flowHeight = 10,
+                  sendHeight = 18, panHeight = 50, buttonHeight = 20;
+
+    /** The design's channel strip: fader track centred at 46 px, 7 px meter wells. */
+    constexpr FaderSection::Geometry faderGeometry { 64, 7.0f };
 
     /** Signal-flow stages, as the mixer toolbar names them. */
     enum Stage { trackChainStage, insertsStage, sendsStage, faderStage };
@@ -73,7 +77,7 @@ struct ChannelStrip::SendRow : juce::Component
 //==============================================================================
 ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
     : commands (c), themeManager (tm),
-      pan (tm, panKnobSpec(), "Pan", true), gain (tm, gainReadoutSpec()), fader (tm), meter (tm),
+      pan (tm, panKnobSpec(), "Pan", true), faderSection (tm, faderGeometry),
       mute (tm, TrackButton::Kind::mute), solo (tm, TrackButton::Kind::solo), arm (tm, TrackButton::Kind::arm)
 {
     input.setTitle ("Input");
@@ -89,23 +93,16 @@ ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
     pan.setDialSize (22);
     pan.onChange = [this] (double v, bool continues) { commands.invoke ("track.setPan", trackPanArgs (state.track.id, v, continues)); };
 
-    auto setVolume = [this] (double db, bool continues)
+    faderSection.onVolumeChange = [this] (double db, bool continues)
     {
         commands.invoke ("track.setVolume", trackVolumeArgs (state.track.id, db, continues));
     };
-    fader.onChange = setVolume;
-    gain.onChange = setVolume;
-    gain.setTitle ("Gain");
-    gain.setTooltip ("Gain: click to type");
-    gain.setDoubleClickEdits (false);
-
-    meter.onPeaksReset = [this] { repaint (peakReadout); };
 
     mute.onClick = [this] { commands.invoke ("track.toggleMute", trackArgs (state.track.id)); };
     solo.onClick = [this] { commands.invoke ("track.toggleSolo", trackArgs (state.track.id)); };
     arm.onClick = [this] { commands.invoke ("track.toggleArm", trackArgs (state.track.id)); };
 
-    for (auto* child : std::initializer_list<juce::Component*> { &input, &pan, &gain, &fader, &meter, &mute, &solo, &arm })
+    for (auto* child : std::initializer_list<juce::Component*> { &input, &pan, &faderSection, &mute, &solo, &arm })
         addAndMakeVisible (child);
 
     for (int i = 0; i < PluginRack::maxMixerInserts; ++i)
@@ -316,9 +313,7 @@ void ChannelStrip::setState (const StripState& next)
     input.setEnabled (state.track.kind == TrackKind::audio && ! state.isReturn);
 
     pan.setValue (state.track.pan);
-    fader.setValue (state.track.volumeDb);
-    fader.setColour (colour);
-    gain.setValue (state.track.volumeDb);
+    faderSection.setVolume (state.track.volumeDb, colour);
 
     mute.setToggleState (state.track.muted, juce::dontSendNotification);
     solo.setToggleState (state.track.solo, juce::dontSendNotification);
@@ -381,17 +376,12 @@ juce::String ChannelStrip::chainSummary() const
 
 void ChannelStrip::setLevel (StereoLevel level, double elapsedSeconds)
 {
-    const auto peakBefore = meter.getPeakDb();
-    meter.setLevel (level, elapsedSeconds);
-
-    if (std::abs (meter.getPeakDb() - peakBefore) > 0.05)
-        repaint (peakReadout);
+    faderSection.setLevel (level, elapsedSeconds);
 }
 
 void ChannelStrip::resetPeaks()
 {
-    meter.resetPeaks();
-    repaint (peakReadout);
+    faderSection.resetPeaks();
 }
 
 void ChannelStrip::setSectionVisible (Section section, bool visible)
@@ -405,7 +395,7 @@ void ChannelStrip::setSectionVisible (Section section, bool visible)
 void ChannelStrip::resized()
 {
     auto r = getLocalBounds();
-    headArea = r.removeFromTop (3 + 2 * sectionPadY + 14);
+    headArea = r.removeFromTop (headHeight);
 
     auto section = [&] (bool visible, int contentHeight)
     {
@@ -474,26 +464,8 @@ void ChannelStrip::resized()
     pan.setBounds (panArea.reduced (padX, 4).removeFromLeft (80).withHeight (panHeight));
 
     faderArea = r;
-    const auto showFader = shown (Section::fader);
-
-    for (auto* c : std::initializer_list<juce::Component*> { &gain, &fader, &meter })
-        c->setVisible (showFader);
-
-    if (showFader)
-    {
-        auto f = faderArea.reduced (padX, sectionPadY);
-        auto readouts = f.removeFromTop (readoutHeight);
-        gain.setBounds (readouts.removeFromLeft ((readouts.getWidth() - rowGap) / 2));
-        readouts.removeFromLeft (rowGap);
-        peakReadout = readouts;
-        f.removeFromTop (8);
-
-        auto meterColumn = f.removeFromRight (meterWidth);
-        f.removeFromRight (6);
-        fader.setBounds (f);
-        meter.setBounds (meterColumn.withY (fader.getY() + fader.getTravelBounds().getY())
-                                    .withHeight (fader.getTravelBounds().getHeight()));
-    }
+    faderSection.setVisible (shown (Section::fader));
+    faderSection.setBounds (faderArea);
 }
 
 void ChannelStrip::paintSectionHeader (juce::Graphics& g, juce::Rectangle<int> area, const juce::String& title,
@@ -524,16 +496,9 @@ void ChannelStrip::paint (juce::Graphics& g)
     g.fillRoundedRectangle (bounds, radius);
 
     // Head: colour bar, number in the track colour, name (ellipsis; the tooltip has it all).
-    {
-        juce::Graphics::ScopedSaveState save (g);
-        juce::Path shape;
-        shape.addRoundedRectangle (bounds, radius);
-        g.reduceClipRegion (shape);
-        g.setColour (colour);
-        g.fillRect (headArea.withHeight (3));
-    }
+    paintColourBar (g, bounds, radius, colour);
 
-    auto head = headArea.withTrimmedTop (3).reduced (padX, sectionPadY);
+    auto head = headArea.withTrimmedTop (colourBarHeight).reduced (padX, sectionPadY);
     const auto number = state.isReturn ? state.returnLetter : twoDigits (state.number);
     const auto numberFont = themeManager.numberFont (TypeStyle { 10.0f, true, 600 });
     g.setFont (numberFont);
@@ -602,17 +567,7 @@ void ChannelStrip::paint (juce::Graphics& g)
     divider (panArea);
 
     if (shown (Section::fader))
-    {
         divider (faderArea);
-
-        // Peak readout: red above -1.5 dBFS; click resets.
-        const auto peak = meter.getPeakDb();
-        g.setColour (theme.bgSlot);
-        g.fillRoundedRectangle (peakReadout.toFloat(), theme.radiusMd);
-        drawNumber (g, themeManager, peak <= FaderLaw::floorDb ? juce::String (juce::CharPointer_UTF8 ("-\xe2\x88\x9e")) : juce::String (peak, 1),
-                    TypeStyle { 10.0f, true, 400 }, peakReadout, juce::Justification::centred,
-                    peak > -1.5 ? theme.meterHigh : theme.textSecondary);
-    }
 }
 
 int ChannelStrip::flowStageAt (juce::Point<int> p) const
@@ -647,12 +602,6 @@ void ChannelStrip::mouseDown (const juce::MouseEvent& e)
         if (onTrackChainClicked)
             onTrackChainClicked();
 
-        return;
-    }
-
-    if (peakReadout.contains (e.getPosition()))
-    {
-        resetPeaks();
         return;
     }
 

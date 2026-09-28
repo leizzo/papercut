@@ -52,7 +52,7 @@ public:
 
     void setLevel (StereoLevel, double elapsedSeconds);
     void resetPeaks();
-    void setMeterMode (MeterMode m)   { meter.setMode (m); repaint (peakReadout); }
+    void setMeterMode (MeterMode m)   { faderSection.setMeterMode (m); }
 
     void setSectionVisible (Section, bool);
 
@@ -95,14 +95,12 @@ private:
     std::vector<std::unique_ptr<InsertSlot>> insertSlots;
     std::vector<std::unique_ptr<SendRow>> sendRows;
     Knob pan;
-    ValueField gain;
-    Fader fader;
-    StereoMeter meter;
+    FaderSection faderSection;
     TrackButton mute, solo, arm;
 
     std::array<bool, 4> sectionShown { true, true, true, true };
     juce::Rectangle<int> headArea, ioArea, chainArea, chainLink, flowArea, insertsArea, sendsArea, panArea,
-                         faderArea, peakReadout, buttonsArea;
+                         faderArea, buttonsArea;
 
     bool shown (Section s) const   { return sectionShown[(size_t) s]; }
     void setUpInsertSlot (InsertSlot&);

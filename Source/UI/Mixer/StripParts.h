@@ -7,6 +7,15 @@
 namespace papercut
 {
 
+/** The measures every mixer strip shares (PRD §10.1), so strips line up. */
+namespace StripMetrics
+{
+    constexpr int padX = 10, sectionPadY = 8, rowGap = 4, colourBarHeight = 3, headTextHeight = 14;
+
+    /** The head: colour bar, then a padded row of text. */
+    constexpr int headHeight = colourBarHeight + 2 * sectionPadY + headTextHeight;
+}
+
 /** `Fader`: a vertical fader on the normative dB law (PRD §10.3), with its dB
     scale on the left, a track in bg-slot filled in the track colour up to the
     cap, and a 26 x 38 cap with a centre line in the track colour. The
@@ -51,6 +60,9 @@ public:
     /** Peak, RMS or LUFS ballistics (the mixer toolbar's meter mode). */
     void setMode (MeterMode);
 
+    /** Width of each of the two wells; the rest of the width is the gap between them. */
+    void setWellWidth (float w)   { wellWidth = w; repaint(); }
+
     /** Called when a click resets the peaks. */
     std::function<void()> onPeaksReset;
 
@@ -59,10 +71,51 @@ public:
 
 private:
     ThemeManager& themeManager;
+    float wellWidth = 7.0f;
     std::array<double, 2> levels { FaderLaw::floorDb, FaderLaw::floorDb };
     std::array<PeakHold, 2> holds;
     std::array<MeterBallistics, 2> ballistics;
 };
+
+/** A strip's fader section (PRD §10.3): the gain and peak readouts above the
+    fader and its stereo meter, laid out as the design draws each strip. The peak
+    readout shows the meter's peak hold, red above -1.5 dBFS; clicking it, or the
+    meter, resets the peaks. Gaps pass mouse events through to the strip. */
+class FaderSection : public juce::Component
+{
+public:
+    /** Per strip in the design: the fader's width (which centres its track) and the meter's wells. */
+    struct Geometry
+    {
+        int faderWidth;
+        float meterWellWidth;
+    };
+
+    FaderSection (ThemeManager&, Geometry);
+
+    /** A fader drag or a typed gain; continues joins the drag's undo step. */
+    std::function<void (double db, bool continues)> onVolumeChange;
+
+    void setVolume (double db, juce::Colour);
+    void setLevel (StereoLevel, double elapsedSeconds);
+    void resetPeaks();
+    void setMeterMode (MeterMode m)   { meter.setMode (m); }
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+
+private:
+    ThemeManager& themeManager;
+    Geometry geometry;
+    ValueField gain;
+    Fader fader;
+    StereoMeter meter;
+    juce::Rectangle<int> peakReadout;
+};
+
+/** Fills a strip's colour bar: its top edge, clipped to the strip's rounded corners. */
+void paintColourBar (juce::Graphics&, juce::Rectangle<float> strip, float radius, juce::Colour);
 
 /** A pan knob: -1..1, shown as L30 / C / R20. */
 ContinuousValue::Spec panKnobSpec();

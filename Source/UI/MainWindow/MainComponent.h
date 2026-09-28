@@ -1,8 +1,6 @@
 #pragma once
 
 #include "Commands/CommandRegistry.h"
-#include "Engine/Automation.h"
-#include "Engine/Shaper.h"
 #include "UI/Arrangement/ArrangementView.h"
 #include "UI/Layout/LayoutManager.h"
 #include "UI/Mixer/MixerView.h"
@@ -13,7 +11,6 @@
 #include "UI/Plugins/PluginEditorWindow.h"
 #include "UI/Developer/DeveloperOverlay.h"
 #include "UI/Developer/LayoutWatcher.h"
-#include "UI/Session/SessionView.h"
 #include "UI/State/ShellState.h"
 #include "Toasts.h"
 #include "TopBar.h"
@@ -26,8 +23,9 @@ class LayoutSource;
 /** The MainWindow's content (PRD §5–6): the top bar, then the view the shell
     shows. Session and Arrange sit between the Browser (left) and the detail
     view (bottom); Mixer, Piano Roll and Editor fill the window. Views are kept
-    alive while hidden, so each keeps its scroll and zoom. In Developer Mode a
-    JSON status bar and the developer overlay sit at the bottom. Also the
+    alive while hidden, so each keeps its scroll and zoom. In Developer Mode,
+    dev.toggleOverlay shows a JSON status bar and the developer overlay at the
+    bottom; they are off by default, as the design has neither. Also the
     ApplicationCommandTarget that routes menus and keyboard shortcuts into the
     Command registry. */
 class MainComponent : public juce::Component,
@@ -49,9 +47,6 @@ public:
         std::function<void (const juce::String&)> reportError;
         PluginRack& plugins;
         Mixer& mixer;
-        Session& session;
-        Automation& automation;
-        Shaper& shaper;
         SamplePreview& preview;
     };
 
@@ -88,7 +83,6 @@ private:
     PianoRollView pianoRoll;
     Browser browser;
     DetailView detailView;
-    SessionView sessionView;
     MixerView mixerView;
 
     /** A view that isn't built yet, or has nothing to show. */
@@ -100,7 +94,7 @@ private:
         juce::String text;
     };
 
-    Placeholder editorPlaceholder, pianoRollPlaceholder;
+    Placeholder sessionPlaceholder, editorPlaceholder, pianoRollPlaceholder;
     DeveloperOverlay developerOverlay;
     Toasts toasts;
 
@@ -122,6 +116,8 @@ private:
     void updateStatusBar();
     void registerArrangementZoomCommands();
     void registerEscapeCommand();
+    void registerDeveloperOverlayCommand();
+    void toggleDeveloperOverlay();
     void showMenu (const juce::String& name, juce::Rectangle<int> screenArea);
     void openPianoRollForSelection();
     void mouseDown (const juce::MouseEvent&) override;
