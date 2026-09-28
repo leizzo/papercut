@@ -1,55 +1,35 @@
 #pragma once
 
-#include "Engine/ApplicationModel.h"
 #include "Engine/Mixer.h"
-
-#include <juce_gui_basics/juce_gui_basics.h>
+#include "StripParts.h"
 
 namespace papercut
 {
 
 class CommandRegistry;
-class ThemeManager;
 
-/** The Edit's master fader: volume and pan through mixer.setMasterVolume and
-    mixer.setMasterPan. A drag is one undo step. */
+/** The master strip (PRD §10.2): head, pan, gain readout, the master fader
+    and a stereo meter, through mixer.setMasterVolume / setMasterPan. A drag is
+    one undo step. The loudness panel and Mono / Dim / Cue arrive with M2. */
 class MasterStrip : public juce::Component
 {
 public:
     MasterStrip (CommandRegistry&, ThemeManager&);
 
     void setMaster (const MasterInfo&);
-    void setLevelDb (float db);
+    void setLevel (StereoLevel, double elapsedSeconds);
+    void resetPeaks()   { meter.resetPeaks(); }
 
     void paint (juce::Graphics&) override;
     void resized() override;
-    void applyTheme();
 
 private:
-    struct GestureSlider : juce::Slider
-    {
-        std::function<void (double value, bool continuesGesture)> onGestureValue;
-
-        void startedDragging() override   { dragging = true; sentInDrag = false; }
-        void stoppedDragging() override   { dragging = false; }
-
-        void valueChanged() override
-        {
-            if (onGestureValue)
-                onGestureValue (getValue(), dragging && sentInDrag);
-
-            sentInDrag = dragging;
-        }
-
-        bool dragging = false, sentInDrag = false;
-    };
-
     CommandRegistry& commands;
     ThemeManager& themeManager;
-    MasterInfo master;
-    GestureSlider pan, volume;
-    float levelDb = (float) ApplicationModel::minVolumeDb;
-    juce::Rectangle<int> meterBounds;
+    Knob pan;
+    ValueField gain;
+    Fader fader;
+    StereoMeter meter;
 };
 
 } // namespace papercut

@@ -141,6 +141,13 @@ namespace
     };
 
     /** A track header's input menu. */
+    /** Selects a track in every view (a mixer strip click). Never undoable. */
+    struct SelectTrackCommand : ModelCommand
+    {
+        SelectTrackCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.select", "Select Track", m, h) {}
+        void execute (const juce::var& args) override   { model.selectTrack (args[ArgKeys::trackId].toString()); }
+    };
+
     struct SetTrackColourCommand : ModelCommand
     {
         SetTrackColourCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.setColour", "Set Track Colour", m, h) {}
@@ -580,6 +587,7 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
                                                             [] (const TrackInfo& t) { return t.armed; }, &ApplicationModel::setTrackArmed));
     registry.add (std::make_unique<SetTrackInputCommand> (model, host));
     registry.add (std::make_unique<SetTrackColourCommand> (model, host));
+    registry.add (std::make_unique<SelectTrackCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
     registry.add (std::make_unique<InsertClipAtCommand> (model, host));
     registry.add (std::make_unique<AddMidiClipCommand> (model, host));

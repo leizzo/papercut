@@ -31,7 +31,7 @@ struct AppCommandHost
     project.new  project.open  project.save  project.saveAs
     track.add    track.addMidi   track.remove
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
-    track.setInput   track.toggleArm   track.setColour
+    track.setInput   track.toggleArm   track.setColour   track.select
     clip.add     clip.insertAt  clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
     clip.copy    clip.loopExtend  clip.rename  clip.reverse  clip.setColour
     clip.duplicate  clip.consolidate  clip.delete   (these three act on the selected clips)
@@ -44,7 +44,7 @@ struct AppCommandHost
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
 
-/** Arguments for track.toggleMute, track.toggleSolo and track.toggleArm. */
+/** Arguments for track.toggleMute, track.toggleSolo, track.toggleArm and track.select. */
 juce::var trackArgs (const juce::String& trackId);
 
 /** Arguments for track.setVolume. A continuous gesture (a fader drag) passes

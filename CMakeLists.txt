@@ -165,6 +165,9 @@ add_library(papercut_ui STATIC
     Source/UI/Detail/DeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
     Source/UI/Plugins/PluginEditorWindow.cpp
+    Source/UI/Mixer/Metering.cpp
+    Source/UI/Mixer/StripParts.cpp
+    Source/UI/Mixer/InsertSlot.cpp
     Source/UI/Mixer/ChannelStrip.cpp
     Source/UI/Mixer/MasterStrip.cpp
     Source/UI/Mixer/MixerView.cpp

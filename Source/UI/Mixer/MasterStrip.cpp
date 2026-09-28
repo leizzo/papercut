@@ -1,143 +1,93 @@
 #include "MasterStrip.h"
 #include "Commands/MixerCommands.h"
 #include "Engine/ApplicationModel.h"
-#include "UI/Theme/ThemeManager.h"
-
-#include <cmath>
+#include "UI/Controls/Icons.h"
 
 namespace papercut
 {
 
 namespace
 {
-    constexpr double volumeSkewMidPointDb = -12.0;
-
-    juce::String volumeText (double db)
+    ContinuousValue::Spec panSpec()
     {
-        return db <= ApplicationModel::minVolumeDb ? juce::String ("-inf dB")
-                                                   : juce::String (db, 1) + " dB";
+        ContinuousValue::Spec spec;
+        spec.minimum = -1.0;
+        spec.maximum = 1.0;
+        spec.format = ValueFormat::pan();
+        return spec;
     }
 
-    juce::String panText (double pan)
+    ContinuousValue::Spec gainSpec()
     {
-        const auto percent = juce::roundToInt (std::abs (pan) * 100.0);
-        return percent == 0 ? juce::String ("C") : (pan < 0 ? "L" : "R") + juce::String (percent);
-    }
-
-    void colourSlider (juce::Slider& slider, const Theme& theme)
-    {
-        slider.setColour (juce::Slider::thumbColourId, theme.accent);
-        slider.setColour (juce::Slider::trackColourId, theme.text);
-        slider.setColour (juce::Slider::backgroundColourId, theme.laneB);
-        slider.setColour (juce::Slider::rotarySliderFillColourId, theme.accent);
-        slider.setColour (juce::Slider::rotarySliderOutlineColourId, theme.laneB);
+        ContinuousValue::Spec spec;
+        spec.minimum = ApplicationModel::minVolumeDb;
+        spec.maximum = ApplicationModel::maxVolumeDb;
+        spec.format = ValueFormat::decibels (ApplicationModel::minVolumeDb);
+        spec.wheelStep = 0.5;
+        return spec;
     }
 }
 
 MasterStrip::MasterStrip (CommandRegistry& c, ThemeManager& tm)
-    : commands (c), themeManager (tm)
+    : commands (c), themeManager (tm), pan (tm, panSpec(), "Pan", true), gain (tm, gainSpec()), fader (tm), meter (tm)
 {
-    volume.setTitle ("Master Volume");
-    volume.setSliderStyle (juce::Slider::LinearVertical);
-    volume.setRange (ApplicationModel::minVolumeDb, ApplicationModel::maxVolumeDb);
-    volume.setSkewFactorFromMidPoint (volumeSkewMidPointDb);
-    volume.setDoubleClickReturnValue (true, 0.0);
-    volume.textFromValueFunction = volumeText;
-    volume.onGestureValue = [this] (double db, bool continues)
-    {
-        commands.invoke ("mixer.setMasterVolume", masterVolumeArgs (db, continues));
-    };
+    setTitle ("Master");
+    pan.setDialSize (22);
+    pan.onChange = [this] (double v, bool continues) { commands.invoke ("mixer.setMasterPan", masterPanArgs (v, continues)); };
 
-    pan.setTitle ("Master Pan");
-    pan.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-    pan.setRange (-1.0, 1.0);
-    pan.setDoubleClickReturnValue (true, 0.0);
-    pan.textFromValueFunction = panText;
-    pan.onGestureValue = [this] (double value, bool continues)
-    {
-        commands.invoke ("mixer.setMasterPan", masterPanArgs (value, continues));
-    };
+    auto setVolume = [this] (double db, bool continues) { commands.invoke ("mixer.setMasterVolume", masterVolumeArgs (db, continues)); };
+    fader.onChange = setVolume;
+    gain.onChange = setVolume;
+    gain.setDoubleClickEdits (false);
+    gain.setTooltip ("Master gain: click to type");
 
-    for (auto* slider : { static_cast<juce::Slider*> (&volume), static_cast<juce::Slider*> (&pan) })
-    {
-        slider->setTextBoxStyle (juce::Slider::NoTextBox, true, 0, 0);
-        slider->setPopupDisplayEnabled (true, true, nullptr);
-        addAndMakeVisible (slider);
-    }
-
-    applyTheme();
-    setMaster ({});
+    for (auto* child : std::initializer_list<juce::Component*> { &pan, &gain, &fader, &meter })
+        addAndMakeVisible (child);
 }
 
 void MasterStrip::setMaster (const MasterInfo& info)
 {
-    master = info;
-
-    if (! volume.dragging)
-        volume.setValue (master.volumeDb, juce::dontSendNotification);
-
-    if (! pan.dragging)
-        pan.setValue (master.pan, juce::dontSendNotification);
-
-    repaint();
+    pan.setValue (info.pan);
+    fader.setValue (info.volumeDb);
+    gain.setValue (info.volumeDb);
+    fader.setColour (themeManager.getTheme().accent);
 }
 
-void MasterStrip::setLevelDb (float db)
+void MasterStrip::setLevel (StereoLevel level, double elapsedSeconds)
 {
-    if (std::abs (levelDb - db) < 0.25f)
-        return;
-
-    levelDb = db;
-    repaint (meterBounds);
-}
-
-void MasterStrip::applyTheme()
-{
-    auto& theme = themeManager.getTheme();
-    colourSlider (volume, theme);
-    colourSlider (pan, theme);
-    repaint();
+    meter.setLevel (level, elapsedSeconds);
 }
 
 void MasterStrip::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
-    auto& metrics = themeManager.getMetrics();
+    const auto bounds = getLocalBounds().toFloat();
+    g.setColour (theme.bgPanel);
+    g.fillRoundedRectangle (bounds, theme.radiusLg);
+    g.setColour (theme.border);
+    g.drawRoundedRectangle (bounds.reduced (0.5f), theme.radiusLg, 1.0f);
 
-    g.setColour (theme.panel);
-    g.fillRoundedRectangle (getLocalBounds().toFloat(), theme.cornerRadius);
-
-    g.setFont (themeManager.getFont());
-    g.setColour (theme.accent);
-    g.drawText ("Master", getLocalBounds().reduced (metrics.inset).removeFromTop (metrics.trackControlHeight),
-                juce::Justification::centredLeft, true);
-
-    if (! meterBounds.isEmpty())
-    {
-        g.setColour (theme.laneB);
-        g.fillRect (meterBounds);
-
-        const auto span = (float) (ApplicationModel::maxVolumeDb - ApplicationModel::minVolumeDb);
-        const auto norm = span <= 0.0f ? 0.0f
-                                       : juce::jlimit (0.0f, 1.0f, (levelDb - (float) ApplicationModel::minVolumeDb) / span);
-        auto filled = meterBounds;
-        filled.removeFromTop (juce::roundToInt ((1.0f - norm) * (float) filled.getHeight()));
-        g.setColour (theme.recording);
-        g.fillRect (filled);
-    }
+    auto head = getLocalBounds().removeFromTop (30).reduced (10, 8);
+    drawIcon (g, Icon::audioLines, head.removeFromLeft (14).toFloat(), theme.accent);
+    head.removeFromLeft (7);
+    drawStyledText (g, themeManager, "Master", TypeStyle { 12.0f, false, 600 }, head, juce::Justification::centredLeft,
+                    theme.textPrimary);
+    drawNumber (g, themeManager, "1/2", TypeStyle { 10.0f, true, 400 }, head, juce::Justification::centredRight, theme.textDim);
 }
 
 void MasterStrip::resized()
 {
-    auto& metrics = themeManager.getMetrics();
-    auto r = getLocalBounds().reduced (metrics.inset);
-    r.removeFromTop (metrics.trackControlHeight);   // the name
-    r.removeFromTop (metrics.inset);
-    pan.setBounds (r.removeFromTop (metrics.trackControlHeight).removeFromLeft (metrics.trackControlHeight));
-    r.removeFromTop (metrics.inset);
-    meterBounds = r.removeFromRight (metrics.trackButtonWidth);
-    r.removeFromRight (metrics.inset);
-    volume.setBounds (r);
+    auto r = getLocalBounds().reduced (10, 0);
+    r.removeFromTop (30);
+    pan.setBounds (r.removeFromTop (56).removeFromLeft (60));
+    gain.setBounds (r.removeFromTop (20).removeFromLeft (70));
+    r.removeFromTop (8);
+    r.removeFromBottom (10);
+
+    auto meterColumn = r.removeFromRight (17);
+    r.removeFromRight (6);
+    fader.setBounds (r.removeFromLeft (70));
+    meter.setBounds (meterColumn.withY (fader.getY() + fader.getTravelBounds().getY()).withHeight (fader.getTravelBounds().getHeight()));
 }
 
 } // namespace papercut

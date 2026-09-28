@@ -154,13 +154,14 @@ struct MixerTests : juce::UnitTest
             expectEquals (f.model.getTracks()[0].id, trackId);
         }
 
-        beginTest ("getTrackLevelDb is silence when the track has not played");
+        beginTest ("getTrackLevel is silence when the track has not played");
         {
             MixerFixture f;
             f.invoke ("track.add");
-            const auto level = f.mixer.getTrackLevelDb (f.model.getTracks()[0].id);
-            expectWithinAbsoluteError ((double) level, ApplicationModel::minVolumeDb, 1.0e-3);
-            expectWithinAbsoluteError ((double) f.mixer.getMasterLevelDb(), ApplicationModel::minVolumeDb, 1.0e-3);
+            const auto level = f.mixer.getTrackLevel (f.model.getTracks()[0].id);
+            expectWithinAbsoluteError ((double) level.left, ApplicationModel::minVolumeDb, 1.0e-3);
+            expectWithinAbsoluteError ((double) level.right, ApplicationModel::minVolumeDb, 1.0e-3);
+            expectWithinAbsoluteError ((double) f.mixer.getMasterLevel().left, ApplicationModel::minVolumeDb, 1.0e-3);
         }
 
         beginTest ("Send mute is one undo step, because the engine records the gain");

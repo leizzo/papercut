@@ -4,12 +4,22 @@
 namespace papercut
 {
 
+namespace
+{
+    constexpr int stripsPadding = 12, groupGap = 14, stripGap = 6, masterWidth = 186;
+}
+
 MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegistry& c, ThemeManager& tm)
-    : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm), master (c, tm)
+    : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm),
+      addReturnButton (tm, "Add Return", Button::Variant::ghost, Icon::plus),
+      addBusButton (tm, "Add Bus", Button::Variant::ghost, Icon::plus),
+      addSendButton (tm, "Add Send", Button::Variant::ghost, Icon::plus),
+      toBusButton (tm, "To Bus", Button::Variant::ghost),
+      master (c, tm)
 {
     setComponentID (componentId);
 
-    addReturnButton.setTooltip ("Add a return");
+    addReturnButton.setTooltip ("Add a return (Mod+Alt+T)");
     addBusButton.setTooltip ("Add a bus");
     addSendButton.setTooltip ("Add a send from the selected track to a return");
     toBusButton.setTooltip ("Move the selected track into a bus");
@@ -75,11 +85,15 @@ MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegi
                             });
     };
 
-    for (auto* child : std::initializer_list<juce::Component*> { &addReturnButton, &addBusButton, &addSendButton, &toBusButton, &master })
+    for (auto* child : std::initializer_list<juce::Component*> { &addReturnButton, &addBusButton, &addSendButton, &toBusButton,
+                                                                 &viewport, &master })
         addAndMakeVisible (child);
 
-    startTimerHz (15);
+    viewport.setViewedComponent (&stripsArea, false);
+    viewport.setScrollBarsShown (false, true);
+    viewport.setScrollBarThickness (6);
 
+    startTimerHz (30);
     model.addListener (this);
     themeManager.addListener (this);
     refresh();
@@ -97,98 +111,136 @@ juce::String MixerView::targetTrackId() const
     if (auto id = model.getSelectedTrackId(); id.isNotEmpty())
         return id;
 
-    return tracks.empty() ? juce::String() : tracks.front().id;
+    return trackOrder.empty() ? juce::String() : trackOrder.front();
 }
 
 void MixerView::timerCallback()
 {
-    for (auto& track : tracks)
-        if (auto strip = strips.find (track.id); strip != strips.end())
-            strip->second->setLevelDb (mixer.getTrackLevelDb (track.id));
+    // Hidden strips don't meter (PRD §19).
+    if (! isShowing())
+    {
+        lastMeterTime = 0;
+        return;
+    }
 
-    master.setLevelDb (mixer.getMasterLevelDb());
+    const auto now = juce::Time::getMillisecondCounterHiRes() / 1000.0;
+    const auto elapsed = lastMeterTime > 0 ? now - lastMeterTime : 0.0;
+    lastMeterTime = now;
+
+    for (auto& [id, strip] : strips)
+        strip->setLevel (mixer.getTrackLevel (id), elapsed);
+
+    master.setLevel (mixer.getMasterLevel(), elapsed);
 }
 
 void MixerView::refresh()
 {
-    tracks = model.getTracks();
+    const auto tracks = model.getTracks();
+    const auto returns = mixer.getReturns();
+    const auto buses = mixer.getBuses();
+    const auto inputs = model.getAudioInputs();
+
+    trackOrder.clear();
+    returnOrder.clear();
     std::map<juce::String, std::unique_ptr<ChannelStrip>> kept;
 
-    for (auto& track : tracks)
+    for (size_t i = 0; i < tracks.size(); ++i)
     {
-        const auto sends = mixer.getSends (track.id);
-        const auto inserts = plugins.getChain (track.id, PluginChain::mixer);
+        auto& track = tracks[i];
+        StripState state;
+        state.number = (int) i + 1;
+        state.track = track;
+        state.sends = mixer.getSends (track.id);
+        state.inserts = plugins.getChain (track.id, PluginChain::mixer);
+        state.deviceChain = plugins.getChain (track.id, PluginChain::device);
+        state.inputs = inputs;
 
-        if (auto existing = strips.find (track.id); existing != strips.end())
+        for (auto& bus : buses)
+            if (std::find (bus.childTrackIds.begin(), bus.childTrackIds.end(), track.id) != bus.childTrackIds.end())
+                state.output = bus.name;
+
+        for (auto& ret : returns)
+            if (ret.trackId == track.id)
+            {
+                state.isReturn = true;
+                state.returnLetter = juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, ret.bus)));
+            }
+
+        (state.isReturn ? returnOrder : trackOrder).push_back (track.id);
+
+        auto existing = strips.find (track.id);
+        auto strip = existing != strips.end() ? std::move (existing->second) : nullptr;
+
+        if (strip == nullptr)
         {
-            existing->second->setState (track, sends, inserts);
-            kept[track.id] = std::move (existing->second);
+            strip = std::make_unique<ChannelStrip> (commands, themeManager);
+            strip->onTrackChainClicked = [this, id = track.id] { if (onShowDeviceChain) onShowDeviceChain (id); };
+            stripsArea.addAndMakeVisible (*strip);
         }
-        else
-        {
-            auto strip = std::make_unique<ChannelStrip> (commands, themeManager, track, sends, inserts);
-            addAndMakeVisible (*strip);
-            kept[track.id] = std::move (strip);
-        }
+
+        strip->setState (state);
+        kept[track.id] = std::move (strip);
     }
 
     strips = std::move (kept);
     master.setMaster (mixer.getMaster());
-    applyTheme();
-    resized();
+    layoutStrips();
 }
 
-void MixerView::applyTheme()
+void MixerView::layoutStrips()
 {
-    auto& theme = themeManager.getTheme();
+    auto& metrics = themeManager.getMetrics();
+    const auto height = juce::jmax (0, viewport.getHeight() - viewport.getScrollBarThickness());
+    auto x = stripsPadding;
 
-    for (auto* button : { &addReturnButton, &addBusButton, &addSendButton, &toBusButton })
+    auto place = [&] (const std::vector<juce::String>& ids)
     {
-        button->setColour (juce::TextButton::buttonColourId, theme.trackHeader);
-        button->setColour (juce::TextButton::textColourOffId, theme.text);
+        for (auto& id : ids)
+            if (auto strip = strips.find (id); strip != strips.end())
+            {
+                strip->second->setBounds (x, stripsPadding, metrics.stripWidth, juce::jmax (0, height - 2 * stripsPadding));
+                x += metrics.stripWidth + stripGap;
+            }
+    };
+
+    place (trackOrder);
+
+    if (! returnOrder.empty())
+    {
+        x += groupGap - stripGap;
+        place (returnOrder);
     }
 
-    for (auto& [id, strip] : strips)
-        strip->applyTheme();
-
-    master.applyTheme();
-    repaint();
-}
-
-void MixerView::themeChanged()
-{
-    applyTheme();
+    stripsArea.setSize (juce::jmax (viewport.getWidth(), x - stripGap + stripsPadding), height);
 }
 
 void MixerView::paint (juce::Graphics& g)
 {
-    g.fillAll (themeManager.getTheme().background);
+    auto& theme = themeManager.getTheme();
+    g.fillAll (theme.bgDeep);
+
+    auto toolbar = getLocalBounds().removeFromTop (themeManager.getMetrics().toolbarHeight);
+    g.setColour (theme.bgPanel);
+    g.fillRect (toolbar);
+    g.setColour (theme.borderSoft);
+    g.fillRect (toolbar.removeFromBottom (1));
 }
 
 void MixerView::resized()
 {
     auto& metrics = themeManager.getMetrics();
-    auto r = getLocalBounds().reduced (metrics.inset);
-    auto bar = r.removeFromTop (metrics.trackControlHeight);
-    for (auto* button : { &addReturnButton, &addBusButton, &addSendButton, &toBusButton })
+    auto r = getLocalBounds();
+    auto toolbar = r.removeFromTop (metrics.toolbarHeight).reduced (metrics.space2xl, 7);
+
+    for (auto* b : { &addReturnButton, &addBusButton, &addSendButton, &toBusButton })
     {
-        button->setBounds (bar.removeFromLeft (metrics.trackHeaderWidth));
-        bar.removeFromLeft (metrics.inset);
+        b->setBounds (toolbar.removeFromLeft (b->getIdealWidth()));
+        toolbar.removeFromLeft (metrics.spaceSm);
     }
 
-    r.removeFromTop (metrics.inset);
-
-    auto place = [&] (juce::Component& component)
-    {
-        component.setBounds (r.removeFromLeft (metrics.trackHeaderWidth).withHeight (r.getHeight()));
-        r.removeFromLeft (metrics.inset);
-    };
-
-    for (auto& track : tracks)
-        if (auto strip = strips.find (track.id); strip != strips.end())
-            place (*strip->second);
-
-    place (master);
+    master.setBounds (r.removeFromRight (masterWidth + stripsPadding).reduced (0, stripsPadding).withTrimmedRight (stripsPadding));
+    viewport.setBounds (r);
+    layoutStrips();
 }
 
 } // namespace papercut

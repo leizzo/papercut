@@ -45,6 +45,15 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
         shell.setView (ShellState::View::pianoRoll);
     };
 
+    // The mixer's Track chain row: back to the timeline, the track selected, its chain in view.
+    mixerView.onShowDeviceChain = [this] (const juce::String& trackId)
+    {
+        services.model.selectTrack (trackId);
+        shell.setDetailCollapsed (false);
+        shell.setView (shell.getLastTimelineView());
+        detailView.revealDeviceChain();
+    };
+
     arrangement.onAudioClipOpened = [this] (const juce::String&) { shell.setView (ShellState::View::editor); };
 
     // Closing the Piano Roll returns to the timeline it was opened from.

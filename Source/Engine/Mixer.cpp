@@ -161,15 +161,14 @@ namespace
         return nullptr;
     }
 
-    float readPeakDb (te::LevelMeasurer::Client& client)
+    StereoLevel readPeaks (te::LevelMeasurer::Client& client)
     {
+        const auto floor = (float) ApplicationModel::minVolumeDb;
         const int channels = juce::jlimit (1, 8, juce::jmax (1, client.getNumChannelsUsed()));
-        float db = (float) ApplicationModel::minVolumeDb;
-
-        for (int channel = 0; channel < channels; ++channel)
-            db = juce::jmax (db, client.getAndClearAudioLevel (channel).dB);
-
-        return db;
+        StereoLevel level { floor, floor };
+        level.left = juce::jmax (floor, client.getAndClearAudioLevel (0).dB);
+        level.right = channels > 1 ? juce::jmax (floor, client.getAndClearAudioLevel (1).dB) : level.left;
+        return level;
     }
 }
 
@@ -197,7 +196,7 @@ Mixer::~Mixer()
         MeterState::detach (edit, slot);
 }
 
-float Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
+StereoLevel Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
 {
     auto* meter = static_cast<te::LevelMeterPlugin*> (meterPlugin);
     auto& edit = projects.getEdit();
@@ -225,18 +224,18 @@ float Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
     }
 
     if (meter == nullptr)
-        return (float) ApplicationModel::minVolumeDb;
+        return {};
 
-    return readPeakDb (slot.client);
+    return readPeaks (slot.client);
 }
 
-float Mixer::getTrackLevelDb (const juce::String& trackId)
+StereoLevel Mixer::getTrackLevel (const juce::String& trackId)
 {
     auto* track = findAudioTrack (projects.getEdit(), trackId);
     return levelOf (trackId, track != nullptr ? track->getLevelMeterPlugin() : nullptr);
 }
 
-float Mixer::getMasterLevelDb()
+StereoLevel Mixer::getMasterLevel()
 {
     auto* master = projects.getEdit().getMasterTrack();
     return levelOf ("master", master != nullptr ? meterOnTrack (*master) : nullptr);

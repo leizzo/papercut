@@ -34,6 +34,12 @@ struct BusInfo
     std::vector<juce::String> childTrackIds;
 };
 
+/** A meter reading: the peak of each side since the last read, in dB. */
+struct StereoLevel
+{
+    float left = -100.0f, right = -100.0f;
+};
+
 /** The Edit's master fader, not any track in ApplicationModel::getTracks(). */
 struct MasterInfo
 {
@@ -88,12 +94,13 @@ public:
 
     MasterInfo getMaster() const;
 
-    /** Peak of the track's level meter, in dB. Silence (minVolumeDb) when the
-        track has no meter or the meter has not seen audio. */
-    float getTrackLevelDb (const juce::String& trackId);
+    /** Peaks of the track's level meter since the last read, left and right,
+        in dB. Silence (minVolumeDb) when the track has no meter or the meter has
+        not seen audio. A mono signal reads the same on both sides. */
+    StereoLevel getTrackLevel (const juce::String& trackId);
 
-    /** Peak of the master track's level meter, in dB. Same silence rule. */
-    float getMasterLevelDb();
+    /** The master track's meter. Same silence rule. */
+    StereoLevel getMasterLevel();
 
     /** Master fader, not a track fader. continuesGesture as for setSendGain. */
     bool setMasterVolume (double db, bool continuesGesture = false);
@@ -108,7 +115,7 @@ private:
 
     /** meterPlugin is a tracktion::LevelMeterPlugin*. Kept as void* so this
         header stays free of Tracktion types. */
-    float levelOf (const juce::String& slotId, void* meterPlugin);
+    StereoLevel levelOf (const juce::String& slotId, void* meterPlugin);
 
     void beginUndoStep (const juce::String& name);
     void beginGestureStep (const juce::String& name, const juce::String& gestureKey, bool continues);

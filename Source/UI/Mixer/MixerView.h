@@ -15,9 +15,10 @@ namespace papercut
 class CommandRegistry;
 class Mixer;
 
-/** One ChannelStrip per Application Model track (returns included) and a
-    MasterStrip. Add Return, Add Bus, Add Send and To Bus invoke mixer Commands.
-    A timer paints each strip's level meter. */
+/** The Mixer view (PRD §10.1): the 40 px toolbar, then the strips area — the
+    track strips, the return strips, and the master strip — scrolling
+    sideways when they don't fit. Meters refresh at 30 Hz while the mixer
+    shows, and pause while it's hidden (§19). */
 class MixerView : public juce::Component,
                   private ApplicationModel::Listener,
                   private ThemeManager::Listener,
@@ -29,29 +30,36 @@ public:
     MixerView (ApplicationModel&, Mixer&, PluginRack&, CommandRegistry&, ThemeManager&);
     ~MixerView() override;
 
+    /** A strip's Track chain row was clicked. */
+    std::function<void (const juce::String& trackId)> onShowDeviceChain;
+
     void paint (juce::Graphics&) override;
     void resized() override;
 
 private:
+    struct StripsArea : juce::Component {};
+
     ApplicationModel& model;
     Mixer& mixer;
     PluginRack& plugins;
     CommandRegistry& commands;
     ThemeManager& themeManager;
 
-    juce::TextButton addReturnButton { "Add Return" }, addBusButton { "Add Bus" },
-                     addSendButton { "Add Send" }, toBusButton { "To Bus" };
-    std::vector<TrackInfo> tracks;
+    Button addReturnButton, addBusButton, addSendButton, toBusButton;
+    juce::Viewport viewport;
+    StripsArea stripsArea;
+    std::vector<juce::String> trackOrder, returnOrder;
     std::map<juce::String, std::unique_ptr<ChannelStrip>> strips;
     MasterStrip master;
+    double lastMeterTime = 0;
 
     void refresh();
-    void applyTheme();
+    void layoutStrips();
     void timerCallback() override;
     juce::String targetTrackId() const;
 
     void modelChanged() override   { refresh(); }
-    void themeChanged() override;
+    void themeChanged() override   { repaint(); }
 };
 
 } // namespace papercut

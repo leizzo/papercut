@@ -1,0 +1,174 @@
+#include "StripParts.h"
+
+namespace papercut
+{
+
+namespace
+{
+    constexpr int capWidth = 26, capHeight = 38, scaleWidth = 28;
+    constexpr double scaleMarks[] = { 6.0, 0.0, -6.0, -12.0, -24.0, -36.0, FaderLaw::floorDb };
+
+    ContinuousValue::Spec faderSpec()
+    {
+        ContinuousValue::Spec spec;
+        spec.minimum = FaderLaw::floorDb;
+        spec.maximum = 6.0;
+        spec.defaultValue = 0.0;
+        spec.format = ValueFormat::decibels (FaderLaw::floorDb);
+        spec.wheelStep = 0.5;
+        spec.toProportion = [] (double db) { return 1.0 - FaderLaw::dbToTravel (db); };
+        spec.fromProportion = [] (double p) { return FaderLaw::travelToDb (1.0 - p); };
+        return spec;
+    }
+}
+
+float yForDb (juce::Rectangle<float> travel, double db)
+{
+    return travel.getY() + (float) FaderLaw::dbToTravel (db) * travel.getHeight();
+}
+
+//==============================================================================
+Fader::Fader (ThemeManager& tm) : ContinuousControl (tm, faderSpec(), Axis::vertical)
+{
+    setTitle ("Volume");
+}
+
+juce::Rectangle<int> Fader::getTravelBounds() const
+{
+    // Half a cap of room at each end, so the cap never leaves the component.
+    return getLocalBounds().withTrimmedLeft (scaleWidth).reduced (0, capHeight / 2);
+}
+
+juce::Rectangle<float> Fader::capBounds() const
+{
+    const auto travel = getTravelBounds().toFloat();
+    const auto y = yForDb (travel, getValue());
+    return juce::Rectangle<float> ((float) capWidth, (float) capHeight).withCentre ({ travel.getCentreX(), y });
+}
+
+void Fader::paint (juce::Graphics& g)
+{
+    auto& theme = themeManager.getTheme();
+    const auto travel = getTravelBounds().toFloat();
+
+    // dB scale.
+    const auto scaleFont = themeManager.numberFont (TypeStyle { 8.5f, true, 400 });
+    g.setFont (scaleFont);
+
+    for (auto db : scaleMarks)
+    {
+        const auto y = yForDb (travel, db);
+        const auto label = db <= FaderLaw::floorDb ? juce::String (juce::CharPointer_UTF8 ("-\xe2\x88\x9e"))
+                                                   : (db > 0 ? "+" : "") + juce::String ((int) db);
+        g.setColour (db == 0.0 ? theme.textSecondary : theme.textDim);
+        g.drawText (label, juce::Rectangle<float> (0.0f, y - 6.0f, (float) scaleWidth - 6.0f, 12.0f), juce::Justification::centredRight, false);
+        g.setColour (db == 0.0 ? theme.textDim : theme.border);
+        g.fillRect (juce::Rectangle<float> ((float) scaleWidth - 5.0f, y, 5.0f, 1.0f));
+    }
+
+    // Track, and its fill below the cap.
+    const auto track = juce::Rectangle<float> (4.0f, travel.getHeight()).withCentre (travel.getCentre());
+    g.setColour (theme.bgSlot);
+    g.fillRoundedRectangle (track, 2.0f);
+    g.setColour (theme.borderSoft);
+    g.drawRoundedRectangle (track, 2.0f, 1.0f);
+
+    const auto cap = capBounds();
+    g.setColour (colour.withAlpha (0.35f));
+    g.fillRoundedRectangle (track.withTop (cap.getCentreY()), 2.0f);
+
+    // Cap: elevation level 1, bg-elevated, a centre line in the track colour.
+    paintElevation (g, theme.elevation1, cap, theme.radiusMd);
+    g.setColour (isMouseOverOrDragging() ? theme.bgHover : theme.bgElevated);
+    g.fillRoundedRectangle (cap, theme.radiusMd);
+    g.setColour (theme.border);
+    g.drawRoundedRectangle (cap.reduced (0.5f), theme.radiusMd, 1.0f);
+    g.setColour (colour);
+    g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 8.0f, 2.0f));
+
+    for (auto dy : { -6.0f, 6.0f })
+    {
+        g.setColour (theme.border);
+        g.fillRect (cap.withSizeKeepingCentre (cap.getWidth() - 12.0f, 1.0f).translated (0.0f, dy));
+    }
+}
+
+//==============================================================================
+StereoMeter::StereoMeter (ThemeManager& tm) : themeManager (tm)
+{
+    setTitle ("Meter");
+    setTooltip ("Click to reset the peaks");
+}
+
+void StereoMeter::setLevel (StereoLevel level, double elapsedSeconds)
+{
+    const std::array<double, 2> next { level.left, level.right };
+    auto changed = false;
+
+    for (size_t i = 0; i < 2; ++i)
+    {
+        const auto before = holds[i].get();
+        holds[i].update (next[i], elapsedSeconds);
+        changed = changed || std::abs (next[i] - levels[i]) > 0.1 || std::abs (holds[i].get() - before) > 0.05;
+        levels[i] = next[i];
+    }
+
+    if (changed)
+        repaint();
+}
+
+void StereoMeter::resetPeaks()
+{
+    for (auto& hold : holds)
+        hold.reset();
+
+    repaint();
+}
+
+void StereoMeter::mouseDown (const juce::MouseEvent&)
+{
+    resetPeaks();
+
+    if (onPeaksReset)
+        onPeaksReset();
+}
+
+void StereoMeter::paint (juce::Graphics& g)
+{
+    auto& theme = themeManager.getTheme();
+    constexpr float wellWidth = 7.0f;
+    const auto bounds = getLocalBounds().toFloat();
+    const auto gap = juce::jmax (1.0f, bounds.getWidth() - 2.0f * wellWidth);
+
+    // One gradient over the full height; the level only clips it.
+    juce::ColourGradient ramp (theme.meterHigh, 0.0f, bounds.getY(), theme.meterLow, 0.0f, bounds.getBottom(), false);
+    ramp.addColour (0.2, theme.meterMid);
+
+    for (size_t i = 0; i < 2; ++i)
+    {
+        const auto well = juce::Rectangle<float> (bounds.getX() + (float) i * (wellWidth + gap), bounds.getY(), wellWidth, bounds.getHeight());
+        g.setColour (theme.bgSlot);
+        g.fillRoundedRectangle (well, theme.radiusXs);
+
+        const auto top = yForDb (well, levels[i]);
+
+        if (top < well.getBottom())
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (well.withTop (top).getSmallestIntegerContainer());
+            g.setGradientFill (ramp);
+            g.fillRoundedRectangle (well, theme.radiusXs);
+        }
+
+        const auto peak = holds[i].get();
+
+        if (peak > FaderLaw::floorDb)
+        {
+            const auto y = yForDb (well, peak);
+            g.setColour (peak > -1.5 ? theme.meterHigh : peak > -12.0 ? theme.meterMid : theme.meterLow);
+            g.fillRect (well.withY (y - 1.0f).withHeight (2.0f));
+        }
+    }
+}
+
+} // namespace papercut

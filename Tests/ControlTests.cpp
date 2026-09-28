@@ -2,6 +2,7 @@
 
 #include "UI/Controls/ContinuousValue.h"
 #include "UI/Controls/ValueFormat.h"
+#include "UI/Mixer/Metering.h"
 
 namespace papercut::test
 {
@@ -203,6 +204,42 @@ struct ControlTests : juce::UnitTest
             expect (! v.commitText ("nope"));
             expectEquals (v.getValue(), 6.0);
             expectEquals (v.getText(), juce::String ("+6.0 dB"));
+        }
+
+        beginTest ("The fader law puts the PRD's dB marks at their travel, both ways");
+        {
+            const std::pair<double, double> marks[] = { { 6.0, 0.0 }, { 0.0, 0.16 }, { -6.0, 0.31 }, { -12.0, 0.45 },
+                                                        { -24.0, 0.64 }, { -36.0, 0.79 }, { FaderLaw::floorDb, 1.0 } };
+
+            for (auto [markDb, travel] : marks)
+            {
+                expectWithinAbsoluteError (FaderLaw::dbToTravel (markDb), travel, 1.0e-9);
+                expectWithinAbsoluteError (FaderLaw::travelToDb (travel), markDb, 1.0e-9);
+            }
+
+            // Piecewise linear: half-way between two marks.
+            expectWithinAbsoluteError (FaderLaw::dbToTravel (-9.0), 0.38, 1.0e-9);
+            expectWithinAbsoluteError (FaderLaw::travelToDb (0.38), -9.0, 1.0e-9);
+
+            // Out of range clamps.
+            expectEquals (FaderLaw::dbToTravel (20.0), 0.0);
+            expectEquals (FaderLaw::dbToTravel (-500.0), 1.0);
+
+            for (double t = 0.0; t <= 1.0; t += 0.01)
+                expectWithinAbsoluteError (FaderLaw::dbToTravel (FaderLaw::travelToDb (t)), t, 1.0e-9);
+        }
+
+        beginTest ("Peak hold jumps up, holds 1.5 s, then falls 20 dB/s to the level");
+        {
+            PeakHold hold;
+            expectEquals (hold.update (-6.0, 0.02), -6.0);
+            expectEquals (hold.update (-30.0, 1.0), -6.0);
+            expectEquals (hold.update (-30.0, 0.5), -6.0);            // 1.5 s held
+            expectWithinAbsoluteError (hold.update (-30.0, 0.5), -16.0, 1.0e-9);
+            expectWithinAbsoluteError (hold.update (-30.0, 1.0), -30.0, 1.0e-9);   // never below the level
+            expectEquals (hold.update (-3.0, 0.02), -3.0);
+            hold.reset();
+            expectEquals (hold.get(), FaderLaw::floorDb);
         }
     }
 };
