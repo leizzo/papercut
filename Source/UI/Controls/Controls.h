@@ -89,7 +89,8 @@ public:
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
 };
 
-/** `Chip/Toggle On · Off`: a toggling pill with an optional icon. */
+/** `Chip/Toggle On · Off`: a toggling pill with an optional icon, or a 5 px
+    LED in its place (the mixer's section chips): accent when on, dim when off. */
 class Chip : public ThemedButton
 {
 public:
@@ -97,8 +98,11 @@ public:
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
     int getIdealWidth() const;
 
+    void setShowsLed (bool b)   { showsLed = b; repaint(); }
+
 private:
     std::optional<Icon> icon;
+    bool showsLed = false;
 };
 
 /** `TrackBtn/Off · Mute On · Solo On · Arm On` plus the header's Auto button.
@@ -115,13 +119,14 @@ private:
     Kind kind;
 };
 
-/** `Segmented/Item · Item Active` in a well, or `Tab/View · Tab/View Active`
-    (the view switcher). One item is selected; clicking another, or the arrow
+/** `Segmented/Item · Item Active` in a well, `Tab/View · Tab/View Active`
+    (the view switcher), or sunken: a bg-elevated well whose active item sinks
+    to bg-slot with accent text (the mixer's meter mode). One item is selected; clicking another, or the arrow
     keys when focused, selects it and calls onChange. */
 class Segmented : public juce::Component
 {
 public:
-    enum class Style { segmented, tabs };
+    enum class Style { segmented, tabs, sunken };
 
     Segmented (ThemeManager&, juce::StringArray items, Style = Style::segmented);
 

@@ -326,20 +326,39 @@ void Knob::setDimmed (bool b)
     repaint();
 }
 
+void Knob::setArcColour (std::optional<juce::Colour> c)
+{
+    arcColour = c;
+    repaint();
+}
+
 void Knob::setDialSize (int size)
 {
     dialSize = size;
     repaint();
 }
 
+void Knob::setReadoutBeside (bool b)
+{
+    readoutBeside = b;
+    repaint();
+}
+
 juce::Rectangle<float> Knob::dialBounds() const
 {
     const auto size = (float) juce::jmin (dialSize, getWidth(), getHeight());
+
+    if (readoutBeside)
+        return { 0.0f, ((float) getHeight() - size) / 2.0f, size, size };
+
     return { ((float) getWidth() - size) / 2.0f, 0.0f, size, size };
 }
 
 juce::Rectangle<int> Knob::getReadoutBounds() const
 {
+    if (readoutBeside)
+        return getLocalBounds().withLeft ((int) dialBounds().getRight() + 8);
+
     return getLocalBounds().withTop ((int) dialBounds().getBottom());
 }
 
@@ -369,7 +388,8 @@ void Knob::paint (juce::Graphics& g)
     if (std::abs (angle - from) > 0.001f)
     {
         arc.addPieSegment (dial, juce::jmin (from, angle), juce::jmax (from, angle), 0.72f);
-        g.setColour (dimmed ? theme.textDim : (isMouseOverOrDragging() ? theme.accentHover : theme.accent));
+        const auto hover = arcColour ? arcColour->brighter (0.2f) : theme.accentHover;
+        g.setColour (dimmed ? theme.textDim : (isMouseOverOrDragging() ? hover : arcColour.value_or (theme.accent)));
         g.fillPath (arc);
     }
 
@@ -385,6 +405,19 @@ void Knob::paint (juce::Graphics& g)
         return;
 
     const auto lineHeight = juce::roundToInt (theme.caption.size) + 3;
+
+    if (readoutBeside)
+    {
+        // Label over a brighter value, centred on the dial as a pair.
+        const auto pairHeight = 2 * lineHeight;
+        text = text.withSizeKeepingCentre (text.getWidth(), pairHeight);
+        drawStyledText (g, themeManager, label, TypeStyle { theme.caption.size, false, 400 },
+                        text.removeFromTop (lineHeight), juce::Justification::centredLeft, theme.textDim);
+        drawNumber (g, themeManager, getModel().getText(), TypeStyle { theme.caption.size + 1.0f, true, 400 },
+                    text.removeFromTop (lineHeight), juce::Justification::centredLeft, theme.textPrimary);
+        return;
+    }
+
     text.removeFromTop (4);
 
     if (label.isNotEmpty())

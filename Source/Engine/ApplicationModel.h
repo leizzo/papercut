@@ -60,6 +60,7 @@ struct TrackInfo
     bool solo = false;
     juce::String input;    ///< the audio input it records from, or empty
     bool armed = false;    ///< records its input when the transport records
+    bool isReturn = false; ///< a return track (holds an aux return); it never records
     std::vector<ClipInfo> clips;
 };
 

@@ -1708,6 +1708,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         info.colourIndex = impl->colourOf (*t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
+        info.isReturn = ! t->pluginList.getPluginsOfType<te::AuxReturnPlugin>().isEmpty();
 
         if (auto* input = impl->inputOf (*t, inputs))
         {

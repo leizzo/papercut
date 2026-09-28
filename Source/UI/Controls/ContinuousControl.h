@@ -115,8 +115,14 @@ public:
     /** Greys the arc (a bypassed device). */
     void setDimmed (bool);
 
+    /** The arc's colour; accent unless set (a DeviceCard's knobs take the device colour). */
+    void setArcColour (std::optional<juce::Colour>);
+
     /** Diameter of the dial; the rest of the height holds the label and value. */
     void setDialSize (int);
+
+    /** Label and value to the right of the dial, left-aligned (a strip's pan row), not under it. */
+    void setReadoutBeside (bool);
 
     void paint (juce::Graphics&) override;
 
@@ -128,6 +134,8 @@ protected:
 private:
     juce::String label;
     bool bipolar, dimmed = false;
+    std::optional<juce::Colour> arcColour;
+    bool readoutBeside = false;
     int dialSize = 30;
 
     juce::Rectangle<float> dialBounds() const;

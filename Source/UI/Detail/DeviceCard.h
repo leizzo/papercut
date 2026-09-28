@@ -13,7 +13,8 @@ class CommandRegistry;
 
 /** One device of a track's device chain (PRD §9.2): 164 high, a title bar in
     the device colour with a power button and the name, and knobs with label
-    and value. Power toggles bypass (the card at 50 %, arcs grey); dragging the
+    and value, their arcs in the device colour. A device's colour comes from
+    its type, so the same device looks the same on every track. Power toggles bypass (the card at 50 %, arcs grey); dragging the
     title bar reorders; double-clicking it collapses the card to 28 px wide.
     A knob drag edits that parameter, one undo step per gesture. A missing
     plug-in shows a red dashed outline and a MISSING badge. */
@@ -28,7 +29,7 @@ public:
     const PluginInfo& getPlugin() const noexcept   { return plugin; }
 
     /** New state from the model; rebuilds the knobs only if the parameters changed. */
-    void setState (const PluginInfo&, juce::Colour deviceColour, bool collapsed);
+    void setState (const PluginInfo&, bool collapsed);
 
     int getPreferredWidth() const;
 

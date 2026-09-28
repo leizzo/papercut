@@ -57,14 +57,18 @@ void DeviceCard::rebuildKnobs (const std::vector<PluginParameter>& parameters)
     {
         knobs[i]->setValue (parameters[i].value);
         knobs[i]->setDimmed (! plugin.enabled);
+        knobs[i]->setArcColour (colour);
         knobs[i]->setVisible (! collapsed);
     }
 }
 
-void DeviceCard::setState (const PluginInfo& info, juce::Colour deviceColour, bool isCollapsed)
+void DeviceCard::setState (const PluginInfo& info, bool isCollapsed)
 {
+    auto& theme = themeManager.getTheme();
     plugin = info;
-    colour = deviceColour;
+    // A stable pick from the track palette by device type (the design: EQ Eight is always arp, Saturator bass).
+    colour = theme.trackColour ((int) ((juce::uint32) (plugin.manufacturer + "/" + plugin.name).hashCode()
+                                       % (juce::uint32) theme.trackPalette.size()));
     collapsed = isCollapsed;
     setAlpha (plugin.enabled ? 1.0f : 0.5f);
     rebuildKnobs (rack.getParameters (plugin.id));

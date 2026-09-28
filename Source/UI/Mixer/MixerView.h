@@ -55,7 +55,6 @@ private:
     ThemeManager& themeManager;
 
     juce::ValueTree state;
-    IconButton addButton;
 
     struct SectionChip
     {
@@ -72,7 +71,8 @@ private:
 
     Segmented meterMode;
     Button resetPeaks;
-    juce::Rectangle<int> titleArea, flowIndicator;
+    juce::Rectangle<int> titleArea, titleDivider, flowIndicator;
+    int flowWidth() const;
     int flowStage = -1;
     juce::Viewport viewport;
     StripsArea stripsArea;
@@ -83,13 +83,12 @@ private:
 
     void refresh();
     void layoutStrips();
-    void showAddMenu();
+    void showStripMenu (const juce::String& trackId, bool isReturn);
     void showEffectPicker (const juce::String& trackId, InsertSlot&, const juce::String& replacing);
     void applySections();
     void applyMeterMode();
     void setFlowStage (int);
     void timerCallback() override;
-    juce::String targetTrackId() const;
 
     void modelChanged() override   { refresh(); }
     void themeChanged() override   { repaint(); }

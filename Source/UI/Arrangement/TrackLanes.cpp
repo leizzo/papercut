@@ -124,7 +124,10 @@ void TrackLanes::paint (juce::Graphics& g)
     auto& theme = themeManager.getTheme();
     const auto rowHeight = laneHeight();
 
+    // A track's timeline is bg-slot; the space below the last track stays bg-deep.
     g.fillAll (theme.bgDeep);
+    g.setColour (theme.bgSlot);
+    g.fillRect (0, view.rowToY (0, rowHeight), getWidth(), (int) tracks.size() * rowHeight);
 
     // Grid lines where the ruler numbers its bars.
     g.setColour (theme.borderSoft);

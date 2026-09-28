@@ -1,6 +1,7 @@
 #include "MixerView.h"
 #include "Commands/MixerCommands.h"
 #include "Commands/PluginCommands.h"
+#include "UI/Controls/Menus.h"
 
 namespace papercut
 {
@@ -8,22 +9,23 @@ namespace papercut
 namespace
 {
     constexpr int stripsPadding = 12, groupGap = 14, stripGap = 6, masterWidth = 186;
+    constexpr int toolbarGap = 14, flowPadX = 10, flowGap = 6, flowIcon = 10;
+    const TypeStyle titleStyle { 13.0f, false, 600 }, flowStyle { 10.0f, false, 400 };
+    const char* const flowStages[] = { "Track chain", "Inserts", "Sends", "Fader" };
 }
 
 MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegistry& c, ThemeManager& tm, juce::ValueTree uiState)
     : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm), state (std::move (uiState)),
-      addButton (tm, "Add Return, Bus or Send", Icon::plus, IconButton::Kind::small),
-      meterMode (tm, { "Peak", "RMS", "LUFS" }),
-      resetPeaks (tm, "Reset Peaks", Button::Variant::outline),
+      meterMode (tm, { "Peak", "RMS", "LUFS" }, Segmented::Style::sunken),
+      resetPeaks (tm, "Reset Peaks", Button::Variant::outline, Icon::rotateCcw),
       master (c, tm)
 {
     setComponentID (componentId);
 
-    addButton.onClick = [this] { showAddMenu(); };
-
     for (auto& chip : sectionChips)
     {
         chip.button = std::make_unique<Chip> (themeManager, chip.name);
+        chip.button->setShowsLed (true);
         chip.button->setToggleState (! (bool) state.getProperty ("hide_" + juce::String (chip.name), false), juce::dontSendNotification);
         chip.button->onClick = [this, &chip]
         {
@@ -55,7 +57,7 @@ MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegi
         master.resetPeaks();
     };
 
-    for (auto* child : std::initializer_list<juce::Component*> { &addButton, &meterMode, &resetPeaks, &viewport, &master })
+    for (auto* child : std::initializer_list<juce::Component*> { &meterMode, &resetPeaks, &viewport, &master })
         addAndMakeVisible (child);
 
     viewport.setViewedComponent (&stripsArea, false);
@@ -76,32 +78,24 @@ MixerView::~MixerView()
     model.removeListener (this);
 }
 
-void MixerView::showAddMenu()
+void MixerView::showStripMenu (const juce::String& trackId, bool isReturn)
 {
-    juce::PopupMenu menu;
-    menu.addItem ("Add Return", [this]
-    {
-        commands.invoke ("mixer.addReturn", returnArgs ("Return " + juce::String (mixer.getReturns().size() + 1)));
-    });
-    menu.addItem ("Add Bus", [this]
-    {
-        commands.invoke ("mixer.addBus", busArgs ("Bus " + juce::String (mixer.getBuses().size() + 1)));
-    });
-
-    const auto trackId = targetTrackId();
     juce::PopupMenu sends, buses;
 
     for (auto& ret : mixer.getReturns())
-        sends.addItem (ret.name, trackId.isNotEmpty(), false,
-                       [this, trackId, bus = ret.bus] { commands.invoke ("mixer.addSend", sendArgs (trackId, bus)); });
+        sends.addItem (ret.name, [this, trackId, bus = ret.bus] { commands.invoke ("mixer.addSend", sendArgs (trackId, bus)); });
 
     for (auto& bus : mixer.getBuses())
-        buses.addItem (bus.name, trackId.isNotEmpty(), false,
-                       [this, trackId, id = bus.trackId] { commands.invoke ("mixer.moveToBus", moveToBusArgs (trackId, id)); });
+        buses.addItem (bus.name, [this, trackId, id = bus.trackId] { commands.invoke ("mixer.moveToBus", moveToBusArgs (trackId, id)); });
 
-    menu.addSubMenu ("Add Send from Selected Track", sends, sends.getNumItems() > 0);
-    menu.addSubMenu ("Move Selected Track to Bus", buses, buses.getNumItems() > 0);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton));
+    // A return doesn't send to returns or join a bus.
+    juce::PopupMenu menu;
+    menu.addSubMenu ("Add Send", sends, ! isReturn && sends.getNumItems() > 0);
+    menu.addSubMenu ("Move to Bus", buses, ! isReturn && buses.getNumItems() > 0);
+    menu.addSeparator();
+    menu.addItem (commandItem (commands, "mixer.addReturn", returnArgs ("Return " + juce::String (mixer.getReturns().size() + 1))));
+    menu.addItem (commandItem (commands, "mixer.addBus", busArgs ("Bus " + juce::String (mixer.getBuses().size() + 1))));
+    menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
 void MixerView::showEffectPicker (const juce::String& trackId, InsertSlot& slot, const juce::String& replacing)
@@ -158,14 +152,6 @@ void MixerView::setFlowStage (int stage)
         flowStage = stage;
         repaint (flowIndicator);
     }
-}
-
-juce::String MixerView::targetTrackId() const
-{
-    if (auto id = model.getSelectedTrackId(); id.isNotEmpty())
-        return id;
-
-    return trackOrder.empty() ? juce::String() : trackOrder.front();
 }
 
 void MixerView::timerCallback()
@@ -229,6 +215,7 @@ void MixerView::refresh()
         {
             strip = std::make_unique<ChannelStrip> (commands, themeManager);
             strip->onTrackChainClicked = [this, id = track.id] { if (onShowDeviceChain) onShowDeviceChain (id); };
+            strip->onShowMenu = [this, s = strip.get()] { showStripMenu (s->getState().track.id, s->getState().isReturn); };
             strip->onFlowStageHovered = [this] (int stage) { setFlowStage (stage); };
             strip->onOpenPlugin = [this] (const juce::String& pluginId) { if (onOpenPlugin) onOpenPlugin (pluginId); };
             strip->onPickInsert = [this, id = track.id] (InsertSlot& slot, const juce::String& replacing)
@@ -291,50 +278,68 @@ void MixerView::paint (juce::Graphics& g)
     g.setColour (theme.borderSoft);
     g.fillRect (toolbar.removeFromBottom (1));
 
-    drawStyledText (g, themeManager, "Mixer", theme.heading, titleArea, juce::Justification::centredLeft, theme.textPrimary);
+    drawStyledText (g, themeManager, "Mixer", titleStyle, titleArea, juce::Justification::centredLeft, theme.textPrimary);
+    g.setColour (theme.border);
+    g.fillRect (titleDivider);
 
-    // Signal flow: Track chain › Inserts › Sends › Fader, the stage under the pointer in lime.
-    const char* const stages[] = { "Track chain", "Inserts", "Sends", "Fader" };
-    const auto font = themeManager.font (theme.bodySm);
-    const auto chevron = juce::String (juce::CharPointer_UTF8 ("  \xe2\x80\xba  "));
-    auto r = flowIndicator;
+    // Signal flow: Track chain › Inserts › Sends › Fader in a bg-slot well, the stage under the pointer in lime.
+    if (flowIndicator.isEmpty())
+        return;
 
-    for (int i = 0; i < 4; ++i)
+    g.setColour (theme.bgSlot);
+    g.fillRoundedRectangle (flowIndicator.toFloat(), 5.0f);
+    g.setColour (theme.borderSoft);
+    g.drawRoundedRectangle (flowIndicator.toFloat().reduced (0.5f), 5.0f, 1.0f);
+
+    const auto font = themeManager.font (flowStyle);
+    g.setFont (font);
+    auto r = flowIndicator.reduced (flowPadX, 0);
+
+    for (int i = 0; i < (int) std::size (flowStages); ++i)
     {
-        const auto text = juce::String (stages[i]);
-        g.setFont (i == flowStage ? themeManager.font (TypeStyle { theme.bodySm.size, false, 600 }) : font);
+        const auto text = juce::String (flowStages[i]);
         g.setColour (i == flowStage ? theme.accent : theme.textSecondary);
-        g.drawText (text, r.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 1),
+        g.drawText (text, r.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (font, text) + 1),
                     juce::Justification::centredLeft, false);
 
-        if (i < 3)
+        if (i < (int) std::size (flowStages) - 1)
         {
-            g.setFont (font);
-            g.setColour (theme.textDim);
-            g.drawText (chevron, r.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (font, chevron)),
-                        juce::Justification::centredLeft, false);
+            r.removeFromLeft (flowGap);
+            drawIcon (g, Icon::chevronRight, r.removeFromLeft (flowIcon).withSizeKeepingCentre (flowIcon, flowIcon).toFloat(), theme.textDim);
+            r.removeFromLeft (flowGap);
         }
     }
+}
+
+int MixerView::flowWidth() const
+{
+    const auto font = themeManager.font (flowStyle);
+    auto width = 2 * flowPadX + ((int) std::size (flowStages) - 1) * (flowIcon + 2 * flowGap);
+
+    for (auto* stage : flowStages)
+        width += juce::GlyphArrangement::getStringWidthInt (font, stage) + 1;
+
+    return width;
 }
 
 void MixerView::resized()
 {
     auto& metrics = themeManager.getMetrics();
-    auto& theme = themeManager.getTheme();
     auto r = getLocalBounds();
     auto toolbar = r.removeFromTop (metrics.toolbarHeight).reduced (metrics.space2xl, 0);
     const auto rowHeight = metrics.controlMd;
     auto centred = [&] (juce::Rectangle<int> area) { return area.withSizeKeepingCentre (area.getWidth(), rowHeight); };
 
-    titleArea = toolbar.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (themeManager.font (theme.heading), "Mixer") + 4);
-    toolbar.removeFromLeft (metrics.spaceSm);
-    addButton.setBounds (centred (toolbar.removeFromLeft (24)).withSizeKeepingCentre (24, 24));
-    toolbar.removeFromLeft (14);
+    // Left: title | section chips, 14 apart; the chips 4 apart.
+    titleArea = toolbar.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (themeManager.font (titleStyle), "Mixer") + 1);
+    toolbar.removeFromLeft (toolbarGap);
+    titleDivider = toolbar.removeFromLeft (1).withSizeKeepingCentre (1, 18);
+    toolbar.removeFromLeft (toolbarGap);
 
     for (auto& chip : sectionChips)
     {
         chip.button->setBounds (centred (toolbar.removeFromLeft (chip.button->getIdealWidth())));
-        toolbar.removeFromLeft (metrics.spaceSm);
+        toolbar.removeFromLeft (metrics.spaceXs);
     }
 
     resetPeaks.setBounds (centred (toolbar.removeFromRight (resetPeaks.getIdealWidth())));
@@ -342,8 +347,8 @@ void MixerView::resized()
     meterMode.setBounds (centred (toolbar.removeFromRight (meterMode.getIdealWidth())));
     toolbar.removeFromRight (metrics.spaceXl);
 
-    const auto flowWidth = juce::jmin (toolbar.getWidth(), 280);
-    flowIndicator = toolbar.removeFromRight (flowWidth);
+    const auto flow = flowWidth();
+    flowIndicator = flow <= toolbar.getWidth() ? centred (toolbar.removeFromRight (flow)) : juce::Rectangle<int>();
 
     master.setBounds (r.removeFromRight (masterWidth + stripsPadding).reduced (0, stripsPadding).withTrimmedRight (stripsPadding));
     viewport.setBounds (r);

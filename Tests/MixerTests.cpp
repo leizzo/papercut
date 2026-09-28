@@ -45,7 +45,7 @@ struct MixerTests : juce::UnitTest
 
     void runTest() override
     {
-        beginTest ("addReturn creates a track that getReturns lists on bus 0; undo removes it");
+        beginTest ("addReturn creates a track that getReturns lists on bus 0 and TrackInfo marks as a return; undo removes it");
         {
             MixerFixture f;
             f.invoke ("mixer.addReturn");
@@ -56,6 +56,7 @@ struct MixerTests : juce::UnitTest
             expectEquals (returns[0].name, juce::String ("Return"));
             expectEquals (f.numTracks(), 1);
             expectEquals (f.model.getTracks()[0].id, returns[0].trackId);
+            expect (f.model.getTracks()[0].isReturn);
 
             f.invoke ("edit.undo");
             expectEquals ((int) f.mixer.getReturns().size(), 0);
@@ -90,6 +91,7 @@ struct MixerTests : juce::UnitTest
             MixerFixture f;
             f.invoke ("track.add");
             const auto trackId = f.model.getTracks()[0].id;
+            expect (! f.model.getTracks()[0].isReturn);
 
             f.invoke ("mixer.addSend", sendArgs (trackId, 0));
 

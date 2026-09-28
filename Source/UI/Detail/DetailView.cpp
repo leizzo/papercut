@@ -100,7 +100,7 @@ struct DetailView::Chain : juce::Component,
     std::vector<std::unique_ptr<DeviceCard>> cards;
     int dropIndex = -1;
 
-    void setChain (const juce::String& track, const std::vector<PluginInfo>& plugins, juce::Colour colour)
+    void setChain (const juce::String& track, const std::vector<PluginInfo>& plugins)
     {
         auto same = track == trackId && plugins.size() == cards.size();
 
@@ -139,7 +139,7 @@ struct DetailView::Chain : juce::Component,
         }
 
         for (size_t i = 0; i < plugins.size(); ++i)
-            cards[i]->setState (plugins[i], colour, owner.state.getProperty (collapsedKey (plugins[i].id), false));
+            cards[i]->setState (plugins[i], owner.state.getProperty (collapsedKey (plugins[i].id), false));
 
         layout();
     }
@@ -283,15 +283,13 @@ void DetailView::refresh()
 
     clipPanel->title = {};
     clipPanel->rows.clear();
-    juce::Colour colour = theme.accent;
 
     for (auto& track : model.getTracks())
     {
         if (track.id != trackId)
             continue;
 
-        colour = theme.trackColour (track.colourIndex);
-        clipPanel->colour = colour;
+        clipPanel->colour = theme.trackColour (track.colourIndex);
         const auto midi = track.kind == TrackKind::midi;
 
         for (auto& clip : track.clips)
@@ -322,7 +320,7 @@ void DetailView::refresh()
     }
 
     clipPanel->repaint();
-    chain->setChain (trackId, trackId.isNotEmpty() ? rack.getChain (trackId, PluginChain::device) : std::vector<PluginInfo>(), colour);
+    chain->setChain (trackId, trackId.isNotEmpty() ? rack.getChain (trackId, PluginChain::device) : std::vector<PluginInfo>());
 }
 
 void DetailView::paint (juce::Graphics& g)

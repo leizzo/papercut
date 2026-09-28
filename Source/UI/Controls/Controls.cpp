@@ -198,7 +198,7 @@ Chip::Chip (ThemeManager& tm, const juce::String& text, std::optional<Icon> i) :
 int Chip::getIdealWidth() const
 {
     const auto label = textWidth (themeManager.font (themeManager.getTheme().body), getButtonText());
-    return 2 * 9 + label + (icon ? 12 + 5 : 0);
+    return 2 * 9 + label + (icon ? 12 + 5 : showsLed ? 5 + 5 : 0);
 }
 
 void Chip::paintButton (juce::Graphics& g, bool, bool down)
@@ -222,8 +222,14 @@ void Chip::paintButton (juce::Graphics& g, bool, bool down)
                   on ? theme.accent : theme.textDim);
         content.removeFromLeft (5);
     }
+    else if (showsLed)
+    {
+        g.setColour (on ? theme.accent : theme.textDim);
+        g.fillEllipse (content.removeFromLeft (5).toFloat().withSizeKeepingCentre (5.0f, 5.0f));
+        content.removeFromLeft (5);
+    }
 
-    g.setColour (on ? theme.textPrimary : theme.textSecondary);
+    g.setColour (on ? theme.textPrimary : theme.textDim);
     g.setFont (themeManager.font (theme.body));
     g.drawText (getButtonText(), content, juce::Justification::centredLeft, true);
     paintFocus (g, radius);
@@ -261,7 +267,7 @@ void TrackButton::paintButton (juce::Graphics& g, bool, bool down)
 
     if (kind == Kind::arm)
     {
-        g.setColour (on ? theme.textOnAccent : theme.rec.withAlpha (0.8f));
+        g.setColour (glyphColour);   // red is the armed fill, never the idle dot
         g.fillEllipse (bounds.withSizeKeepingCentre (7.0f, 7.0f));
     }
     else if (kind == Kind::automation)
@@ -318,7 +324,7 @@ juce::Rectangle<float> Segmented::itemBounds (int index) const
 {
     auto area = getLocalBounds().toFloat();
 
-    if (style == Style::segmented)
+    if (style != Style::tabs)
         area = area.reduced (2.0f);
 
     auto font = themeManager.font (textStyle());
@@ -360,8 +366,11 @@ void Segmented::paint (juce::Graphics& g)
     const auto tabs = style == Style::tabs;
     const auto radius = tabs ? 5.0f : theme.radiusSm;
 
+    const auto sunken = style == Style::sunken;
+
     if (! tabs)
-        fillAndStroke (g, getLocalBounds().toFloat(), theme.radiusLg, theme.bgSlot, theme.borderSoft);
+        fillAndStroke (g, getLocalBounds().toFloat(), theme.radiusLg, sunken ? theme.bgElevated : theme.bgSlot,
+                       sunken ? theme.border : theme.borderSoft);
 
     for (int i = 0; i < items.size(); ++i)
     {
@@ -370,16 +379,16 @@ void Segmented::paint (juce::Graphics& g)
 
         if (active || i == hovered)
         {
-            g.setColour (active ? theme.accent : theme.bgHover);
+            g.setColour (active ? (sunken ? theme.bgSlot : theme.accent) : theme.bgHover);
             g.fillRoundedRectangle (r, radius);
         }
 
         auto textStyleForItem = textStyle();
 
-        if (active)
+        if (active && ! sunken)
             textStyleForItem.weight = 600;
 
-        g.setColour (active ? theme.textOnAccent : theme.textSecondary);
+        g.setColour (active ? (sunken ? theme.accent : theme.textOnAccent) : theme.textSecondary);
         g.setFont (themeManager.font (textStyleForItem));
         g.drawText (items[i], r, juce::Justification::centred, true);
     }

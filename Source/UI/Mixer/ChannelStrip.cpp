@@ -12,7 +12,7 @@ namespace
     using namespace StripMetrics;
 
     constexpr int labelHeight = 11, slotHeight = 19, selectHeight = 20, chainLinkHeight = 22, flowHeight = 10,
-                  sendHeight = 18, panHeight = 50, buttonHeight = 20;
+                  sendHeight = 18, panHeight = 22, buttonHeight = 20;
 
     /** The design's channel strip: fader track centred at 46 px, 7 px meter wells. */
     constexpr FaderSection::Geometry faderGeometry { 64, 7.0f };
@@ -90,7 +90,8 @@ ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
             commands.invoke ("track.setInput", trackInputArgs (state.track.id, chosen));
     };
 
-    pan.setDialSize (22);
+    pan.setDialSize (panHeight);
+    pan.setReadoutBeside (true);
     pan.onChange = [this] (double v, bool continues) { commands.invoke ("track.setPan", trackPanArgs (state.track.id, v, continues)); };
 
     faderSection.onVolumeChange = [this] (double db, bool continues)
@@ -460,8 +461,8 @@ void ChannelStrip::resized()
         buttons.removeFromLeft (rowGap);
     }
 
-    panArea = r.removeFromTop (panHeight + sectionPadY);
-    pan.setBounds (panArea.reduced (padX, 4).removeFromLeft (80).withHeight (panHeight));
+    panArea = r.removeFromTop (panHeight + 2 * sectionPadY);
+    pan.setBounds (panArea.reduced (padX, sectionPadY));
 
     faderArea = r;
     faderSection.setVisible (shown (Section::fader));
@@ -607,6 +608,9 @@ void ChannelStrip::mouseDown (const juce::MouseEvent& e)
 
     // Selecting a strip selects its track in every view (PRD §16.1).
     commands.invoke ("track.select", trackArgs (state.track.id));
+
+    if (e.mods.isPopupMenu() && onShowMenu)
+        onShowMenu();
 }
 
 } // namespace papercut

@@ -40,6 +40,7 @@ namespace
         ApplicationCommandEntry { 0x2003, "track.add",               "Create" },
         ApplicationCommandEntry { 0x2007, "track.addMidi",           "Create" },
         ApplicationCommandEntry { 0x6002, "mixer.addReturn",         "Create" },
+        ApplicationCommandEntry { 0x6005, "mixer.addBus",            "Create" },
         ApplicationCommandEntry { 0x2005, "clip.add",                "Create" },
         ApplicationCommandEntry { 0x2008, "clip.addMidi",            "Create" },
 

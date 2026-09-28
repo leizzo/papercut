@@ -43,8 +43,8 @@ void TrackHeader::setTrack (const TrackInfo& info, const juce::StringArray& inpu
     mute.setToggleState (track.muted, juce::dontSendNotification);
     automation.setToggleState (automationShown, juce::dontSendNotification);
 
-    // Recording takes an audio input, so only audio tracks arm.
-    arm.setVisible (track.kind == TrackKind::audio);
+    // Recording takes an audio input, so only audio tracks arm; a return never records.
+    arm.setVisible (track.kind == TrackKind::audio && ! track.isReturn);
     setTitle (track.name);
     resized();
     repaint();

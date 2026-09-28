@@ -59,6 +59,9 @@ public:
     /** The Track chain row was clicked: show this track's device chain. */
     std::function<void()> onTrackChainClicked;
 
+    /** A right-click on the strip: its track's mixer menu (sends, bus). */
+    std::function<void()> onShowMenu;
+
     /** The pointer is over a section (the toolbar's signal-flow indicator); -1: none. */
     std::function<void (int stage)> onFlowStageHovered;
 
