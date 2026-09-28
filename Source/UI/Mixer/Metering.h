@@ -35,4 +35,24 @@ private:
     double peakDb = FaderLaw::floorDb, held = 0;
 };
 
+/** How the mixer's meters read (PRD §10.3): the peak, a 300 ms RMS, or a
+    momentary loudness over 400 ms. */
+enum class MeterMode { peak, rms, lufs };
+
+/** Smooths one meter reading for its mode. Peak passes through; RMS and LUFS
+    average power with a 300 ms / 400 ms time constant. The loudness reading
+    has no K-weighting yet: it is a 400 ms power average. */
+class MeterBallistics
+{
+public:
+    void setMode (MeterMode m)   { mode = m; power = 0; }
+
+    /** Feeds a reading taken elapsedSeconds after the last; returns the level shown. */
+    double update (double levelDb, double elapsedSeconds);
+
+private:
+    MeterMode mode = MeterMode::peak;
+    double power = 0;
+};
+
 } // namespace papercut

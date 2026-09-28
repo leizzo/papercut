@@ -18,7 +18,13 @@ class Mixer;
 /** The Mixer view (PRD §10.1): the 40 px toolbar, then the strips area — the
     track strips, the return strips, and the master strip — scrolling
     sideways when they don't fit. Meters refresh at 30 Hz while the mixer
-    shows, and pause while it's hidden (§19). */
+    shows, and pause while it's hidden (§19).
+
+    Toolbar: the title, an add menu (return, bus, send, move to bus), section
+    chips that show or hide a section on every strip (§10.7), the signal-flow
+    indicator (the stage under the pointer in lime), the meter mode
+    (Peak | RMS | LUFS) and Reset Peaks. Chips and meter mode are UI State,
+    saved with the project. */
 class MixerView : public juce::Component,
                   private ApplicationModel::Listener,
                   private ThemeManager::Listener,
@@ -27,7 +33,7 @@ class MixerView : public juce::Component,
 public:
     static constexpr const char* componentId = "mixer";
 
-    MixerView (ApplicationModel&, Mixer&, PluginRack&, CommandRegistry&, ThemeManager&);
+    MixerView (ApplicationModel&, Mixer&, PluginRack&, CommandRegistry&, ThemeManager&, juce::ValueTree uiState);
     ~MixerView() override;
 
     /** A strip's Track chain row was clicked. */
@@ -45,7 +51,26 @@ private:
     CommandRegistry& commands;
     ThemeManager& themeManager;
 
-    Button addReturnButton, addBusButton, addSendButton, toBusButton;
+    juce::ValueTree state;
+    IconButton addButton;
+
+    struct SectionChip
+    {
+        const char* name;
+        std::optional<ChannelStrip::Section> section;
+        std::unique_ptr<Chip> button;
+    };
+
+    std::array<SectionChip, 6> sectionChips { {
+        { "I/O", ChannelStrip::Section::io, {} }, { "Inserts", ChannelStrip::Section::inserts, {} },
+        { "Sends", ChannelStrip::Section::sends, {} }, { "EQ", std::nullopt, {} },
+        { "Fader", ChannelStrip::Section::fader, {} }, { "Comments", std::nullopt, {} },
+    } };
+
+    Segmented meterMode;
+    Button resetPeaks;
+    juce::Rectangle<int> titleArea, flowIndicator;
+    int flowStage = -1;
     juce::Viewport viewport;
     StripsArea stripsArea;
     std::vector<juce::String> trackOrder, returnOrder;
@@ -55,6 +80,10 @@ private:
 
     void refresh();
     void layoutStrips();
+    void showAddMenu();
+    void applySections();
+    void applyMeterMode();
+    void setFlowStage (int);
     void timerCallback() override;
     juce::String targetTrackId() const;
 

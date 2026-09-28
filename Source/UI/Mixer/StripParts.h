@@ -48,6 +48,9 @@ public:
 
     void resetPeaks();
 
+    /** Peak, RMS or LUFS ballistics (the mixer toolbar's meter mode). */
+    void setMode (MeterMode);
+
     /** Called when a click resets the peaks. */
     std::function<void()> onPeaksReset;
 
@@ -58,6 +61,7 @@ private:
     ThemeManager& themeManager;
     std::array<double, 2> levels { FaderLaw::floorDb, FaderLaw::floorDb };
     std::array<PeakHold, 2> holds;
+    std::array<MeterBallistics, 2> ballistics;
 };
 
 /** Where the fader law puts a dB value in an area, as a y. */

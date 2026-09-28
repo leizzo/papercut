@@ -121,6 +121,7 @@ struct Mixer::MeterState
         juce::String pluginId;
         te::LevelMeasurer::Client client;
         bool added = false;
+        bool rms = false;
     };
 
     std::map<juce::String, Slot> slots;
@@ -215,6 +216,7 @@ StereoLevel Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
     {
         MeterState::detach (edit, slot);
         slot.pluginId = pluginId;
+        slot.rms = false;   // a new meter starts in peak mode
 
         if (meter != nullptr)
         {
@@ -226,6 +228,12 @@ StereoLevel Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
     if (meter == nullptr)
         return {};
 
+    if (slot.rms != measuringRms)
+    {
+        meter->measurer.setMode (measuringRms ? te::LevelMeasurer::RMSMode : te::LevelMeasurer::peakMode);
+        slot.rms = measuringRms;
+    }
+
     return readPeaks (slot.client);
 }
 
@@ -233,6 +241,11 @@ StereoLevel Mixer::getTrackLevel (const juce::String& trackId)
 {
     auto* track = findAudioTrack (projects.getEdit(), trackId);
     return levelOf (trackId, track != nullptr ? track->getLevelMeterPlugin() : nullptr);
+}
+
+void Mixer::setMeasuringRms (bool rms)
+{
+    measuringRms = rms;
 }
 
 StereoLevel Mixer::getMasterLevel()

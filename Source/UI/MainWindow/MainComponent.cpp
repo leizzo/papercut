@@ -22,7 +22,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
       detailView (services.model, services.plugins, services.commands, services.themeManager, shell,
                   services.uiState.getState ("detail")),
       sessionView (services.model, services.session, services.commands, services.themeManager),
-      mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager),
+      mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager,
+                 services.uiState.getState ("mixer")),
       editorPlaceholder (services.themeManager, "The audio Editor arrives with M4. Double-click an audio clip then."),
       pianoRollPlaceholder (services.themeManager, "Select a MIDI clip, or double-click one, to edit its notes."),
       developerOverlay (services.themeManager)

@@ -102,7 +102,8 @@ StereoMeter::StereoMeter (ThemeManager& tm) : themeManager (tm)
 
 void StereoMeter::setLevel (StereoLevel level, double elapsedSeconds)
 {
-    const std::array<double, 2> next { level.left, level.right };
+    const std::array<double, 2> next { ballistics[0].update (level.left, elapsedSeconds),
+                                       ballistics[1].update (level.right, elapsedSeconds) };
     auto changed = false;
 
     for (size_t i = 0; i < 2; ++i)
@@ -115,6 +116,14 @@ void StereoMeter::setLevel (StereoLevel level, double elapsedSeconds)
 
     if (changed)
         repaint();
+}
+
+void StereoMeter::setMode (MeterMode mode)
+{
+    for (auto& b : ballistics)
+        b.setMode (mode);
+
+    resetPeaks();
 }
 
 void StereoMeter::resetPeaks()

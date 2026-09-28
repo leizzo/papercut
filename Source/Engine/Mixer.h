@@ -102,6 +102,9 @@ public:
     /** The master track's meter. Same silence rule. */
     StereoLevel getMasterLevel();
 
+    /** Whether the meters measure RMS (the mixer's RMS and LUFS modes) rather than peak. */
+    void setMeasuringRms (bool);
+
     /** Master fader, not a track fader. continuesGesture as for setSendGain. */
     bool setMasterVolume (double db, bool continuesGesture = false);
     bool setMasterPan (double pan, bool continuesGesture = false);
@@ -112,6 +115,7 @@ private:
     ProjectManager& projects;
     juce::String openGestureKey;
     std::unique_ptr<MeterState> meters;
+    bool measuringRms = false;
 
     /** meterPlugin is a tracktion::LevelMeterPlugin*. Kept as void* so this
         header stays free of Tracktion types. */

@@ -9,84 +9,52 @@ namespace
     constexpr int stripsPadding = 12, groupGap = 14, stripGap = 6, masterWidth = 186;
 }
 
-MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegistry& c, ThemeManager& tm)
-    : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm),
-      addReturnButton (tm, "Add Return", Button::Variant::ghost, Icon::plus),
-      addBusButton (tm, "Add Bus", Button::Variant::ghost, Icon::plus),
-      addSendButton (tm, "Add Send", Button::Variant::ghost, Icon::plus),
-      toBusButton (tm, "To Bus", Button::Variant::ghost),
+MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegistry& c, ThemeManager& tm, juce::ValueTree uiState)
+    : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm), state (std::move (uiState)),
+      addButton (tm, "Add Return, Bus or Send", Icon::plus, IconButton::Kind::small),
+      meterMode (tm, { "Peak", "RMS", "LUFS" }),
+      resetPeaks (tm, "Reset Peaks", Button::Variant::outline),
       master (c, tm)
 {
     setComponentID (componentId);
 
-    addReturnButton.setTooltip ("Add a return (Mod+Alt+T)");
-    addBusButton.setTooltip ("Add a bus");
-    addSendButton.setTooltip ("Add a send from the selected track to a return");
-    toBusButton.setTooltip ("Move the selected track into a bus");
-    addReturnButton.onClick = [this]
-    {
-        commands.invoke ("mixer.addReturn", returnArgs ("Return " + juce::String (mixer.getReturns().size() + 1)));
-    };
-    addBusButton.onClick = [this]
-    {
-        commands.invoke ("mixer.addBus", busArgs ("Bus " + juce::String (mixer.getBuses().size() + 1)));
-    };
-    addSendButton.onClick = [this]
-    {
-        const auto trackId = targetTrackId();
-        const auto returns = mixer.getReturns();
+    addButton.onClick = [this] { showAddMenu(); };
 
-        if (trackId.isEmpty())
-            return;
-
-        if (returns.size() <= 1)
+    for (auto& chip : sectionChips)
+    {
+        chip.button = std::make_unique<Chip> (themeManager, chip.name);
+        chip.button->setToggleState (! (bool) state.getProperty ("hide_" + juce::String (chip.name), false), juce::dontSendNotification);
+        chip.button->onClick = [this, &chip]
         {
-            const int bus = returns.empty() ? 0 : returns.front().bus;
-            commands.invoke ("mixer.addSend", sendArgs (trackId, bus));
-            return;
-        }
+            state.setProperty ("hide_" + juce::String (chip.name), ! chip.button->getToggleState(), nullptr);
+            applySections();
+        };
 
-        juce::PopupMenu menu;
+        // EQ and Comments have no strip section yet.
+        chip.button->setEnabled (chip.section.has_value());
+        chip.button->setTooltip (chip.section ? "Show or hide " + juce::String (chip.name) + " on every strip"
+                                              : juce::String (chip.name) + ": not in the strip yet");
+        addAndMakeVisible (*chip.button);
+    }
 
-        for (int i = 0; i < (int) returns.size(); ++i)
-            menu.addItem (i + 1, returns[(size_t) i].name);
-
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addSendButton),
-                            [this, trackId, returns] (int result)
-                            {
-                                if (result > 0 && result <= (int) returns.size())
-                                    commands.invoke ("mixer.addSend", sendArgs (trackId, returns[(size_t) result - 1].bus));
-                            });
-    };
-    toBusButton.onClick = [this]
+    meterMode.setTitle ("Meter mode");
+    meterMode.setSelectedIndex (juce::jlimit (0, 2, (int) state.getProperty ("meterMode", 0)), juce::dontSendNotification);
+    meterMode.onChange = [this] (int index)
     {
-        const auto trackId = targetTrackId();
-        const auto buses = mixer.getBuses();
-
-        if (trackId.isEmpty() || buses.empty())
-            return;
-
-        if (buses.size() == 1)
-        {
-            commands.invoke ("mixer.moveToBus", moveToBusArgs (trackId, buses.front().trackId));
-            return;
-        }
-
-        juce::PopupMenu menu;
-
-        for (int i = 0; i < (int) buses.size(); ++i)
-            menu.addItem (i + 1, buses[(size_t) i].name);
-
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&toBusButton),
-                            [this, trackId, buses] (int result)
-                            {
-                                if (result > 0 && result <= (int) buses.size())
-                                    commands.invoke ("mixer.moveToBus", moveToBusArgs (trackId, buses[(size_t) result - 1].trackId));
-                            });
+        state.setProperty ("meterMode", index, nullptr);
+        applyMeterMode();
     };
 
-    for (auto* child : std::initializer_list<juce::Component*> { &addReturnButton, &addBusButton, &addSendButton, &toBusButton,
-                                                                 &viewport, &master })
+    resetPeaks.setTooltip ("Clear every peak hold");
+    resetPeaks.onClick = [this]
+    {
+        for (auto& [id, strip] : strips)
+            strip->resetPeaks();
+
+        master.resetPeaks();
+    };
+
+    for (auto* child : std::initializer_list<juce::Component*> { &addButton, &meterMode, &resetPeaks, &viewport, &master })
         addAndMakeVisible (child);
 
     viewport.setViewedComponent (&stripsArea, false);
@@ -97,6 +65,7 @@ MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegi
     model.addListener (this);
     themeManager.addListener (this);
     refresh();
+    applyMeterMode();
 }
 
 MixerView::~MixerView()
@@ -104,6 +73,62 @@ MixerView::~MixerView()
     stopTimer();
     themeManager.removeListener (this);
     model.removeListener (this);
+}
+
+void MixerView::showAddMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem ("Add Return", [this]
+    {
+        commands.invoke ("mixer.addReturn", returnArgs ("Return " + juce::String (mixer.getReturns().size() + 1)));
+    });
+    menu.addItem ("Add Bus", [this]
+    {
+        commands.invoke ("mixer.addBus", busArgs ("Bus " + juce::String (mixer.getBuses().size() + 1)));
+    });
+
+    const auto trackId = targetTrackId();
+    juce::PopupMenu sends, buses;
+
+    for (auto& ret : mixer.getReturns())
+        sends.addItem (ret.name, trackId.isNotEmpty(), false,
+                       [this, trackId, bus = ret.bus] { commands.invoke ("mixer.addSend", sendArgs (trackId, bus)); });
+
+    for (auto& bus : mixer.getBuses())
+        buses.addItem (bus.name, trackId.isNotEmpty(), false,
+                       [this, trackId, id = bus.trackId] { commands.invoke ("mixer.moveToBus", moveToBusArgs (trackId, id)); });
+
+    menu.addSubMenu ("Add Send from Selected Track", sends, sends.getNumItems() > 0);
+    menu.addSubMenu ("Move Selected Track to Bus", buses, buses.getNumItems() > 0);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addButton));
+}
+
+void MixerView::applySections()
+{
+    for (auto& chip : sectionChips)
+        if (chip.section)
+            for (auto& [id, strip] : strips)
+                strip->setSectionVisible (*chip.section, chip.button->getToggleState());
+}
+
+void MixerView::applyMeterMode()
+{
+    const auto mode = (MeterMode) meterMode.getSelectedIndex();
+    mixer.setMeasuringRms (mode != MeterMode::peak);
+
+    for (auto& [id, strip] : strips)
+        strip->setMeterMode (mode);
+
+    master.setMeterMode (mode);
+}
+
+void MixerView::setFlowStage (int stage)
+{
+    if (stage != flowStage)
+    {
+        flowStage = stage;
+        repaint (flowIndicator);
+    }
 }
 
 juce::String MixerView::targetTrackId() const
@@ -147,26 +172,26 @@ void MixerView::refresh()
     for (size_t i = 0; i < tracks.size(); ++i)
     {
         auto& track = tracks[i];
-        StripState state;
-        state.number = (int) i + 1;
-        state.track = track;
-        state.sends = mixer.getSends (track.id);
-        state.inserts = plugins.getChain (track.id, PluginChain::mixer);
-        state.deviceChain = plugins.getChain (track.id, PluginChain::device);
-        state.inputs = inputs;
+        StripState stripState;
+        stripState.number = (int) i + 1;
+        stripState.track = track;
+        stripState.sends = mixer.getSends (track.id);
+        stripState.inserts = plugins.getChain (track.id, PluginChain::mixer);
+        stripState.deviceChain = plugins.getChain (track.id, PluginChain::device);
+        stripState.inputs = inputs;
 
         for (auto& bus : buses)
             if (std::find (bus.childTrackIds.begin(), bus.childTrackIds.end(), track.id) != bus.childTrackIds.end())
-                state.output = bus.name;
+                stripState.output = bus.name;
 
         for (auto& ret : returns)
             if (ret.trackId == track.id)
             {
-                state.isReturn = true;
-                state.returnLetter = juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, ret.bus)));
+                stripState.isReturn = true;
+                stripState.returnLetter = juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, ret.bus)));
             }
 
-        (state.isReturn ? returnOrder : trackOrder).push_back (track.id);
+        (stripState.isReturn ? returnOrder : trackOrder).push_back (track.id);
 
         auto existing = strips.find (track.id);
         auto strip = existing != strips.end() ? std::move (existing->second) : nullptr;
@@ -175,10 +200,17 @@ void MixerView::refresh()
         {
             strip = std::make_unique<ChannelStrip> (commands, themeManager);
             strip->onTrackChainClicked = [this, id = track.id] { if (onShowDeviceChain) onShowDeviceChain (id); };
+            strip->onFlowStageHovered = [this] (int stage) { setFlowStage (stage); };
+            strip->setMeterMode ((MeterMode) meterMode.getSelectedIndex());
+
+            for (auto& chip : sectionChips)
+                if (chip.section)
+                    strip->setSectionVisible (*chip.section, chip.button->getToggleState());
+
             stripsArea.addAndMakeVisible (*strip);
         }
 
-        strip->setState (state);
+        strip->setState (stripState);
         kept[track.id] = std::move (strip);
     }
 
@@ -224,19 +256,60 @@ void MixerView::paint (juce::Graphics& g)
     g.fillRect (toolbar);
     g.setColour (theme.borderSoft);
     g.fillRect (toolbar.removeFromBottom (1));
+
+    drawStyledText (g, themeManager, "Mixer", theme.heading, titleArea, juce::Justification::centredLeft, theme.textPrimary);
+
+    // Signal flow: Track chain › Inserts › Sends › Fader, the stage under the pointer in lime.
+    const char* const stages[] = { "Track chain", "Inserts", "Sends", "Fader" };
+    const auto font = themeManager.font (theme.bodySm);
+    const auto chevron = juce::String (juce::CharPointer_UTF8 ("  \xe2\x80\xba  "));
+    auto r = flowIndicator;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        const auto text = juce::String (stages[i]);
+        g.setFont (i == flowStage ? themeManager.font (TypeStyle { theme.bodySm.size, false, 600 }) : font);
+        g.setColour (i == flowStage ? theme.accent : theme.textSecondary);
+        g.drawText (text, r.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), text) + 1),
+                    juce::Justification::centredLeft, false);
+
+        if (i < 3)
+        {
+            g.setFont (font);
+            g.setColour (theme.textDim);
+            g.drawText (chevron, r.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (font, chevron)),
+                        juce::Justification::centredLeft, false);
+        }
+    }
 }
 
 void MixerView::resized()
 {
     auto& metrics = themeManager.getMetrics();
+    auto& theme = themeManager.getTheme();
     auto r = getLocalBounds();
-    auto toolbar = r.removeFromTop (metrics.toolbarHeight).reduced (metrics.space2xl, 7);
+    auto toolbar = r.removeFromTop (metrics.toolbarHeight).reduced (metrics.space2xl, 0);
+    const auto rowHeight = metrics.controlMd;
+    auto centred = [&] (juce::Rectangle<int> area) { return area.withSizeKeepingCentre (area.getWidth(), rowHeight); };
 
-    for (auto* b : { &addReturnButton, &addBusButton, &addSendButton, &toBusButton })
+    titleArea = toolbar.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (themeManager.font (theme.heading), "Mixer") + 4);
+    toolbar.removeFromLeft (metrics.spaceSm);
+    addButton.setBounds (centred (toolbar.removeFromLeft (24)).withSizeKeepingCentre (24, 24));
+    toolbar.removeFromLeft (14);
+
+    for (auto& chip : sectionChips)
     {
-        b->setBounds (toolbar.removeFromLeft (b->getIdealWidth()));
+        chip.button->setBounds (centred (toolbar.removeFromLeft (chip.button->getIdealWidth())));
         toolbar.removeFromLeft (metrics.spaceSm);
     }
+
+    resetPeaks.setBounds (centred (toolbar.removeFromRight (resetPeaks.getIdealWidth())));
+    toolbar.removeFromRight (metrics.spaceXl);
+    meterMode.setBounds (centred (toolbar.removeFromRight (meterMode.getIdealWidth())));
+    toolbar.removeFromRight (metrics.spaceXl);
+
+    const auto flowWidth = juce::jmin (toolbar.getWidth(), 280);
+    flowIndicator = toolbar.removeFromRight (flowWidth);
 
     master.setBounds (r.removeFromRight (masterWidth + stripsPadding).reduced (0, stripsPadding).withTrimmedRight (stripsPadding));
     viewport.setBounds (r);

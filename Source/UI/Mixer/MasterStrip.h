@@ -18,7 +18,8 @@ public:
 
     void setMaster (const MasterInfo&);
     void setLevel (StereoLevel, double elapsedSeconds);
-    void resetPeaks()   { meter.resetPeaks(); }
+    void resetPeaks()                 { meter.resetPeaks(); }
+    void setMeterMode (MeterMode m)   { meter.setMode (m); }
 
     void paint (juce::Graphics&) override;
     void resized() override;

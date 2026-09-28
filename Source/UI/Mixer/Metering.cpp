@@ -1,6 +1,7 @@
 #include "Metering.h"
 
 #include <array>
+#include <cmath>
 
 namespace papercut
 {
@@ -64,6 +65,19 @@ double PeakHold::update (double levelDb, double elapsedSeconds)
     }
 
     return peakDb;
+}
+
+double MeterBallistics::update (double levelDb, double elapsedSeconds)
+{
+    if (mode == MeterMode::peak)
+        return levelDb;
+
+    const auto timeConstant = mode == MeterMode::rms ? 0.3 : 0.4;
+    const auto alpha = 1.0 - std::exp (-std::max (0.0, elapsedSeconds) / timeConstant);
+    const auto incoming = levelDb <= FaderLaw::floorDb ? 0.0 : std::pow (10.0, levelDb / 10.0);
+    power += alpha * (incoming - power);
+
+    return power <= 1.0e-10 ? FaderLaw::floorDb : std::max (FaderLaw::floorDb, 10.0 * std::log10 (power));
 }
 
 } // namespace papercut

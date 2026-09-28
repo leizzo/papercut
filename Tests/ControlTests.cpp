@@ -241,6 +241,30 @@ struct ControlTests : juce::UnitTest
             hold.reset();
             expectEquals (hold.get(), FaderLaw::floorDb);
         }
+
+        beginTest ("Meter modes: peak passes through; RMS averages over 300 ms, LUFS over 400 ms");
+        {
+            MeterBallistics meter;
+            expectEquals (meter.update (-6.0, 0.03), -6.0);
+
+            meter.setMode (MeterMode::rms);
+            double shown = 0;
+
+            for (int i = 0; i < 10; ++i)      // a 0 dB step, fed for 300 ms
+                shown = meter.update (0.0, 0.03);
+
+            // One time constant: 1 - 1/e of the power, about -2 dB.
+            expectWithinAbsoluteError (shown, 10.0 * std::log10 (1.0 - std::exp (-1.0)), 0.05);
+
+            MeterBallistics loudness;
+            loudness.setMode (MeterMode::lufs);
+            double slower = 0;
+
+            for (int i = 0; i < 10; ++i)
+                slower = loudness.update (0.0, 0.03);
+
+            expectLessThan (slower, shown);
+        }
     }
 };
 

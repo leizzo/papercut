@@ -51,6 +51,7 @@ public:
 
     void setLevel (StereoLevel, double elapsedSeconds);
     void resetPeaks();
+    void setMeterMode (MeterMode m)   { meter.setMode (m); repaint (peakReadout); }
 
     void setSectionVisible (Section, bool);
 
