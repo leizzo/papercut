@@ -35,14 +35,17 @@ struct AppCommandHost
     track.add    track.addMidi   track.remove
     track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
     track.setInput   track.toggleArm   track.setColour   track.select
+    track.toggleMuteAt (args: argument = track index)   track.toggleSoloSelected
     clip.add     clip.insertAt  clip.addMidi  clip.move     clip.resize   clip.split   clip.setTake
     clip.copy    clip.loopExtend  clip.rename  clip.reverse  clip.setColour
     clip.duplicate  clip.consolidate  clip.delete   (these three act on the selected clips)
     note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
+    note.transposeSelected (args: clipId, argument = semitones)   note.selectAll (args: clipId)
     edit.undo    edit.redo    edit.delete   edit.deselectAll
     transport.play  transport.stop  transport.togglePlay  transport.returnToStart
     transport.setPosition
     transport.record  transport.toggleLoop  transport.setLoopRange
+    transport.loopSelection  transport.playFromSelection
     transport.setTempo  transport.tapTempo  transport.setTimeSignature  transport.toggleMetronome
 */
 void registerAppCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);

@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include "Commands/AppCommands.h"
 #include "Commands/ApplicationCommandTable.h"
 #include "UI/Developer/DeveloperCommands.h"
 #include "UI/Layout/LayoutSource.h"
@@ -35,6 +36,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     registerShellCommands (services.commands, shell);
     registerArrangementZoomCommands();
     registerEscapeCommand();
+    registerPianoRollCommands();
 
     layouts.onError = services.reportError;
     statusBarHost.onBuilt = [this] { updateStatusBar(); };
@@ -305,8 +307,11 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
 
     info.setInfo (command->getName(), command->getName(), entry->category, 0);
 
-    if (entry->keyCode != 0)
-        info.addDefaultKeypress (entry->keyCode, juce::ModifierKeys (entry->modifiers));
+    // Global shortcuts belong to the menus; a view's own go through the ShortcutListener.
+    for (auto& binding : getKeyBindings())
+        if (juce::String (binding.commandId) == entry->commandId && binding.contexts == ShortcutContext::anyView
+            && binding.argument == KeyBinding::noArgument)
+            info.addDefaultKeypress (binding.keyCode, juce::ModifierKeys (binding.modifiers));
 
     info.setActive (command->isEnabled());
 }
@@ -317,6 +322,77 @@ bool MainComponent::perform (const InvocationInfo& invocation)
         return services.commands.invoke (entry->commandId);
 
     return false;
+}
+
+int MainComponent::currentShortcutContext() const
+{
+    switch (shell.getView())
+    {
+        case ShellState::View::session:    return ShortcutContext::sessionView;
+        case ShellState::View::arrange:    return ShortcutContext::arrangeView;
+        case ShellState::View::mixer:      return ShortcutContext::mixerView;
+        case ShellState::View::pianoRoll:  return ShortcutContext::pianoRollView;
+        case ShellState::View::editor:     return ShortcutContext::editorView;
+    }
+
+    return ShortcutContext::anyView;
+}
+
+bool MainComponent::ShortcutListener::keyPressed (const juce::KeyPress& key, juce::Component*)
+{
+    auto* binding = findBinding (key, owner.currentShortcutContext());
+
+    if (binding == nullptr)
+        return false;
+
+    // A plain global shortcut on a menu Command is the ApplicationCommandManager's.
+    const auto inMenus = std::any_of (getApplicationCommandTable().begin(), getApplicationCommandTable().end(),
+                                      [binding] (auto& e) { return juce::String (e.commandId) == binding->commandId; });
+
+    if (binding->contexts == ShortcutContext::anyView && binding->argument == KeyBinding::noArgument && inMenus)
+        return false;
+
+    if (! owner.services.commands.contains (binding->commandId))
+        return false;
+
+    owner.services.commands.invoke (binding->commandId, bindingArgs (*binding));
+    return true;
+}
+
+void MainComponent::registerPianoRollCommands()
+{
+    struct PianoRollCommand : Command
+    {
+        PianoRollCommand (const char* id, const char* name, std::function<void (const juce::var&)> fn)
+            : Command (id, name), action (std::move (fn)) {}
+
+        void execute (const juce::var& args) override   { action (args); }
+        std::function<void (const juce::var&)> action;
+    };
+
+    // The Piano Roll's keys act on the clip it has open.
+    auto withClip = [this] (const char* commandId, std::function<juce::var (const juce::String&, const juce::var&)> makeArgs)
+    {
+        return [this, commandId, makeArgs] (const juce::var& args)
+        {
+            if (auto clipId = pianoRoll.openClipId(); clipId.isNotEmpty() && pianoRoll.isShowing())
+                services.commands.invoke (commandId, makeArgs (clipId, args));
+        };
+    };
+
+    services.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.quantize", "Quantize",
+        withClip ("note.quantize", [] (const juce::String& id, const juce::var&) { return noteQuantizeArgs (id, "1/16"); })));
+
+    services.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.transpose", "Transpose",
+        withClip ("note.transposeSelected", [] (const juce::String& id, const juce::var& args)
+        {
+            auto a = clipArgs (id);
+            a.getDynamicObject()->setProperty ("argument", args["argument"]);
+            return a;
+        })));
+
+    services.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.selectAll", "Select All Notes",
+        withClip ("note.selectAll", [] (const juce::String& id, const juce::var&) { return clipArgs (id); })));
 }
 
 } // namespace papercut

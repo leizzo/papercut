@@ -1,6 +1,8 @@
 #include "AppCommands.h"
 #include "TapTempo.h"
 
+#include <optional>
+
 #include "Engine/ApplicationModel.h"
 
 namespace papercut
@@ -17,7 +19,7 @@ namespace
                                pitch ("pitch"), length ("length"), velocity ("velocity"), grid ("grid"),
                                noteId ("noteId"), noteIds ("noteIds"),
                                deltaSeconds ("deltaSeconds"), deltaPitch ("deltaPitch"),
-                               bpm ("bpm"), file ("file"), name ("name"), numerator ("numerator"), denominator ("denominator");
+                               bpm ("bpm"), file ("file"), name ("name"), argument ("argument"), numerator ("numerator"), denominator ("denominator");
     }
 
     /** Base for Commands that act on the Application Model. */
@@ -141,6 +143,123 @@ namespace
     };
 
     /** A track header's input menu. */
+    /** F1-F8: the mute of the track at args["argument"] (0-based). */
+    struct ToggleMuteAtCommand : ModelCommand
+    {
+        ToggleMuteAtCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.toggleMuteAt", "Mute Track", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            const auto tracks = model.getTracks();
+            const auto index = (int) args[ArgKeys::argument];
+
+            if (juce::isPositiveAndBelow (index, (int) tracks.size()))
+                model.setTrackMuted (tracks[(size_t) index].id, ! tracks[(size_t) index].muted);
+        }
+    };
+
+    /** S: solo the selected track. */
+    struct ToggleSoloSelectedCommand : ModelCommand
+    {
+        ToggleSoloSelectedCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("track.toggleSoloSelected", "Solo", m, h) {}
+
+        void execute (const juce::var&) override
+        {
+            for (auto& track : model.getTracks())
+                if (track.id == model.getSelectedTrackId())
+                    model.setTrackSolo (track.id, ! track.solo);
+        }
+
+        bool isEnabled() const override   { return model.getSelectedTrackId().isNotEmpty(); }
+    };
+
+    /** The span of the selected clips, if any. */
+    std::optional<TimeRangeSeconds> selectionSpan (const ApplicationModel& model)
+    {
+        std::optional<TimeRangeSeconds> span;
+
+        for (auto& track : model.getTracks())
+            for (auto& clip : track.clips)
+                if (clip.selected)
+                {
+                    const auto end = clip.startSeconds + clip.lengthSeconds;
+                    span = span ? TimeRangeSeconds { std::min (span->start, clip.startSeconds), std::max (span->end, end) }
+                                : TimeRangeSeconds { clip.startSeconds, end };
+                }
+
+        return span;
+    }
+
+    /** Mod+L: loop the selection, or with nothing selected, toggle the loop. */
+    struct LoopSelectionCommand : ModelCommand
+    {
+        LoopSelectionCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.loopSelection", "Loop Selection", m, h) {}
+
+        void execute (const juce::var&) override
+        {
+            if (auto span = selectionSpan (model); span && model.setLoopRange (span->start, span->end))
+                model.setLooping (true);
+            else
+                model.setLooping (! model.isLooping());
+        }
+    };
+
+    /** Shift+Space: play from the start of the selection (else as Play). */
+    struct PlayFromSelectionCommand : ModelCommand
+    {
+        PlayFromSelectionCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("transport.playFromSelection", "Play from Selection", m, h) {}
+
+        void execute (const juce::var&) override
+        {
+            if (auto span = selectionSpan (model))
+                model.setTransportPosition (span->start);
+
+            model.play();
+        }
+    };
+
+    /** Up / Down (Shift: octave) in the Piano Roll. */
+    struct TransposeSelectedNotesCommand : ModelCommand
+    {
+        TransposeSelectedNotesCommand (ApplicationModel& m, AppCommandHost& h)
+            : ModelCommand ("note.transposeSelected", "Transpose", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            const auto clipId = args[ArgKeys::clipId].toString();
+            juce::StringArray selected;
+
+            for (auto& track : model.getTracks())
+                for (auto& clip : track.clips)
+                    if (clip.id == clipId)
+                        for (auto& note : clip.notes)
+                            if (note.selected)
+                                selected.add (note.id);
+
+            if (! selected.isEmpty())
+                model.moveNotes (clipId, selected, 0.0, (int) args[ArgKeys::argument]);
+        }
+    };
+
+    /** Mod+A in the Piano Roll. Never undoable. */
+    struct SelectAllNotesCommand : ModelCommand
+    {
+        SelectAllNotesCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("note.selectAll", "Select All Notes", m, h) {}
+
+        void execute (const juce::var& args) override
+        {
+            juce::StringArray ids;
+
+            for (auto& track : model.getTracks())
+                for (auto& clip : track.clips)
+                    if (clip.id == args[ArgKeys::clipId].toString())
+                        for (auto& note : clip.notes)
+                            ids.add (note.id);
+
+            model.selectNotes (ids);
+        }
+    };
+
     struct DeselectAllCommand : ModelCommand
     {
         DeselectAllCommand (ApplicationModel& m, AppCommandHost& h) : ModelCommand ("edit.deselectAll", "Deselect All", m, h) {}
@@ -595,6 +714,12 @@ void registerAppCommands (CommandRegistry& registry, ApplicationModel& model, Ap
     registry.add (std::make_unique<SetTrackColourCommand> (model, host));
     registry.add (std::make_unique<SelectTrackCommand> (model, host));
     registry.add (std::make_unique<DeselectAllCommand> (model, host));
+    registry.add (std::make_unique<ToggleMuteAtCommand> (model, host));
+    registry.add (std::make_unique<ToggleSoloSelectedCommand> (model, host));
+    registry.add (std::make_unique<LoopSelectionCommand> (model, host));
+    registry.add (std::make_unique<PlayFromSelectionCommand> (model, host));
+    registry.add (std::make_unique<TransposeSelectedNotesCommand> (model, host));
+    registry.add (std::make_unique<SelectAllNotesCommand> (model, host));
     registry.add (std::make_unique<AddClipCommand> (model, host));
     registry.add (std::make_unique<InsertClipAtCommand> (model, host));
     registry.add (std::make_unique<AddMidiClipCommand> (model, host));

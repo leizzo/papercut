@@ -14,6 +14,7 @@ MainWindow::MainWindow (const juce::String& title, MainComponent::Services servi
     commandManager.registerAllCommandsForTarget (content.get());
     commandManager.setFirstCommandTarget (content.get());
     addKeyListener (commandManager.getKeyMappings());
+    addKeyListener (&content->getShortcutListener());   // added last, so consulted first
 
     for (auto* name : getMenuNames())
         menuNames.add (name);

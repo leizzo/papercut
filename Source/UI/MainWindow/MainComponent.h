@@ -57,6 +57,11 @@ public:
 
     MainComponent (Services, juce::ApplicationCommandManager&);
 
+    /** Dispatches the shortcuts JUCE's key mappings can't: those of one view
+        (fired only while it shows) and those that pass an argument. Add it to
+        the window after the ApplicationCommandManager's key mappings. */
+    juce::KeyListener& getShortcutListener() noexcept   { return shortcuts; }
+
     /** A toast at the bottom centre (PRD §16.7). undoable offers Undo (edit.undo). */
     void showToast (const juce::String& message, bool undoable, bool isError = false);
     ~MainComponent() override;
@@ -98,6 +103,17 @@ private:
     Placeholder editorPlaceholder, pianoRollPlaceholder;
     DeveloperOverlay developerOverlay;
     Toasts toasts;
+
+    struct ShortcutListener : juce::KeyListener
+    {
+        explicit ShortcutListener (MainComponent& o) : owner (o) {}
+        bool keyPressed (const juce::KeyPress&, juce::Component*) override;
+        MainComponent& owner;
+    };
+
+    ShortcutListener shortcuts { *this };
+    int currentShortcutContext() const;
+    void registerPianoRollCommands();
     juce::TooltipWindow tooltips { this, 600 };
     std::unique_ptr<LayoutWatcher> layoutWatch;
     std::unique_ptr<LayoutWatcher> themeWatch;

@@ -37,6 +37,9 @@ public:
     /** The open clip is still in the Edit. */
     bool isOpen() const;
 
+    /** The MIDI clip being edited, or empty. */
+    juce::String openClipId() const;
+
     /** Shows this MIDI clip, scrolled to its start with middle C in view. */
     void openClip (const juce::String& clipId);
 
@@ -69,7 +72,6 @@ private:
     std::vector<TrackInfo> tracks;
     juce::Rectangle<int> toolbarBounds, nameArea, velocityLabel;
 
-    juce::String openClipId() const;
     const ClipInfo* currentClip() const;
     void refresh();
     void close();
