@@ -1,0 +1,32 @@
+- name: juce-async-callbacks-guard-lifetime
+  each: method
+  where: Source/{UI,App,Commands}/**/*.{cpp,h}
+  ensure: >-
+    A lambda handed to MessageManager::callAsync, Timer::callAfterDelay, a
+    thread, a file chooser, a modal/popup callback or any other deferred
+    callback does not capture raw this or a reference to a Component/object that
+    may be deleted first; it captures a juce::Component::SafePointer or
+    juce::WeakReference and returns early if it is null. Lambdas stored as the
+    component's own onClick/onChange members, and code that runs synchronously,
+    pass.
+  min: 70
+- name: juce-listeners-removed
+  each: file
+  where: Source/{UI,Engine,App}/**/*.{cpp,h}
+  ensure: >-
+    Every listener this file's classes register on an object that can outlive
+    them (addListener, addChangeListener, ValueTree::addListener,
+    ThemeManager/ApplicationModel listeners) is removed in the destructor of the
+    class that registered it, or is held by a scoped helper that removes it.
+    Look only at the addListener calls in this file and their matching removals.
+  min: 70
+- name: juce-owned-not-raw
+  each: method
+  where: Source/**/*.{cpp,h}
+  ensure: >-
+    Ownership is expressed with std::unique_ptr, juce::OwnedArray or a member
+    object. A new whose result is kept in a raw pointer that this code must
+    later delete, or any explicit delete, breaks this. new handed straight to an
+    API that documents taking ownership (setContentOwned, OwnedArray::add, a
+    unique_ptr) passes.
+  min: 70

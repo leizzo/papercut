@@ -1,0 +1,24 @@
+- name: tracktion-edits-through-undo
+  each: method
+  where: Source/Engine/**/*.{cpp,h}
+  ensure: >-
+    Every change this method makes to the Edit (a ValueTree
+    setProperty/addChild/removeChild, inserting or removing a track, clip,
+    plugin or automation point, changing a parameter value) passes the Edit's
+    UndoManager, or a comment at that line says why it is not undoable
+    (transport, loop, selection, zoom, scroll, track input or arming — per
+    CONTEXT.md Engine Undo). Passing nullptr as the UndoManager for any other
+    Edit change breaks this. A method that changes nothing in the Edit passes.
+  min: 70
+- name: tracktion-lookups-checked
+  each: method
+  where: Source/Engine/**/*.{cpp,h}
+  ensure: >-
+    Every Tracktion lookup that can come back empty — findTrackForID,
+    findClipForID, dynamic_cast to a track/plugin type, getVolumePlugin,
+    getPluginsOfType(...)[0], pluginList[i], getAutomatableParameterByID, an
+    EditItemID parsed from a string — is checked before it is dereferenced, and
+    the not-found case returns a juce::Result, nullptr or std::nullopt the
+    caller can see. Dereferencing one unchecked, or turning not-found into a
+    silent success, breaks this.
+  min: 70
