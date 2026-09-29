@@ -37,6 +37,7 @@ struct AutomationMoveArgs
     float value = 0;
 };
 
+/** The point at index on a lane. */
 struct AutomationRemoveArgs
 {
     juce::String trackId;
@@ -44,6 +45,7 @@ struct AutomationRemoveArgs
     int index = 0;
 };
 
+/** A new Shaper on a track's parameter. */
 struct ShaperAddArgs
 {
     juce::String trackId;
@@ -51,6 +53,7 @@ struct ShaperAddArgs
     ShaperMode mode = ShaperMode::loop;
 };
 
+/** Names one Shaper. */
 struct ShaperArgs
 {
     juce::String shaperId;
@@ -65,6 +68,7 @@ struct ShaperLoopArgs
     std::vector<ShaperShapePoint> shape { { 0.0f, 0.0f }, { 1.0f, 1.0f } };
 };
 
+/** An audio-trigger Shaper's envelope and depth. */
 struct ShaperTriggerArgs
 {
     juce::String shaperId;

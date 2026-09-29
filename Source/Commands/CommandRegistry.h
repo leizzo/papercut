@@ -28,6 +28,7 @@ struct CommandRef
 class Command
 {
 public:
+    /** A Command is built by CommandRegistry::add from its handle, CommandInfo and body. */
     Command (juce::String commandId, juce::String displayName, std::type_index argsType,
              std::function<void (const std::any&)> body,
              std::function<bool()> isEnabled, std::function<bool()> isTicked);

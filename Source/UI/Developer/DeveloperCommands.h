@@ -4,8 +4,6 @@
 
 #include <functional>
 
-namespace juce { class String; }
-
 namespace resamper
 {
 

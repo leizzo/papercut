@@ -48,6 +48,7 @@ struct NoteQuantizeArgs
     juce::String grid;
 };
 
+/** Shifts a clip's selected notes by semitones. */
 struct NoteTransposeArgs
 {
     juce::String clipId;

@@ -8,13 +8,13 @@ namespace resamper
 
 struct AppCommandHost;
 
-/** A new Return or Bus. Invoked without args, mixer.addReturn names it "Return"
-    and mixer.addBus "Bus". */
+/** A new Return; invoked without args it is named "Return". */
 struct ReturnArgs
 {
     juce::String name = "Return";
 };
 
+/** A new Bus; invoked without args it is named "Bus". */
 struct BusArgs
 {
     juce::String name = "Bus";
@@ -36,6 +36,7 @@ struct SendGainArgs
     bool continuesGesture = false;
 };
 
+/** Mutes or unmutes one of a track's sends. */
 struct SendMutedArgs
 {
     juce::String trackId;
@@ -43,6 +44,7 @@ struct SendMutedArgs
     bool muted = false;
 };
 
+/** Routes a track into a Bus; busTrackId names the Bus track. */
 struct MoveToBusArgs
 {
     juce::String trackId;

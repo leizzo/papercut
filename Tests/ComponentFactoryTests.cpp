@@ -18,6 +18,7 @@ struct ComponentFactoryTests : juce::UnitTest
         Setup()
         {
             commands.add (CommandRef<> { "test.probe" }, { "Probe" }, [this] { ++invocations; });
+            commands.add (CommandRef<int> { "test.withArgs" }, { "With Args" }, [this] (const int&) { ++invocations; });
             registerPrimitives (factory, commands, themes);
         }
 
@@ -64,6 +65,13 @@ struct ComponentFactoryTests : juce::UnitTest
             Setup s;
             expectLayoutError ([&] { s.factory.createFromJson (R"({ "type": "button", "id": "b", "text": "Go", "command": "no.such" })"); },
                                "no.such");
+        }
+
+        beginTest ("A button naming a Command that takes args fails loudly");
+        {
+            Setup s;
+            expectLayoutError ([&] { s.factory.createFromJson (R"({ "type": "button", "id": "b", "text": "Go", "command": "test.withArgs" })"); },
+                               "test.withArgs");
         }
 
         beginTest ("Malformed JSON fails loudly");

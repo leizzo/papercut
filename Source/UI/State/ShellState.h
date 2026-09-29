@@ -7,7 +7,6 @@
 namespace resamper
 {
 
-
 /** The window's shell (PRD §5–6): which view shows, the Browser and the
     detail view, and Follow. Lives in a UI State subtree, so it is saved with
     the project and is never undoable. Listen to getState() for changes. */

@@ -70,9 +70,13 @@ struct AppTests : juce::UnitTest
             MainComponent main (f.app, commandManager);
 
             for (auto& binding : getKeyBindings())
-                if (auto* command = f.commands.find (binding.commandId))
-                    if (binding.argument != KeyBinding::noArgument)
-                        expect (command->getArgsType() == typeid (int), binding.commandId);
+            {
+                if (binding.argument == KeyBinding::noArgument)
+                    continue;
+
+                auto* command = f.commands.find (binding.commandId);
+                expect (command != nullptr && command->getArgsType() == typeid (int), binding.commandId);
+            }
         }
 
         beginTest ("Invoked by ID with args of another type, a Command does nothing and says so");

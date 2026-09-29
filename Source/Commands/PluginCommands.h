@@ -31,6 +31,7 @@ struct PluginMoveArgs
     int index = 0;
 };
 
+/** Bypasses a plug-in, or brings it back. */
 struct PluginBypassArgs
 {
     juce::String trackId;

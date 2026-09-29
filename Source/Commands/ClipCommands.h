@@ -51,6 +51,7 @@ struct ClipTakeArgs
     int takeIndex = 0;
 };
 
+/** A clip's new name. */
 struct ClipRenameArgs
 {
     juce::String clipId;
