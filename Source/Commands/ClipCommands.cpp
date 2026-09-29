@@ -51,7 +51,7 @@ void registerClipCommands (CommandRegistry& registry, ApplicationModel& model, A
     });
 
     // The top-right corner drag.
-    registry.add (cmd::clipLoopExtend, { "Loop Clip" }, [&model] (const ClipEdgesArgs& a)
+    registry.add (cmd::clipLoopExtend, { "Loop Clip" }, [&model] (const ClipLoopArgs& a)
     {
         model.loopExtendClip (a.clipId, a.endSeconds);
     });

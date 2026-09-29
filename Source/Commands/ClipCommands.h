@@ -37,6 +37,13 @@ struct ClipEdgesArgs
     double startSeconds = 0, endSeconds = 0;
 };
 
+/** How far a clip repeats its content: up to endSeconds. */
+struct ClipLoopArgs
+{
+    juce::String clipId;
+    double endSeconds = 0;
+};
+
 /** A clip's take: a 0-based take index. */
 struct ClipTakeArgs
 {
@@ -67,7 +74,7 @@ namespace cmd
     inline constexpr CommandRef<> clipSplit { "clip.split" };                      ///< the selected clip, at the playhead
     inline constexpr CommandRef<ClipTakeArgs> clipSetTake { "clip.setTake" };
     inline constexpr CommandRef<ClipMoveArgs> clipCopy { "clip.copy" };            ///< a copy at the new start
-    inline constexpr CommandRef<ClipEdgesArgs> clipLoopExtend { "clip.loopExtend" }; ///< repeats the clip up to endSeconds
+    inline constexpr CommandRef<ClipLoopArgs> clipLoopExtend { "clip.loopExtend" };
     inline constexpr CommandRef<ClipRenameArgs> clipRename { "clip.rename" };
     inline constexpr CommandRef<ClipArgs> clipReverse { "clip.reverse" };          ///< no clipId: the selected clip
     inline constexpr CommandRef<ClipColourArgs> clipSetColour { "clip.setColour" };

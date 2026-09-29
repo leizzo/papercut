@@ -81,7 +81,7 @@ struct ClipOperationTests : juce::UnitTest
             const auto clip = f.midiClip();
             const auto end = clip.startSeconds + 3.0 * clip.lengthSeconds;
 
-            expect (f.invoke (cmd::clipLoopExtend, { clip.id, clip.startSeconds, end }));
+            expect (f.invoke (cmd::clipLoopExtend, { clip.id, end }));
             auto extended = f.midiClip();
             expect (extended.looping);
             expectWithinAbsoluteError (extended.lengthSeconds, 3.0 * clip.lengthSeconds, 1.0e-6);
@@ -97,7 +97,7 @@ struct ClipOperationTests : juce::UnitTest
             Clips f;
             f.invoke (cmd::trackToggleMute, { f.track (1).id });
             const auto clip = f.audioClip();
-            expect (f.invoke (cmd::clipLoopExtend, { clip.id, 0.0, 3.0 }));
+            expect (f.invoke (cmd::clipLoopExtend, { clip.id, 3.0 }));
             auto extended = f.audioClip();
             expect (extended.looping);
             expectWithinAbsoluteError (extended.lengthSeconds, 3.0, 1.0e-3);

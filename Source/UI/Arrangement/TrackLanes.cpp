@@ -473,7 +473,7 @@ void TrackLanes::mouseUp (const juce::MouseEvent& e)
             commands.invoke (released.copy ? cmd::clipCopy : cmd::clipMove,
                              { to.id, to.startSeconds, tracks[(size_t) released.row].id });
         else if (released.mode == DragMode::loopExtend)
-            commands.invoke (cmd::clipLoopExtend, { to.id, to.startSeconds, to.startSeconds + to.lengthSeconds });
+            commands.invoke (cmd::clipLoopExtend, { to.id, to.startSeconds + to.lengthSeconds });
         else
             commands.invoke (cmd::clipResize, { to.id, to.startSeconds, to.startSeconds + to.lengthSeconds });
     }
