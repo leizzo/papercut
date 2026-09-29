@@ -1,15 +1,16 @@
 - name: juce-async-callbacks-guard-lifetime
   each: method
   where: Source/{UI,App,Commands}/**/*.{cpp,h}
+  min: 70
   ensure: >-
     A lambda handed to MessageManager::callAsync, Timer::callAfterDelay, a
-    thread, a file chooser, a modal/popup callback or any other deferred
-    callback does not capture raw this or a reference to a Component/object that
-    may be deleted first; it captures a juce::Component::SafePointer or
-    juce::WeakReference and returns early if it is null. Lambdas stored as the
-    component's own onClick/onChange members, and code that runs synchronously,
-    pass.
-  min: 70
+    thread, a file chooser, a popup menu item, a modal/alert callback or any
+    other deferred callback does not capture raw this or a reference to a
+    Component/object that may be deleted first; it captures a
+    juce::Component::SafePointer or juce::WeakReference and returns early if it
+    is null. Lambdas assigned to this object's own members or to members of an
+    object it owns (onClick, onChange, a command host's std::function fields),
+    and code that runs synchronously, pass.
 - name: juce-listeners-removed
   each: file
   where: Source/{UI,Engine,App}/**/*.{cpp,h}
