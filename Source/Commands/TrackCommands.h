@@ -6,8 +6,6 @@
 namespace resamper
 {
 
-struct AppCommandHost;
-
 /** Registers the track Commands:
 
     track.add    track.addMidi   track.remove
@@ -15,7 +13,7 @@ struct AppCommandHost;
     track.setInput   track.toggleArm   track.setColour   track.select
     track.toggleMuteAt (args: argument = track index)   track.toggleSoloSelected
 */
-void registerTrackCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
+void registerTrackCommands (CommandRegistry&, ApplicationModel&);
 
 /** Arguments for track.toggleMute, track.toggleSolo, track.toggleArm and track.select. */
 juce::var trackArgs (const juce::String& trackId);

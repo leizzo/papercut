@@ -1,6 +1,6 @@
 #include "PluginCommands.h"
 
-#include "AppCommands.h"
+#include "AppCommandHost.h"
 #include "ArgKeys.h"
 #include "Engine/PluginRack.h"
 
@@ -10,7 +10,7 @@ namespace resamper
 namespace
 {
     /** Reports a message that isn't from a Result: an empty one reports nothing. */
-    void report (const AppCommandHost& host, const juce::String& message)
+    void reportMessage (const AppCommandHost& host, const juce::String& message)
     {
         if (message.isNotEmpty() && host.reportError)
             host.reportError (message);
@@ -28,7 +28,7 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         const auto chain = args[ArgKeys::chain].toString() == "mixer" ? PluginChain::mixer : PluginChain::device;
 
         if (id.isEmpty() || plugin.isEmpty())
-            report (host, "Plug-in insert needs a track and a plug-in");
+            reportMessage (host, "Plug-in insert needs a track and a plug-in");
         else
             host.report (rack.insert (id, plugin, chain));
     });
@@ -39,9 +39,9 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         const auto pluginId = args[ArgKeys::pluginId].toString();
 
         if (id.isEmpty() || pluginId.isEmpty())
-            report (host, "Plug-in remove needs a track and a plug-in");
+            reportMessage (host, "Plug-in remove needs a track and a plug-in");
         else if (! rack.remove (id, pluginId))
-            report (host, "Couldn't remove the plug-in");
+            reportMessage (host, "Couldn't remove the plug-in");
     });
 
     registry.add ({ "plugin.move", "Move Plug-in" }, [&rack, &host] (const juce::var& args)
@@ -51,9 +51,9 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         const auto indexVar = args[ArgKeys::index];
 
         if (id.isEmpty() || pluginId.isEmpty() || ! (indexVar.isInt() || indexVar.isInt64() || indexVar.isDouble()))
-            report (host, "Plug-in move needs a track, a plug-in and an index");
+            reportMessage (host, "Plug-in move needs a track, a plug-in and an index");
         else if (! rack.move (id, pluginId, (int) indexVar))
-            report (host, "Couldn't move the plug-in");
+            reportMessage (host, "Couldn't move the plug-in");
     });
 
     registry.add ({ "plugin.setBypassed", "Bypass Plug-in" }, [&rack] (const juce::var& args)
@@ -83,7 +83,7 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
 
         // A missing value would otherwise read as 0 and zero the parameter.
         if (! (value.isInt() || value.isInt64() || value.isDouble()))
-            report (host, "Parameter change needs a value");
+            reportMessage (host, "Parameter change needs a value");
         else
             rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
                                (float) value, (bool) args[ArgKeys::continuesGesture]);

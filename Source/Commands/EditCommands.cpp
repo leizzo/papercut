@@ -3,7 +3,7 @@
 namespace resamper
 {
 
-void registerEditCommands (CommandRegistry& registry, ApplicationModel& model, AppCommandHost&)
+void registerEditCommands (CommandRegistry& registry, ApplicationModel& model)
 {
     registry.add ({ "edit.undo", "Undo", [&model] { return model.canUndo(); } }, [&model] { model.undo(); });
     registry.add ({ "edit.redo", "Redo", [&model] { return model.canRedo(); } }, [&model] { model.redo(); });

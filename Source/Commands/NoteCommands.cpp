@@ -1,11 +1,10 @@
 #include "NoteCommands.h"
-#include "AppCommands.h"
 #include "ArgKeys.h"
 
 namespace resamper
 {
 
-void registerNoteCommands (CommandRegistry& registry, ApplicationModel& model, AppCommandHost&)
+void registerNoteCommands (CommandRegistry& registry, ApplicationModel& model)
 {
     registry.add ({ "note.add", "Add Note" }, [&model] (const juce::var& args)
     {

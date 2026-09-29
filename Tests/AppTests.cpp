@@ -44,6 +44,24 @@ struct AppTests : juce::UnitTest
                     expect (f.commands.contains (binding.commandId), binding.commandId);
         }
 
+        beginTest ("A function-backed Command reports its enabled and ticked state; unset, it is enabled and unticked");
+        {
+            Fixture f;
+            auto* undo = f.commands.find ("edit.undo");
+            auto* metronome = f.commands.find ("transport.toggleMetronome");
+            auto* addTrack = f.commands.find ("track.add");
+
+            expect (addTrack->isEnabled() && ! addTrack->isTicked());
+
+            expect (! undo->isEnabled());
+            f.invoke ("track.add");
+            expect (undo->isEnabled());
+
+            const auto wasOn = metronome->isTicked();
+            f.invoke ("transport.toggleMetronome");
+            expect (metronome->isTicked() != wasOn);
+        }
+
         beginTest ("A view Command drives the app: Esc clears the selection");
         {
             Fixture f;

@@ -1,5 +1,5 @@
 #include "AutomationCommands.h"
-#include "AppCommands.h"
+#include "AppCommandHost.h"
 #include "ArgKeys.h"
 
 namespace resamper

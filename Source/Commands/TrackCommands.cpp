@@ -1,11 +1,10 @@
 #include "TrackCommands.h"
-#include "AppCommands.h"
 #include "ArgKeys.h"
 
 namespace resamper
 {
 
-void registerTrackCommands (CommandRegistry& registry, ApplicationModel& model, AppCommandHost&)
+void registerTrackCommands (CommandRegistry& registry, ApplicationModel& model)
 {
     registry.add ({ "track.add", "Add Audio Track" }, [&model] { model.addAudioTrack(); });
     registry.add ({ "track.addMidi", "Add MIDI Track" }, [&model] { model.addMidiTrack(); });

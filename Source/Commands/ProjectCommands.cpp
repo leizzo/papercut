@@ -1,5 +1,5 @@
 #include "ProjectCommands.h"
-#include "AppCommands.h"
+#include "AppCommandHost.h"
 
 namespace resamper
 {

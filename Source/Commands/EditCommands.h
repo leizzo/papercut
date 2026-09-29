@@ -6,9 +6,7 @@
 namespace resamper
 {
 
-struct AppCommandHost;
-
 /** Registers edit.undo  edit.redo  edit.delete  edit.deselectAll. */
-void registerEditCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
+void registerEditCommands (CommandRegistry&, ApplicationModel&);
 
 } // namespace resamper

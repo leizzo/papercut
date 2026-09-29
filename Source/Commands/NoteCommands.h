@@ -6,14 +6,12 @@
 namespace resamper
 {
 
-struct AppCommandHost;
-
 /** Registers the note Commands:
 
     note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
     note.transposeSelected (args: clipId, argument = semitones)   note.selectAll (args: clipId)
 */
-void registerNoteCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
+void registerNoteCommands (CommandRegistry&, ApplicationModel&);
 
 /** Arguments for note.add. Times are seconds from the clip's start. Velocity
     defaults to ApplicationModel::defaultNoteVelocity. */
