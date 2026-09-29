@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <functional>
 #include <map>
 #include <memory>
 
@@ -39,6 +40,15 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Command)
 };
 
+/** How a function-backed Command shows: its ID and name, and optionally whether
+    it is enabled and whether it is ticked (see Command). Unset, it is always
+    enabled and never ticked. */
+struct CommandInfo
+{
+    juce::String id, name;
+    std::function<bool()> isEnabled = {}, isTicked = {};
+};
+
 /** The single registry behind JSON buttons, menus and keyboard shortcuts.
     If an action isn't registered here, no UI surface can reach it. */
 class CommandRegistry
@@ -46,6 +56,13 @@ class CommandRegistry
 public:
     /** Registers a Command. IDs must be unique. */
     void add (std::unique_ptr<Command>);
+
+    /** Registers a Command whose body is a function: most Commands only forward
+        to a facade. The body receives the args invoke() was given. */
+    void add (CommandInfo, std::function<void (const juce::var& args)> execute);
+
+    /** Registers a Command whose body takes no args. */
+    void add (CommandInfo, std::function<void()> execute);
 
     /** Executes the Command with this ID. Returns false (and asserts) for an unknown ID. */
     bool invoke (const juce::String& commandId, const juce::var& args = {});

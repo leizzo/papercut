@@ -115,23 +115,14 @@ MainComponent::~MainComponent()
 
 void MainComponent::registerArrangementZoomCommands()
 {
-    struct ZoomCommand : Command
-    {
-        ZoomCommand (const char* id, const char* name, std::function<void()> fn)
-            : Command (id, name), action (std::move (fn)) {}
-
-        void execute (const juce::var&) override   { action(); }
-        std::function<void()> action;
-    };
-
     // Zoom is for the Arrangement, so these only act while it shows.
     auto add = [this] (const char* id, const char* name, void (ArrangementView::*fn)())
     {
-        app.commands.add (std::make_unique<ZoomCommand> (id, name, [this, fn]
+        app.commands.add ({ id, name }, [this, fn]
         {
             if (arrangement.isShowing())
                 (arrangement.*fn)();
-        }));
+        });
     };
 
     add ("arrange.zoomIn", "Zoom In", &ArrangementView::zoomIn);
@@ -142,36 +133,18 @@ void MainComponent::registerArrangementZoomCommands()
 
 void MainComponent::registerEscapeCommand()
 {
-    struct EscapeCommand : Command
+    // Esc (PRD §16.1): closes popovers and menus, cancels a drag, clears the selection.
+    app.commands.add ({ "ui.escape", "Clear Selection" }, [this]
     {
-        explicit EscapeCommand (MainComponent& o) : Command ("ui.escape", "Clear Selection"), owner (o) {}
-
-        /** Esc (PRD §16.1): closes popovers and menus, cancels a drag, clears the selection. */
-        void execute (const juce::var&) override
-        {
-            juce::PopupMenu::dismissAllActiveMenus();
-            owner.arrangement.cancelDrag();
-            owner.app.commands.invoke ("edit.deselectAll");
-        }
-
-        MainComponent& owner;
-    };
-
-    app.commands.add (std::make_unique<EscapeCommand> (*this));
+        juce::PopupMenu::dismissAllActiveMenus();
+        arrangement.cancelDrag();
+        app.commands.invoke ("edit.deselectAll");
+    });
 }
 
 void MainComponent::registerDeveloperOverlayCommand()
 {
-    struct ToggleOverlayCommand : Command
-    {
-        explicit ToggleOverlayCommand (MainComponent& o) : Command ("dev.toggleOverlay", "Developer Overlay"), owner (o) {}
-
-        void execute (const juce::var&) override   { owner.toggleDeveloperOverlay(); }
-
-        MainComponent& owner;
-    };
-
-    app.commands.add (std::make_unique<ToggleOverlayCommand> (*this));
+    app.commands.add ({ "dev.toggleOverlay", "Developer Overlay" }, [this] { toggleDeveloperOverlay(); });
 }
 
 void MainComponent::toggleDeveloperOverlay()
@@ -390,15 +363,6 @@ bool MainComponent::ShortcutListener::keyPressed (const juce::KeyPress& key, juc
 
 void MainComponent::registerPianoRollCommands()
 {
-    struct PianoRollCommand : Command
-    {
-        PianoRollCommand (const char* id, const char* name, std::function<void (const juce::var&)> fn)
-            : Command (id, name), action (std::move (fn)) {}
-
-        void execute (const juce::var& args) override   { action (args); }
-        std::function<void (const juce::var&)> action;
-    };
-
     // The Piano Roll's keys act on the clip it has open.
     auto withClip = [this] (const char* commandId, std::function<juce::var (const juce::String&, const juce::var&)> makeArgs)
     {
@@ -409,19 +373,19 @@ void MainComponent::registerPianoRollCommands()
         };
     };
 
-    app.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.quantize", "Quantize",
-        withClip ("note.quantize", [] (const juce::String& id, const juce::var&) { return noteQuantizeArgs (id, "1/16"); })));
+    app.commands.add ({ "pianoRoll.quantize", "Quantize" },
+        withClip ("note.quantize", [] (const juce::String& id, const juce::var&) { return noteQuantizeArgs (id, "1/16"); }));
 
-    app.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.transpose", "Transpose",
+    app.commands.add ({ "pianoRoll.transpose", "Transpose" },
         withClip ("note.transposeSelected", [] (const juce::String& id, const juce::var& args)
         {
             auto a = clipArgs (id);
             a.getDynamicObject()->setProperty ("argument", args["argument"]);
             return a;
-        })));
+        }));
 
-    app.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.selectAll", "Select All Notes",
-        withClip ("note.selectAll", [] (const juce::String& id, const juce::var&) { return clipArgs (id); })));
+    app.commands.add ({ "pianoRoll.selectAll", "Select All Notes" },
+        withClip ("note.selectAll", [] (const juce::String& id, const juce::var&) { return clipArgs (id); }));
 }
 
 } // namespace resamper
