@@ -1,6 +1,7 @@
 #include "ApplicationCommandTable.h"
 
 #include <array>
+#include <vector>
 
 namespace resamper
 {
@@ -13,70 +14,120 @@ namespace
     constexpr int alt = MK::altModifier;
     using KP = juce::KeyPress;
 
-    const std::array table
+    /** One menu: its title and its Commands, in order. */
+    struct CommandMenu
     {
-        ApplicationCommandEntry { 0x1001, "project.new",             "File" },
-        ApplicationCommandEntry { 0x1002, "project.open",            "File" },
-        ApplicationCommandEntry { 0x1003, "project.save",            "File" },
-        ApplicationCommandEntry { 0x1004, "project.saveAs",          "File" },
-        ApplicationCommandEntry { 0x5005, "project.autosave",        "File" },
-        ApplicationCommandEntry { 0x5006, "project.recover",         "File" },
-        ApplicationCommandEntry { 0x5007, "project.saveTemplate",    "File" },
-        ApplicationCommandEntry { 0x5008, "project.newFromTemplate", "File" },
-        ApplicationCommandEntry { 0x5004, "file.exportMix",          "File" },
-
-        ApplicationCommandEntry { 0x2001, "edit.undo",               "Edit" },
-        ApplicationCommandEntry { 0x2002, "edit.redo",               "Edit" },
-        ApplicationCommandEntry { 0x200a, "clip.duplicate",          "Edit" },
-        ApplicationCommandEntry { 0x2006, "clip.split",              "Edit" },
-        ApplicationCommandEntry { 0x200b, "clip.consolidate",        "Edit" },
-        ApplicationCommandEntry { 0x2009, "edit.delete",             "Edit" },
-        ApplicationCommandEntry { 0x200c, "ui.escape",               "Edit" },
-        ApplicationCommandEntry { 0x2004, "track.remove",            "Edit" },
-        ApplicationCommandEntry { 0x5001, "track.freeze",            "Edit" },
-        ApplicationCommandEntry { 0x5002, "track.unfreeze",          "Edit" },
-        ApplicationCommandEntry { 0x5003, "track.bounce",            "Edit" },
-
-        ApplicationCommandEntry { 0x2003, "track.add",               "Create" },
-        ApplicationCommandEntry { 0x2007, "track.addMidi",           "Create" },
-        ApplicationCommandEntry { 0x6002, "mixer.addReturn",         "Create" },
-        ApplicationCommandEntry { 0x6005, "mixer.addBus",            "Create" },
-        ApplicationCommandEntry { 0x2005, "clip.add",                "Create" },
-        ApplicationCommandEntry { 0x2008, "clip.addMidi",            "Create" },
-
-        ApplicationCommandEntry { 0x7001, "view.session",            "View" },
-        ApplicationCommandEntry { 0x7002, "view.arrange",            "View" },
-        ApplicationCommandEntry { 0x7003, "view.mixer",              "View" },
-        ApplicationCommandEntry { 0x7004, "view.pianoRoll",          "View" },
-        ApplicationCommandEntry { 0x7005, "view.editor",             "View" },
-        ApplicationCommandEntry { 0x7006, "view.toggleSessionArrange", "View" },
-        ApplicationCommandEntry { 0x7007, "view.toggleBrowser",      "View" },
-        ApplicationCommandEntry { 0x7008, "view.toggleDetail",       "View" },
-        ApplicationCommandEntry { 0x700a, "arrange.zoomIn",          "View" },
-        ApplicationCommandEntry { 0x700b, "arrange.zoomOut",         "View" },
-        ApplicationCommandEntry { 0x700c, "arrange.zoomToSelection", "View" },
-        ApplicationCommandEntry { 0x700d, "arrange.zoomToSong",      "View" },
-        ApplicationCommandEntry { 0x5009, "theme.use",               "View" },
-        ApplicationCommandEntry { 0x4001, "dev.reloadLayout",        "View" },
-        ApplicationCommandEntry { 0x4002, "dev.reloadTheme",         "View" },
-        ApplicationCommandEntry { 0x4003, "dev.toggleOverlay",       "View" },
-
-        ApplicationCommandEntry { 0x3001, "transport.togglePlay",    "Options" },
-        ApplicationCommandEntry { 0x3009, "transport.playFromSelection", "Options" },
-        ApplicationCommandEntry { 0x3002, "transport.play",          "Options" },
-        ApplicationCommandEntry { 0x3003, "transport.stop",          "Options" },
-        ApplicationCommandEntry { 0x3004, "transport.returnToStart", "Options" },
-        ApplicationCommandEntry { 0x3005, "transport.record",        "Options" },
-        ApplicationCommandEntry { 0x3006, "transport.loopSelection", "Options" },
-        ApplicationCommandEntry { 0x300a, "transport.toggleLoop",    "Options" },
-        ApplicationCommandEntry { 0x3007, "transport.toggleMetronome", "Options" },
-        ApplicationCommandEntry { 0x300b, "transport.toggleCountIn", "Options" },
-        ApplicationCommandEntry { 0x3008, "transport.tapTempo",      "Options" },
-        ApplicationCommandEntry { 0x7009, "view.toggleFollow",       "Options" },
-        ApplicationCommandEntry { 0x6001, "plugin.scan",             "Options" },
-        ApplicationCommandEntry { 0x6003, "session.stopAll",         "Options" },
-        ApplicationCommandEntry { 0x6004, "session.recordToArrangement", "Options" },
+        const char* name;
+        std::span<const char* const> commandIds;
     };
+
+    const char* const fileMenu[]
+    {
+        "project.new",
+        "project.open",
+        "project.save",
+        "project.saveAs",
+        "project.autosave",
+        "project.recover",
+        "project.saveTemplate",
+        "project.newFromTemplate",
+        "file.exportMix",
+    };
+
+    const char* const editMenu[]
+    {
+        "edit.undo",
+        "edit.redo",
+        "clip.duplicate",
+        "clip.split",
+        "clip.consolidate",
+        "edit.delete",
+        "ui.escape",
+        "track.remove",
+        "track.freeze",
+        "track.unfreeze",
+        "track.bounce",
+    };
+
+    const char* const createMenu[]
+    {
+        "track.add",
+        "track.addMidi",
+        "mixer.addReturn",
+        "mixer.addBus",
+        "clip.add",
+        "clip.addMidi",
+    };
+
+    const char* const viewMenu[]
+    {
+        "view.session",
+        "view.arrange",
+        "view.mixer",
+        "view.pianoRoll",
+        "view.editor",
+        "view.toggleSessionArrange",
+        "view.toggleBrowser",
+        "view.toggleDetail",
+        "arrange.zoomIn",
+        "arrange.zoomOut",
+        "arrange.zoomToSelection",
+        "arrange.zoomToSong",
+        "theme.use",
+        "dev.reloadLayout",
+        "dev.reloadTheme",
+        "dev.toggleOverlay",
+    };
+
+    const char* const optionsMenu[]
+    {
+        "transport.togglePlay",
+        "transport.playFromSelection",
+        "transport.play",
+        "transport.stop",
+        "transport.returnToStart",
+        "transport.record",
+        "transport.loopSelection",
+        "transport.toggleLoop",
+        "transport.toggleMetronome",
+        "transport.toggleCountIn",
+        "transport.tapTempo",
+        "view.toggleFollow",
+        "plugin.scan",
+        "session.stopAll",
+        "session.recordToArrangement",
+    };
+
+    /** The menus and their items, in order (PRD §6.1). The ApplicationCommand
+        IDs are derived from this order; nothing stores them. */
+    const std::array menus
+    {
+        CommandMenu { "File", fileMenu },
+        CommandMenu { "Edit", editMenu },
+        CommandMenu { "Create", createMenu },
+        CommandMenu { "View", viewMenu },
+        CommandMenu { "Options", optionsMenu },
+        CommandMenu { "Help", {} },
+    };
+
+    /** Above JUCE's StandardApplicationCommandIDs, so no menu item shares an ID with them. */
+    constexpr juce::CommandID firstApplicationCommandID = 0x10000;
+
+    const std::vector<ApplicationCommandEntry>& table()
+    {
+        static const auto entries = []
+        {
+            std::vector<ApplicationCommandEntry> result;
+
+            for (auto& menu : menus)
+                for (auto* commandId : menu.commandIds)
+                    result.push_back ({ firstApplicationCommandID + (juce::CommandID) result.size(), commandId, menu.name });
+
+            return result;
+        }();
+
+        return entries;
+    }
 
     constexpr int timeline = arrangeView | sessionView;
 
@@ -174,13 +225,22 @@ namespace
     }
 }
 
-std::span<const ApplicationCommandEntry> getApplicationCommandTable()   { return table; }
+std::span<const ApplicationCommandEntry> getApplicationCommandTable()   { return table(); }
 std::span<const KeyBinding> getKeyBindings()                            { return bindings; }
 std::span<const PendingShortcut> getPendingShortcuts()                  { return pending; }
 
 std::span<const char* const> getMenuNames()
 {
-    static const char* const names[] = { "File", "Edit", "Create", "View", "Options", "Help" };
+    static const auto names = []
+    {
+        std::array<const char*, menus.size()> result {};
+
+        for (size_t i = 0; i < menus.size(); ++i)
+            result[i] = menus[i].name;
+
+        return result;
+    }();
+
     return names;
 }
 
@@ -188,8 +248,8 @@ juce::PopupMenu createCommandMenu (juce::ApplicationCommandManager& manager, con
 {
     juce::PopupMenu menu;
 
-    for (auto& entry : table)
-        if (menuName == entry.category && manager.getCommandForID (entry.applicationCommandID) != nullptr)
+    for (auto& entry : table())
+        if (menuName == entry.menu && manager.getCommandForID (entry.applicationCommandID) != nullptr)
             menu.addCommandItem (&manager, entry.applicationCommandID);
 
     if (menuName == "Help")
@@ -201,7 +261,7 @@ juce::PopupMenu createCommandMenu (juce::ApplicationCommandManager& manager, con
 
 const ApplicationCommandEntry* findApplicationCommand (juce::CommandID id)
 {
-    for (auto& e : table)
+    for (auto& e : table())
         if (e.applicationCommandID == id)
             return &e;
 
