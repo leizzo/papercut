@@ -145,17 +145,20 @@ One parallel lane of Devices inside a Rack, with its own volume, enable and solo
 _Avoid_: chain (unqualified)
 
 **Pad**:
-One cell of a Drum Rack, played by one MIDI note. Each Pad is a Rack Chain.
+One cell of a Drum Rack, played by one MIDI note. Each Pad is a Rack Chain. A Drum Rack has 128 Pads in 8 banks of 16.
 
 **Macro**:
-One of a Rack's 16 knobs. It moves any number of parameters inside the Rack at once.
+One of a Rack's knobs; a Rack has 1 to 16, and the user adds and removes them. It moves any number of parameters inside the Rack at once.
 
 **Modulator**:
-A source that moves Device parameters continuously: LFO, Envelope, Env Follower, Steps, Random or Macro. It sits in a Native Device's Mods drawer and is routed to parameters with a depth.
+A source that moves Device parameters continuously: LFO, Envelope, Env Follower, Steps, Random or Macro. It sits in a Native Device's Mods drawer and is routed with a depth to any parameter on the same track: other Devices, Plug-in parameters, volume, pan, sends.
 _Avoid_: mod (unqualified), automation, Shaper
 
 **Simpler**:
 The Native Device that plays one sample in one of three modes: **Classic** (loops while held), **1-Shot** (plays through once) or **Slice** (cuts the sample, one slice per note).
+
+**Utility**:
+A transparent Native Device with gain and pan. It is where a track's Modulators live when the track has no other Native Device.
 
 **Sampler**:
 The Native Device that plays many samples, each in a Zone.
@@ -228,7 +231,7 @@ The global switch that lets moving a control write automation.
 _Avoid_: automation record
 
 **Automation Mode**:
-How an Automation Lane behaves while playing with Automation Arm on: **Read**, **Touch** (writes while held, then returns), **Latch** (writes from the first touch until stop) or **Write** (overwrites the lane from play start, touched or not). Touch is the default.
+How an Automation Lane behaves while playing with Automation Arm on: **Read**, **Touch** (writes while held, then returns), **Latch** (writes from the first touch until stop) or **Write** (overwrites the lane from play start, touched or not; there is no separate per-parameter arm). Touch is the default.
 
 **Overridden**:
 The state of an Automation Lane whose parameter was moved by hand without Automation Arm. It stops following its curve until **Re-enable** puts every Overridden lane back to Read.

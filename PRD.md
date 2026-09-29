@@ -21,7 +21,7 @@
 
 | Version | Changes |
 |---|---|
-| **1.3** | Glossary alignment: one tap vocabulary per track (**Input · Pre-FX · Pre-Fader · Post-Fader**); sidechain taps renamed from Pre-FX / Post-FX / Post-Mixer to Input / Pre-FX / Post-Fader (§4.1, §20). §20 root is the **Edit** (was `Project`); rack chains are `RackChain`. |
+| **1.3** | Glossary alignment: one tap vocabulary per track (**Input · Pre-FX · Pre-Fader · Post-Fader**); sidechain taps renamed from Pre-FX / Post-FX / Post-Mixer to Input / Pre-FX / Post-Fader (§4.1, §20). §20 root is the **Edit** (was `Project`); rack chains are `RackChain`. Decisions of 2026-09-29: native device **v2 replaces v1**; native mixer inserts open the floating Expanded editor; `Mod+G` by selection, `Mod+E` = Split / `Mod+Alt+E` = Editor ↔ Piano Roll; macros 1–16 add/remove, 128 pads in 8 banks; crossfader `A | — | B`; Listen → Cue; Bounce vs Flatten; Velocity tab = velocity lane; autosave 30 s to a recovery copy; Write = lanes in Write mode; **Modulators** (Mods Drawer) replace the track Shaper and target any parameter on the track, with a new **Utility** device (§20). Spectral view added to non-goals. |
 | **1.2** | Feature sections already covered by tickets (§5–§14, §15.8, §16–§19, §21) moved verbatim into their issues; headings remain with pointers. Still specified here: §1–§4, §9.2.1a (native device v2), §9.8 (Simpler & Sampler), §15.1–§15.7, §20, §22–§24. Ambiguities found while matching tickets listed in §23.3. M5 now names MIDI Effect racks. |
 | **1.1** | Native devices vs plug-ins (§9.2) and floating **plug-in windows that open on insert** (§9.6). **Sidechain inputs** (§9.7) with source picker and indicators. **Iconography** (§15.8). Sidechain key path in the signal flow (§4.1). Detail view grows for expanded device panels (§6.3). New tokens `state-sidechain`, `bg-hover`, `accent-hover`, `focus-ring`. Accessibility, performance, data model, edge states, release plan (new **M1.1 — Devices & Plug-ins** phase after v0.1.0; sidechain in M2) and screen inventory updated for plug-ins and sidechain. Mixer redesigned to #16: FX / PRE / POST send taps, returns A–D (`return-c`, `return-d` tokens) in a horizontally scrolling strips area with pinned Master, send-section paging. Open items listed in §23.2. |
 | **1.0** | Initial PRD: shell, Session, Arrangement, racks, Mixer (inserts, sends, returns, master), folders & buses, automation, piano roll, audio editor, design system. Open questions resolved in #16. |
@@ -93,6 +93,7 @@ The product principle: **sound design lives in racks, mixing lives in the mixer*
 - Collaboration / cloud project sync.
 - Light theme (tokens are theme-ready, but only dark ships in v1).
 - Mobile / tablet layouts.
+- Spectral view / spectral editing in the Audio Editor (the design's Spectral chip is kept for a later version).
 - Third-party plugin *hosting UI* design beyond the insert slot and device card wrapper (plugin windows are native).
 
 ### 2.3 Success metrics
@@ -282,6 +283,8 @@ The mixer **MUST NOT** display rack devices as inserts. The **Track chain** row 
 
 #### 9.2.1a Native device contract v2 **[Designed — Components › Native devices · v2]**
 
+**v2 replaces the v1 card** (§9.2.1, #66) for every native device; the v1 `Device/*` components are deprecated (decided 2026-09-29).
+
 Based on [research into Ableton Live and Bitwig Studio](docs/research/native-devices-ableton-bitwig.md): Ableton's consistent device surface + Bitwig's in-device modulation and graphs you can grab.
 
 | Rule | Detail |
@@ -291,7 +294,7 @@ Based on [research into Ableton Live and Bitwig Studio](docs/research/native-dev
 | **Zones** | `Input` → `Display` → `Controls` → `Output`. **Mix and Out are always the last zone**, separated by a divider. |
 | **Three sizes** | **Folded** (`Device/Folded`, 28 px strip, vertical name, Mods indicator) · **Compact** (164 px, default, never scrolls) · **Expanded** (docked or floating large editor, via the header's expand button). |
 | **Parameter state** | `Knob/Automated` (red dot) · `Knob/Modulated` (blue depth ring = mono, green = per-voice; cyan dot = live value) · `Knob/Macro` (macro badge). Shift = fine, double-click / Delete = reset, click the value to type. |
-| **Modulators on the device** | `Mods Drawer` attaches under the card: slots (LFO, Envelope, Env Follower, Steps, Random, Macro). **Routing:** click a slot's arrow (it turns blue), then drag on any parameter to set depth. Graphs show the modulation range. |
+| **Modulators on the device** | `Mods Drawer` attaches under the card: slots (LFO, Envelope, Env Follower, Steps, Random, Macro). **Routing:** click a slot's arrow (it turns blue), then drag on any parameter **of the same track** (other devices, plug-in parameters, volume, pan, sends) to set depth. Graphs show the modulation range. |
 | **Nested slots [Proposed]** | Compressor **Sidechain FX**, Reverb / Delay **Wet FX**, Delay **FB FX**, instrument **Post FX**, shown as a "+ FX" pill that opens a mini chain. |
 
 v2 devices: `Device/EQ Eight v2` (pre/post spectrum, Q-width shading, band strip 1–8 with type glyphs and on/off, Adaptive Q, audition, St / L-R / M-S, Scale + Out) · `Device/Compressor v2` (IN/GR meters, Transfer / Activity views, draggable threshold, Ratio / Attack / Release / Knee, Lookahead 0 / 1 / 10 ms, Peak / RMS / Expand, Makeup Auto / Mix / Out) · `Device/Saturator v2` (waveshape display with modulation range, type, modulated Drive, Color, Soft clip, Mix / Out) · `Device/Simpler v2` (waveform with Start / Loop / End flags and playhead, Classic / 1-Shot / Slice, drawable amp envelope, Vol / Pitch). Glue Compressor and Operator follow in the next pass.
@@ -592,7 +595,7 @@ Font families are tokens: `font-ui` = Inter, `font-mono` = IBM Plex Mono.
 | Arrangement | `TrackHeader`, `FolderHeader`, `AutomationLaneHeader`, `Clip`, `TreeIndent`, `Breakpoint`, `Breakpoint/Selected`, `ValueTag`, `LoopTag`, `Playhead` |
 | Devices & panels | `DeviceCard/Native`, `DeviceCard/Plugin`, `PluginWindow` (vendor UI slot), `RackBar`, `ChainRow`, `ChainRow/Selected`, `Pad`, `Pad/Selected`, `Pad/Empty`, `InspectorSection` (slot), `Popover` (slot), `Toolbar` (slots) |
 | Native devices · v2 | `DeviceHeader`, `Device/Folded`, `Mods Drawer`, `Knob/Automated`, `Knob/Modulated`, `Knob/Macro`, `Device/EQ Eight v2`, `Device/Compressor v2`, `Device/Saturator v2`, `Device/Simpler v2`, `Device/Sampler v2` (§9.2.1a, §9.8) |
-| Native devices | `Device/EQ Eight`, `Device/Compressor`, `Device/Compressor · Sidechain`, `Device/Glue Compressor`, `Device/Saturator`, `Device/Simpler`, `Device/Operator` (all built on the `DeviceCard/Native` contract, §9.2.1; 164 px high, 208 with the sidechain panel) |
+| Native devices (v1, deprecated) | `Device/EQ Eight`, `Device/Compressor`, `Device/Compressor · Sidechain`, `Device/Glue Compressor`, `Device/Saturator`, `Device/Simpler`, `Device/Operator` (all built on the `DeviceCard/Native` contract, §9.2.1; 164 px high, 208 with the sidechain panel) |
 | Sidechain | `Sidechain/Badge In`, `Sidechain/Badge Out`, `Sidechain/Insert Tag`, `Sidechain/Source Select`, `Sidechain/Device Toggle`, `Sidechain/Picker Row · Selected · Disabled`, `Sidechain/Panel`, `Sidechain/Plugin Input` |
 
 ### 15.5 Interaction states (all interactive components)
@@ -731,9 +734,10 @@ Send {
 Device  = NativeDevice | Plugin | Rack
 
 NativeDevice {
-  id, kind: "eq8" | "compressor" | "glue" | "gate" | "echo" | "reverb" | "saturator" | "autoFilter" | "simpler" | "operator" | …,
+  id, kind: "eq8" | "compressor" | "glue" | "gate" | "echo" | "reverb" | "saturator" | "autoFilter" | "simpler" | "operator" | "utility" | …,
   enabled: boolean, collapsed: boolean, params: Record<string, number>,
   sidechain?: Sidechain                    // only for detector devices
+  modulators: Modulator[]                  // Mods Drawer; targets any parameter on the same track
 }
 
 Plugin {
@@ -748,7 +752,8 @@ Plugin {
 }
 Rack {
   type: "instrument" | "drum" | "audioEffect" | "midiEffect",
-  chains: RackChain[], macros: Macro[16], selectedChainId
+  chains: RackChain[], macros: Macro[],   // 1..16, user adds / removes; a new rack has 4
+  selectedChainId
 }
 RackChain { id, name, volumeDb, enabled, solo, devices: Device[], padNote?: number }
 
@@ -771,6 +776,10 @@ ClipEnvelope { target: ParamRef, mode: "absolute" | "modulation",
 
 AutomationLane { target: ParamRef, visible, state: "active" | "overridden",
                  mode: "read" | "touch" | "latch" | "write", points: Breakpoint[] }
+
+Modulator { id, kind: "lfo" | "envelope" | "envFollower" | "steps" | "random" | "macro",
+            params: Record<string, number>, shape?: Breakpoint[],
+            routes: { target: ParamRef, depth: number /* -1..1 */ }[] }
 
 Breakpoint { time, value, curve: "linear" | "hold" | "bezier", tension?: number }
 ```
@@ -819,12 +828,13 @@ Answered in #16 (2026-09-28).
 |---|---|---|
 | 1 | #16 decision 1: compact send rows show **FX / PRE / POST** on *Resamper — Mixer* and in the `Send Row` component (Pads → A shows Pre-FX active). | ✅ Designed (v1.1) |
 | 2 | #16 decision 2: returns **A–D** (C Plate, D Parallel) in a horizontally scrolling strips area with pinned Master, edge tab and scrollbar; send sections page `A–B` → `C–D`. | ✅ Designed (v1.1) |
-| 3 | Clicking a **native** mixer insert opens an inline native editor popover (proposed in §9.2.3). Alternative: open native devices in a window like plug-ins. | Needs decision |
+| 3 | Clicking a **native** mixer insert opens the device's floating **Expanded** editor (v2 contract, §9.2.1a), with the same window rules as plug-in windows. No inline popover. | ✅ Resolved (2026-09-29) |
 | 4 | Sidechain links in the **routing sidebar** (*Mixer · Folders & Buses*) are specified (§9.7.5) but not drawn. | Design update needed |
 | 5 | Should one sidechain input accept **multiple summed sources**, or stay one source per input (current spec)? | Needs decision |
-| 6 | Plug-in window behaviour on **view switch** when unpinned: hide or keep visible (current proposal: hide when track deselected, preference-controlled). | Needs decision |
+| 6 | Plug-in window behaviour on **view switch** when unpinned. Resolved from design (*Patterns & Handoff › Window rules*): a view switch does not hide a window by itself; unpinned windows hide when their track is deselected (preference); pinned windows stay on top. | ✅ Resolved (2026-09-29) |
 | 7 | Screens still use hand-drawn elements. They should be rebuilt from DS component instances so component changes propagate. | Planned |
 | 8 | Migrate the 13 phosphor (legacy) icons to lucide equivalents (§15.8). | Planned |
+| 9 | Draw the Drum Rack **bank strip**, the rack macro **`+` / `−`** buttons and page dots (§23.3 item 12), and the Session mini mixer's crossfader **`A | — | B`** control (§23.3 item 11). | Design update needed |
 
 ### 23.3 Ambiguities (v1.2)
 
@@ -832,24 +842,24 @@ Found while matching the PRD against the tickets (2026-09-29). Each needs a deci
 
 | # | Item | Where |
 |---|---|---|
-| 1 | `Mod+E` means **Split** (§8.2, §17) and also **toggle Editor / Piano Roll** (§5.2, #46). Pick one. | #19, #24, #30, #46 |
-| 2 | `Mod+G` groups into a **rack** (§9.4) and creates a **folder** (§11.2). §17 says "folder or rack" but not which context decides. | #37, #54 |
+| 1 | ✅ `Mod+E` = **Split**; **toggle Editor / Piano Roll** moves to `Mod+Alt+E`, matching `Mod+Alt+M` for the Mixer (2026-09-29). | #19, #24, #30, #46 |
+| 2 | ✅ `Mod+G`: the selection decides. Selected tracks → **Folder** (default Folder + Bus); selected devices → **Rack** (§9.4 type rule). `Mod+Shift+G` ungroups by the same rule (2026-09-29). | #30, #37, #54 |
 | 3 | §2.2 non-goal says "plugin windows are native", yet §9.6 specifies a host-drawn window chrome. Reword the non-goal. | §2.2, #68 |
 | 4 | Sidechain panel sits on the **right** of the card, 200 wide (§9.7.2), but §15.4 says native cards are "208 with the sidechain panel" (height). Which? | #72, §15.4 |
 | 5 | Mixer section chips include **EQ** and **Comments** (§10.1), but the strip anatomy (§10.2) has no EQ or Comments section. | #26, #27 |
-| 6 | Write mode overwrites "armed parameters" (§12.6), but no per-parameter arm is defined. | #43 |
-| 7 | MIDI Clip Envelopes list **Velocity** as an envelope tab (§13.3); velocity is note data. Is it the velocity lane in a tab, or a velocity envelope? | #49 |
-| 8 | Native device card v1 (§9.2.1, #66, #67) vs contract v2 (§9.2.1a): does v2 replace v1? v2, §9.8 Simpler & Sampler and the other native devices (Echo, Reverb, Auto Filter, Gate, Glue, Ducker, Operator) have **no tickets**. | §9.2.1a, §9.8, #67, #71 |
+| 6 | ✅ (2026-09-29) No per-parameter arm. With Automation Arm on, **Write** overwrites every Automation Lane of the track whose mode is Write, from play start, touched or not; lanes in Read / Touch / Latch are untouched. "Armed parameters" in §12.6 means "lanes in Write mode". | #43 |
+| 7 | ✅ (2026-09-29) The **Velocity** tab in MIDI Clip Envelopes is the Piano Roll's velocity lane (one bar per note, drag = the note's own velocity). It is not a Clip Envelope: no Breakpoints, no Linked / Unlinked or Absolute / Modulation. It stays first in the tab list and can't be removed. | #49 |
+| 8 | ✅ **v2 replaces v1** (2026-09-29): #66 carries the v2 contract, #67 EQ Eight / Compressor v2; Saturator (#84), Simpler (#85), Sampler (#86) v2 and the Mods Drawer (#83) got tickets. Echo, Reverb, Auto Filter, Gate, Glue, Ducker and Operator still have **no tickets** (not designed in v2 yet). | §9.2.1a, §9.8, #66, #67 |
 | 9 | Tokens added in v1.1+ (`bg-hover`, `accent-hover`, `focus-ring`, `scrim`, `font-ui` / `font-mono`, `opacity-disabled`, elevation L3) have no ticket; #17 is closed. | §15 |
 | 10 | `Marker` is in the data model (§20) but no marker UI is specified. | §20 |
-| 11 | Session crossfader: where tracks are assigned to A / B is not specified. | #56 |
-| 12 | Drum Rack shows a 4 × 4 pad grid: how pads beyond 16 are reached is not specified. Racks allow 16 macros but show 2 × 2: how the rest are revealed is not specified. | #54, #55 |
-| 13 | Editor toolbar: what **Pencil**, **Zoom** and the **Spectral** chip do is not specified. | #50 |
-| 14 | Folder inspector: difference between **Bounce folder** and **Flatten to audio** is not defined. | #40 |
-| 15 | Sidechain **Listen** goes "to Cue / the master": which one, and when? Depends on the Cue output (#62). | #72, #62 |
+| 11 | ✅ (2026-09-29) Crossfader assignment is a small **`A | — | B`** segmented control under each track's pan in the Session **mini mixer** row (not in the Mixer strip). Default **—** (not affected by the crossfader); changing it is undoable. Design update needed (§23.2 item 9). | #56 |
+| 12 | ✅ (2026-09-29) **Pads:** 128 in 8 banks of 16; a vertical bank strip beside the 4 × 4 grid picks the bank, marks banks with filled pads and flashes a bank whose pad plays. **Macros:** 1–16, added / removed with `+` / `−` in the macro header (or right-click › Delete macro); a new rack has 4; deleting a mapped macro removes its mappings and leaves the parameters where they are (one undo step); the 2 × 2 grid pages by 4 with dots once there are more than 4. Design update needed (§23.2 item 9). | #54, #55 |
+| 13 | ✅ (2026-09-29) Audio Editor toolbar: **Pencil** draws Breakpoints on the visible Clip Envelope (Clip Gain by default); **Zoom** click = in, `Alt`-click = out, drag = zoom to the dragged range; **Spectral** is out of v1 (§2.2), the chip is hidden. | #50 |
+| 14 | ✅ (2026-09-29) Both render the folder's sum (a Bus: after its own chain and fader; Folder only: the children's sum). **Bounce folder** is non-destructive: the render goes to a new Audio Track right below the folder, and the folder stays but is muted. **Flatten to audio** replaces the folder and all its children with one Audio Track holding the render, keeping the folder's name, colour and Output. Each is one undo step and ends with a toast. | #40 |
+| 15 | ✅ (2026-09-29) Sidechain **Listen** always plays the conditioned key on the **Cue** output (#62); with no Cue output chosen that falls back to the main output. It adds the key on top of the mix and never mutes the main output (not a solo). | #72, #62 |
 | 16 | Success metrics (§2.3) such as "% of sessions that use automation" need telemetry; no ticket and no privacy decision. | §2.3 |
-| 17 | Autosave: PRD says every 2 min + on focus loss; code saves every 30 s. | #60 |
-| 18 | Open decisions still pending: §23.2 items 3, 5, 6. | #77 |
+| 17 | ✅ (2026-09-29) Autosave every **30 s** and on focus loss, to a separate **recovery copy**, never over the user's project file; the next open offers to restore it. | #60 |
+| 18 | Open decisions still pending: §23.2 item 5. | #77 |
 
 ---
 
