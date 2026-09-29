@@ -30,6 +30,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
 
     te::Edit& edit() const          { return projectManager.getEdit(); }
     juce::UndoManager& undoManager() { return edit().getUndoManager(); }
+    EngineUndo& undo()              { return projectManager.getUndo(); }
 
     /** App-specific, on the track's ValueTree. Absent means audio. */
     static const juce::Identifier trackKindProperty;
@@ -95,7 +96,6 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     }
 
     //==============================================================================
-    /** Starts an Engine Undo step. Every model mutation goes through here. */
     /** Changes a track's volume/pan through the engine's parameter, which records
         the change in the Edit's UndoManager (consecutive writes within one undo
         step coalesce). Returns whether the value changed. */
@@ -116,7 +116,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
 
         // An undo step that ends up empty records nothing.
         const auto before = get (*plugin);
-        projectManager.getUndo().beginGestureStep (stepName, stepName + ":" + trackId, continues);
+        undo().beginGestureStep (stepName, stepName + ":" + trackId, continues);
         set (*plugin);
         return get (*plugin) != before;
     }
@@ -542,7 +542,7 @@ bool ApplicationModel::setTrackColour (const juce::String& trackId, int colourIn
     if (track == nullptr || ! juce::isPositiveAndBelow (colourIndex, trackPaletteSize) || impl->colourOf (*track) == colourIndex)
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Set Track Colour");
+    impl->undo().beginStep ("Set Track Colour");
     track->state.setProperty (Impl::trackColourProperty, colourIndex, &impl->undoManager());
     return true;
 }
@@ -550,7 +550,7 @@ bool ApplicationModel::setTrackColour (const juce::String& trackId, int colourIn
 void ApplicationModel::addAudioTrack()
 {
     auto& edit = impl->edit();
-    impl->projectManager.getUndo().beginStep ("Add Track");
+    impl->undo().beginStep ("Add Track");
 
     if (auto track = edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr))
         impl->giveNextColour (*track);
@@ -559,7 +559,7 @@ void ApplicationModel::addAudioTrack()
 void ApplicationModel::addMidiTrack()
 {
     auto& edit = impl->edit();
-    impl->projectManager.getUndo().beginStep ("Add MIDI Track");
+    impl->undo().beginStep ("Add MIDI Track");
     auto track = edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr);
 
     if (track == nullptr)
@@ -584,7 +584,7 @@ bool ApplicationModel::removeTrack()
     if (track == nullptr)
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Remove Track");
+    impl->undo().beginStep ("Remove Track");
     impl->edit().deleteTrack (track);
     return true;
 }
@@ -703,7 +703,7 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     if (track != nullptr && impl->isMidiTrack (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
-    impl->projectManager.getUndo().beginStep ("Insert Clip");
+    impl->undo().beginStep ("Insert Clip");
 
     if (track == nullptr)
         for (auto* t : te::getAudioTracks (edit))
@@ -741,7 +741,7 @@ juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const 
     if (! te::AudioFile (impl->edit().engine, file).isValid())
         return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
 
-    impl->projectManager.getUndo().beginStep ("Insert Clip");
+    impl->undo().beginStep ("Insert Clip");
     return impl->placeAudioClip (*track, file, te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
 }
 
@@ -759,7 +759,7 @@ juce::Result ApplicationModel::insertMidiClip()
     if (track == nullptr)
         return juce::Result::fail ("Select a MIDI track");
 
-    impl->projectManager.getUndo().beginStep ("Insert MIDI Clip");
+    impl->undo().beginStep ("Insert MIDI Clip");
 
     const auto start = te::TimePosition::fromSeconds (std::max (0.0, getTransportPositionSeconds()));
     auto clip = track->insertMIDIClip ("MIDI Clip", { start, impl->oneBarAfter (start) }, nullptr);
@@ -789,7 +789,7 @@ bool ApplicationModel::moveClip (const juce::String& clipId, double startSeconds
 
     return impl->keepingClipSelection ([&]
     {
-        impl->projectManager.getUndo().beginStep ("Move Clip");
+        impl->undo().beginStep ("Move Clip");
 
         if (changesTrack)
             clip->moveTo (*track);
@@ -819,7 +819,7 @@ bool ApplicationModel::resizeClip (const juce::String& clipId, double startSecon
     if (end <= start || (start == pos.getStart() && end == pos.getEnd()))
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Resize Clip");
+    impl->undo().beginStep ("Resize Clip");
     clip->setPosition ({ { start, end }, pos.getOffset() + (start - pos.getStart()) });
     return true;
 }
@@ -838,7 +838,7 @@ bool ApplicationModel::splitClip (const juce::String& clipId, double timeSeconds
 
     return impl->keepingClipSelection ([&]
     {
-        impl->projectManager.getUndo().beginStep ("Split Clip");
+        impl->undo().beginStep ("Split Clip");
         auto* clip = impl->findClip (clipId);
         return clip->getClipTrack()->splitClip (*clip, te::TimePosition::fromSeconds (timeSeconds)) != nullptr;
     });
@@ -868,7 +868,7 @@ juce::Result ApplicationModel::copyClip (const juce::String& clipId, double star
     if (impl->isMidiTrack (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
         return juce::Result::fail ("A clip only goes on a track of its own kind");
 
-    impl->projectManager.getUndo().beginStep ("Copy Clip");
+    impl->undo().beginStep ("Copy Clip");
     auto copy = te::duplicateClip (*clip);
 
     if (copy == nullptr)
@@ -897,7 +897,7 @@ bool ApplicationModel::duplicateSelectedClips()
     if (selected.isEmpty())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Duplicate");
+    impl->undo().beginStep ("Duplicate");
     juce::Array<te::Clip*> copies;
 
     for (auto* clip : selected)
@@ -931,7 +931,7 @@ bool ApplicationModel::loopExtendClip (const juce::String& clipId, double endSec
     if (end <= pos.getStart() || end == pos.getEnd())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Loop Clip");
+    impl->undo().beginStep ("Loop Clip");
 
     // The clip's current content becomes the loop.
     if (! clip->isLooping())
@@ -1002,7 +1002,7 @@ juce::Result ApplicationModel::consolidateSelectedClips()
             }
         }
 
-        impl->projectManager.getUndo().beginStep ("Consolidate");
+        impl->undo().beginStep ("Consolidate");
 
         for (auto* clip : selected)
             clip->removeFromParent();
@@ -1034,7 +1034,7 @@ juce::Result ApplicationModel::consolidateSelectedClips()
     if (auto r = render::toWav (edit, file, render::bitForTrack (*track), range, false); r.failed())
         return r;
 
-    impl->projectManager.getUndo().beginStep ("Consolidate");
+    impl->undo().beginStep ("Consolidate");
 
     for (auto* clip : selected)
         clip->removeFromParent();
@@ -1052,7 +1052,7 @@ bool ApplicationModel::deleteSelectedClips()
     if (selected.isEmpty())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Delete Clips");
+    impl->undo().beginStep ("Delete Clips");
     impl->selectionManager.deselectAll();
 
     for (auto* clip : selected)
@@ -1069,7 +1069,7 @@ bool ApplicationModel::renameClip (const juce::String& clipId, const juce::Strin
     if (clip == nullptr || trimmed.isEmpty() || trimmed == clip->getName())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Rename Clip");
+    impl->undo().beginStep ("Rename Clip");
     clip->setName (trimmed);
     return true;
 }
@@ -1081,7 +1081,7 @@ bool ApplicationModel::reverseClip (const juce::String& clipId)
     if (audio == nullptr)
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Reverse Clip");
+    impl->undo().beginStep ("Reverse Clip");
     audio->setIsReversed (! audio->getIsReversed());
     return true;
 }
@@ -1094,7 +1094,7 @@ bool ApplicationModel::setClipColour (const juce::String& clipId, int colourInde
         || (int) clip->state.getProperty (Impl::trackColourProperty, -1) == colourIndex)
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Set Clip Colour");
+    impl->undo().beginStep ("Set Clip Colour");
 
     if (colourIndex < 0)
         clip->state.removeProperty (Impl::trackColourProperty, &impl->undoManager());
@@ -1118,7 +1118,7 @@ bool ApplicationModel::setClipTake (const juce::String& clipId, int takeIndex)
     if (! take.isValid())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Switch Take");
+    impl->undo().beginStep ("Switch Take");
     clip->state.setProperty (te::IDs::source, take[te::IDs::source], &impl->undoManager());
     return true;
 }
@@ -1151,7 +1151,7 @@ bool ApplicationModel::addNote (const juce::String& clipId, double startSeconds,
     if (lengthBeats <= 1.0e-9)
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Add Note");
+    impl->undo().beginStep ("Add Note");
     auto* note = clip->getSequence().addNote (pitch, te::BeatPosition::fromBeats (startBeat),
                                               te::BeatDuration::fromBeats (lengthBeats),
                                               velocity, 0, &impl->undoManager());
@@ -1185,7 +1185,7 @@ bool ApplicationModel::deleteSelectedNotes()
     if (targets.empty())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Delete Notes");
+    impl->undo().beginStep ("Delete Notes");
 
     for (auto& target : targets)
         if (auto* note = impl->findNote (*target.clip, target.id))
@@ -1240,7 +1240,7 @@ bool ApplicationModel::moveNotes (const juce::String& clipId, const juce::String
     if (deltaPitch == 0 && std::abs (deltaSeconds) < 1.0e-9)
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Move Notes");
+    impl->undo().beginStep ("Move Notes");
 
     for (auto& item : items)
     {
@@ -1278,7 +1278,7 @@ bool ApplicationModel::resizeNote (const juce::String& clipId, const juce::Strin
             && std::abs (newLength - note->getLengthBeats().inBeats()) < 1.0e-9))
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Resize Note");
+    impl->undo().beginStep ("Resize Note");
     note->setStartAndLength (te::BeatPosition::fromBeats (newStart),
                              te::BeatDuration::fromBeats (newLength),
                              &impl->undoManager());
@@ -1302,7 +1302,7 @@ bool ApplicationModel::setNoteVelocity (const juce::String& clipId, int velocity
     if (! changes)
         return false;
 
-    impl->projectManager.getUndo().beginGestureStep ("Set Velocity", "Set Velocity:" + clipId, continuesGesture);
+    impl->undo().beginGestureStep ("Set Velocity", "Set Velocity:" + clipId, continuesGesture);
 
     for (auto* note : notes)
         note->setVelocity (velocity, &impl->undoManager());
@@ -1359,7 +1359,7 @@ bool ApplicationModel::quantizeNotes (const juce::String& clipId, const juce::St
     if (changes.empty())
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Quantize Notes");
+    impl->undo().beginStep ("Quantize Notes");
 
     for (auto& change : changes)
         change.note->setStartAndLength (te::BeatPosition::fromBeats (change.beat),
@@ -1523,7 +1523,7 @@ void ApplicationModel::stop()
     }
 
     // Stopping turns the recording into clips.
-    impl->projectManager.getUndo().beginStep ("Record");
+    impl->undo().beginStep ("Record");
     impl->transport().stop (false, false);
     impl->removeDuplicateTakes();
 }
@@ -1574,7 +1574,7 @@ bool ApplicationModel::setTempo (double bpm, bool continuesGesture)
     if (tempo == nullptr || juce::exactlyEqual (tempo->getBpm(), clamped))
         return false;
 
-    impl->projectManager.getUndo().beginGestureStep ("Set Tempo", "tempo", continuesGesture);
+    impl->undo().beginGestureStep ("Set Tempo", "tempo", continuesGesture);
     tempo->setBpm (clamped);
     return true;
 }
@@ -1594,7 +1594,7 @@ bool ApplicationModel::setTimeSignature (int numerator, int denominator)
         || (sig->numerator.get() == numerator && sig->denominator.get() == denominator))
         return false;
 
-    impl->projectManager.getUndo().beginStep ("Set Time Signature");
+    impl->undo().beginStep ("Set Time Signature");
     sig->numerator = numerator;
     sig->denominator = denominator;
     return true;

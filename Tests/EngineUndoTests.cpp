@@ -36,6 +36,13 @@ struct EngineUndoTests : juce::UnitTest
             pluginId = rack.getChain (trackId, PluginChain::device)[0].id;
         }
 
+        /** The reverb's first parameter, a fraction of the way through its range. */
+        float parameterAt (float fraction) const
+        {
+            const auto param = rack.getParameters (pluginId)[0];
+            return param.minimum + (param.maximum - param.minimum) * fraction;
+        }
+
         bool bypassed() const   { return ! rack.getChain (trackId, PluginChain::device)[0].enabled; }
     };
 
@@ -57,8 +64,7 @@ struct EngineUndoTests : juce::UnitTest
         {
             UndoFixture f;
             const auto param = f.rack.getParameters (f.pluginId)[0];
-            const auto low = param.minimum + (param.maximum - param.minimum) * 0.6f;
-            const auto high = param.minimum + (param.maximum - param.minimum) * 0.9f;
+            const auto low = f.parameterAt (0.6f), high = f.parameterAt (0.9f);
 
             f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, low));
             f.invoke ("track.add");
@@ -85,8 +91,7 @@ struct EngineUndoTests : juce::UnitTest
         {
             UndoFixture f;
             const auto param = f.rack.getParameters (f.pluginId)[0];
-            const auto low = param.minimum + (param.maximum - param.minimum) * 0.6f;
-            const auto high = param.minimum + (param.maximum - param.minimum) * 0.9f;
+            const auto low = f.parameterAt (0.6f), high = f.parameterAt (0.9f);
 
             f.invoke ("plugin.setBypassed", pluginBypassArgs (f.trackId, f.pluginId, true));
             f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, low));

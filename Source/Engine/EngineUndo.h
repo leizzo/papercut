@@ -13,7 +13,9 @@ class ProjectManager;
     A step is one discrete change (beginStep) or one gesture, such as a fader or
     knob drag, however many values it sends (beginGestureStep). A gesture joins
     its step only while that step is still the newest one and holds a change:
-    a step any facade started since, or an undo or redo, ends it. */
+    a step any facade started since, or an undo or redo, ends it. The rule reads
+    the Edit's UndoManager, so an undo ends the gesture whoever calls it:
+    undo and redo stay with ApplicationModel. */
 class EngineUndo
 {
 public:
