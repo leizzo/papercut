@@ -2,12 +2,12 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct EngineManagerTests : juce::UnitTest
 {
-    EngineManagerTests() : juce::UnitTest ("EngineManager", "Papercut") {}
+    EngineManagerTests() : juce::UnitTest ("EngineManager", "Resamper") {}
 
     void runTest() override
     {
@@ -27,4 +27,4 @@ struct EngineManagerTests : juce::UnitTest
 
 static EngineManagerTests engineManagerTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

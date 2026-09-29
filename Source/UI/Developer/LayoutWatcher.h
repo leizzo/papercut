@@ -4,7 +4,7 @@
 #include <functional>
 #include <memory>
 
-namespace papercut
+namespace resamper
 {
 
 /** Watches a folder for .json updates via gin::FileSystemWatcher.
@@ -28,4 +28,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LayoutWatcher)
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -1,11 +1,11 @@
 #include "TestFixture.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct TrackChannelTests : juce::UnitTest
 {
-    TrackChannelTests() : juce::UnitTest ("Track Channel Controls", "Papercut") {}
+    TrackChannelTests() : juce::UnitTest ("Track Channel Controls", "Resamper") {}
 
     /** Two fresh tracks; the undo history holds their two track.add steps. */
     struct ChannelFixture : Fixture
@@ -202,4 +202,4 @@ struct TrackChannelTests : juce::UnitTest
 
 static TrackChannelTests trackChannelTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

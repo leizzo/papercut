@@ -2,13 +2,13 @@
 #include "UI/State/ShellState.h"
 #include "UI/State/UIStateStore.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The window shell's view state and view Commands (PRD §5.2, §6). */
 struct ShellTests : juce::UnitTest
 {
-    ShellTests() : juce::UnitTest ("Shell", "Papercut") {}
+    ShellTests() : juce::UnitTest ("Shell", "Resamper") {}
 
     void runTest() override
     {
@@ -84,17 +84,17 @@ struct ShellTests : juce::UnitTest
 
 static ShellTests shellTests;
 
-} // namespace papercut::test
+} // namespace resamper::test
 
 #include "UI/State/ArrangementViewState.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** Arrangement zoom, lane height and Follow (PRD §8.3), all UI State. */
 struct ArrangementViewTests : juce::UnitTest
 {
-    ArrangementViewTests() : juce::UnitTest ("Arrangement View", "Papercut") {}
+    ArrangementViewTests() : juce::UnitTest ("Arrangement View", "Resamper") {}
 
     void runTest() override
     {
@@ -149,4 +149,4 @@ struct ArrangementViewTests : juce::UnitTest
 
 static ArrangementViewTests arrangementViewTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

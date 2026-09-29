@@ -4,7 +4,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace papercut
+namespace resamper
 {
 
 class PluginRack;
@@ -28,4 +28,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditorWindow)
 };
 
-} // namespace papercut
+} // namespace resamper

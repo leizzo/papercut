@@ -2,7 +2,7 @@
 
 #include <deque>
 
-namespace papercut
+namespace resamper
 {
 
 /** Tap tempo (PRD §6.1, `T`): the tempo implied by the last few taps. A pause
@@ -44,4 +44,4 @@ private:
     bool hasLast = false;
 };
 
-} // namespace papercut
+} // namespace resamper

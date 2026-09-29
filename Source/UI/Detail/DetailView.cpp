@@ -5,7 +5,7 @@
 
 #include <map>
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -369,4 +369,4 @@ void DetailView::mouseDrag (const juce::MouseEvent& e)
         shell.setDetailHeight (heightAtDragStart - e.getDistanceFromDragStartY());
 }
 
-} // namespace papercut
+} // namespace resamper

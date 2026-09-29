@@ -4,7 +4,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 BeatRuler::BeatRuler (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
@@ -50,4 +50,4 @@ void BeatRuler::mouseDown (const juce::MouseEvent& e)
     commands.invoke ("transport.setPosition", transportPositionArgs (std::max (0.0, view.xToTime ((float) e.x))));
 }
 
-} // namespace papercut
+} // namespace resamper

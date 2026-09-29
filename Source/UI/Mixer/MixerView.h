@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -94,4 +94,4 @@ private:
     void themeChanged() override   { repaint(); }
 };
 
-} // namespace papercut
+} // namespace resamper

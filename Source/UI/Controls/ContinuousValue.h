@@ -2,7 +2,7 @@
 
 #include "ValueFormat.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** The value behind a knob, slider, fader or bar, and the PRD §16.2 rules for
@@ -88,4 +88,4 @@ private:
     void change (double newValue, bool continuesGesture);
 };
 
-} // namespace papercut
+} // namespace resamper

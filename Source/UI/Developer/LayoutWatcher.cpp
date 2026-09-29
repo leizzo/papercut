@@ -2,7 +2,7 @@
 
 #include <gin/gin.h>
 
-namespace papercut
+namespace resamper
 {
 
 struct LayoutWatcher::Impl : private gin::FileSystemWatcher::Listener
@@ -38,4 +38,4 @@ LayoutWatcher::LayoutWatcher (const juce::File& folder)
 
 LayoutWatcher::~LayoutWatcher() = default;
 
-} // namespace papercut
+} // namespace resamper

@@ -3,7 +3,7 @@
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 juce::File writeSineWav (const juce::File& file, double seconds, int numChannels, double acidTempo)
@@ -105,4 +105,4 @@ float renderPeak (Fixture& f)
     return buffer.getMagnitude (0, buffer.getNumSamples());
 }
 
-} // namespace papercut::test
+} // namespace resamper::test

@@ -1,4 +1,4 @@
-# Papercut
+# Resamper
 
 A modular DAW built on JUCE + Tracktion Engine + GIN. This glossary pins the project's domain language; implementation details live in `docs/adr/` and the code, not here.
 

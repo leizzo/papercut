@@ -3,7 +3,7 @@
 #include "Commands/PluginCommands.h"
 #include "Engine/SamplePreview.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -353,4 +353,4 @@ juce::var Browser::getDragSourceDescription (const juce::SparseSet<int>& rows)
     return item.kind == LibraryItem::Kind::folder ? juce::var() : dragDescription (item);
 }
 
-} // namespace papercut
+} // namespace resamper

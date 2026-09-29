@@ -2,12 +2,12 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct ClipEditingTests : juce::UnitTest
 {
-    ClipEditingTests() : juce::UnitTest ("Clip Editing", "Papercut") {}
+    ClipEditingTests() : juce::UnitTest ("Clip Editing", "Resamper") {}
 
     /** One track holding one 2 s clip at 0 s. */
     struct ClipFixture : Fixture
@@ -232,4 +232,4 @@ struct ClipEditingTests : juce::UnitTest
 
 static ClipEditingTests clipEditingTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

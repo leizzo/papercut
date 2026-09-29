@@ -2,7 +2,7 @@
 
 #include <juce_core/juce_core.h>
 
-namespace papercut
+namespace resamper
 {
 
 struct AppCommandHost;
@@ -50,4 +50,4 @@ juce::var newFromTemplateArgs (const juce::String& templateFolder, const juce::S
 /** Arguments for theme.use. file is relative to the UI folder, e.g. "themes/light.json". */
 juce::var themeFileArgs (const juce::String& file);
 
-} // namespace papercut
+} // namespace resamper

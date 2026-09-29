@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 /** One breakpoint on a parameter's automation curve.
@@ -54,4 +54,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Automation)
 };
 
-} // namespace papercut
+} // namespace resamper

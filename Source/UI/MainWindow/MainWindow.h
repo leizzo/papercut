@@ -2,7 +2,7 @@
 
 #include "MainComponent.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** The application window. Owns the ApplicationCommandManager that turns
@@ -28,4 +28,4 @@ private:
     void menuItemSelected (int, int) override       {}
 };
 
-} // namespace papercut
+} // namespace resamper

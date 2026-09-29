@@ -3,14 +3,14 @@
 #include <juce_core/juce_core.h>
 #include <memory>
 
-namespace papercut
+namespace resamper
 {
 
 class EngineManager;
 
 /** Auditions an audio file from the Browser (PRD §6.2: hover or `→`). It plays
     through the engine's audio device alongside the Edit, outside the Edit's
-    mixer. Papercut has no separate Cue output yet, so "Cue" is the main output.
+    mixer. Resamper has no separate Cue output yet, so "Cue" is the main output.
     One file at a time; playing another replaces it. */
 class SamplePreview
 {
@@ -35,4 +35,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (SamplePreview)
 };
 
-} // namespace papercut
+} // namespace resamper

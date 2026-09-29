@@ -3,7 +3,7 @@
 #include "AppCommands.h"
 #include "Engine/Session.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -197,4 +197,4 @@ juce::var sessionSceneArgs (int index)
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

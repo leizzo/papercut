@@ -3,7 +3,7 @@
 #include "CommandRegistry.h"
 #include "Engine/PluginRack.h"
 
-namespace papercut
+namespace resamper
 {
 
 struct AppCommandHost;
@@ -46,4 +46,4 @@ juce::var pluginReplaceArgs (const juce::String& trackId, const juce::String& pl
 juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& pluginId,
                           const juce::String& toTrackId, int index);
 
-} // namespace papercut
+} // namespace resamper

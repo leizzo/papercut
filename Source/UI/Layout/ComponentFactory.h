@@ -5,7 +5,7 @@
 #include <map>
 #include <stdexcept>
 
-namespace papercut
+namespace resamper
 {
 
 /** A malformed layout: unknown type, missing field, bad JSON. Thrown so a
@@ -41,4 +41,4 @@ private:
 /** Reads a required string field, throwing LayoutError if it's missing. */
 juce::String requireString (const juce::var& node, const char* field);
 
-} // namespace papercut
+} // namespace resamper

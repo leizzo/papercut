@@ -2,7 +2,7 @@
 
 #include "Engine/ApplicationModel.h"
 
-namespace papercut
+namespace resamper
 {
 
 class ArrangementViewState;
@@ -25,4 +25,4 @@ private:
     ArrangementViewState& view;
 };
 
-} // namespace papercut
+} // namespace resamper

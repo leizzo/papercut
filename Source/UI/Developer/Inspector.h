@@ -2,7 +2,7 @@
 
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** Shows one component's name, ID, bounds, and parent ID. Theme colours only. */
@@ -29,4 +29,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Inspector)
 };
 
-} // namespace papercut
+} // namespace resamper

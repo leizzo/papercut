@@ -1,7 +1,7 @@
 #include "Menus.h"
 #include "Commands/ApplicationCommandTable.h"
 
-namespace papercut
+namespace resamper
 {
 
 juce::PopupMenu::Item commandItem (CommandRegistry& commands, const juce::String& commandId, const juce::var& args,
@@ -26,4 +26,4 @@ juce::String tooltipFor (const juce::String& name, const juce::String& commandId
     return name;
 }
 
-} // namespace papercut
+} // namespace resamper

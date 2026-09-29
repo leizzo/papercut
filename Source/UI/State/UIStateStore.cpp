@@ -1,6 +1,6 @@
 #include "UIStateStore.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -58,4 +58,4 @@ void UIStateStore::restore (const juce::var& snapshot)
                     getState (component.name.toString()).setProperty (p.name, p.value, nullptr);
 }
 
-} // namespace papercut
+} // namespace resamper

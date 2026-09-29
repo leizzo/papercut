@@ -4,7 +4,7 @@
 #include "Commands/PluginCommands.h"
 #include "UI/Browser/Library.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -613,4 +613,4 @@ void ChannelStrip::mouseDown (const juce::MouseEvent& e)
         onShowMenu();
 }
 
-} // namespace papercut
+} // namespace resamper

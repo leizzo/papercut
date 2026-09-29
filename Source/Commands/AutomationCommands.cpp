@@ -1,7 +1,7 @@
 #include "AutomationCommands.h"
 #include "AppCommands.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -265,4 +265,4 @@ juce::var shaperSetAudioTriggerArgs (const juce::String& shaperId, float attack,
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

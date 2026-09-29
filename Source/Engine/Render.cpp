@@ -1,6 +1,6 @@
 #include "Render.h"
 
-namespace papercut::render
+namespace resamper::render
 {
 
 juce::BigInteger bitForTrack (te::Track& track)
@@ -65,4 +65,4 @@ juce::Result toWav (te::Edit& edit, const juce::File& destFile, const juce::BigI
     return juce::Result::ok();
 }
 
-} // namespace papercut::render
+} // namespace resamper::render

@@ -2,7 +2,7 @@
 
 #include "Inspector.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** Optional debug strip. The parent sets the status text (tracks, clips, playhead);
@@ -31,4 +31,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DeveloperOverlay)
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -4,12 +4,12 @@
 #include "Engine/Mixer.h"
 #include "Engine/Shaper.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct AutomationTests : juce::UnitTest
 {
-    AutomationTests() : juce::UnitTest ("Automation", "Papercut") {}
+    AutomationTests() : juce::UnitTest ("Automation", "Resamper") {}
 
     struct AutoFixture : Fixture
     {
@@ -122,4 +122,4 @@ struct AutomationTests : juce::UnitTest
 
 static AutomationTests automationTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

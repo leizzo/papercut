@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 struct AppCommandHost;
@@ -36,4 +36,4 @@ juce::var shaperSetLoopArgs (const juce::String& shaperId, double lengthBeats, f
 juce::var shaperSetAudioTriggerArgs (const juce::String& shaperId, float attack, float hold, float release,
                                      float thresholdDb, float depth);
 
-} // namespace papercut
+} // namespace resamper

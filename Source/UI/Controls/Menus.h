@@ -4,7 +4,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace papercut
+namespace resamper
 {
 
 /** A context-menu item that invokes a Command and shows the shortcut bound to
@@ -15,4 +15,4 @@ juce::PopupMenu::Item commandItem (CommandRegistry&, const juce::String& command
 /** "Name (shortcut)" for a tooltip, when the Command has a shortcut (PRD §16.6). */
 juce::String tooltipFor (const juce::String& name, const juce::String& commandId);
 
-} // namespace papercut
+} // namespace resamper

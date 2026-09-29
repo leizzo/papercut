@@ -8,13 +8,13 @@
 
 namespace te = tracktion;
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The Browser's library (PRD §6.2) and what dropping from it does. */
 struct BrowserTests : juce::UnitTest
 {
-    BrowserTests() : juce::UnitTest ("Browser", "Papercut") {}
+    BrowserTests() : juce::UnitTest ("Browser", "Resamper") {}
 
     static bool lists (const std::vector<LibraryItem>& items, const juce::String& path)
     {
@@ -140,4 +140,4 @@ struct BrowserTests : juce::UnitTest
 
 static BrowserTests browserTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

@@ -3,13 +3,13 @@
 #include "UI/Layout/LayoutSource.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The design-system tokens (PRD §15) as the Theme and Layout Metrics load them. */
 struct ThemeTests : juce::UnitTest
 {
-    ThemeTests() : juce::UnitTest ("Theme", "Papercut") {}
+    ThemeTests() : juce::UnitTest ("Theme", "Resamper") {}
 
     struct Setup
     {
@@ -155,4 +155,4 @@ struct ThemeTests : juce::UnitTest
 
 static ThemeTests themeTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

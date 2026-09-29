@@ -1,6 +1,6 @@
 #include "Icons.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -61,4 +61,4 @@ void drawIcon (juce::Graphics& g, Icon icon, juce::Rectangle<float> area, juce::
                                                   juce::PathStrokeType::rounded));
 }
 
-} // namespace papercut
+} // namespace resamper

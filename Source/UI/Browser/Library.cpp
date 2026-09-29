@@ -2,7 +2,7 @@
 #include "Commands/AppCommands.h"
 #include "Commands/PluginCommands.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -25,7 +25,7 @@ Library::Library (std::function<juce::Array<PluginInfo>()> c, juce::File r)
 
 juce::File Library::defaultRoot()
 {
-    return juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("Papercut");
+    return juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("Resamper");
 }
 
 juce::String Library::nameOf (LibraryCategory c)
@@ -162,4 +162,4 @@ void dropOnTrack (CommandRegistry& commands, const LibraryItem& item, const juce
         commands.invoke ("clip.insertAt", clipInsertAtArgs (item.file, trackId, startSeconds));
 }
 
-} // namespace papercut
+} // namespace resamper

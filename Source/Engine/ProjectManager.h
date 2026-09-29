@@ -5,7 +5,7 @@
 
 namespace tracktion::inline engine { class Edit; }
 
-namespace papercut
+namespace resamper
 {
 
 class EngineManager;
@@ -70,4 +70,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (ProjectManager)
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -1,6 +1,6 @@
 #include "Inspector.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -83,4 +83,4 @@ void Inspector::applyTheme()
     styleLabel (parentLabel, themes);
 }
 
-} // namespace papercut
+} // namespace resamper

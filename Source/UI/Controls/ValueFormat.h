@@ -4,7 +4,7 @@
 
 #include <functional>
 
-namespace papercut
+namespace resamper
 {
 
 /** How a control's value reads as text and how typed text reads back
@@ -33,4 +33,4 @@ struct ValueFormat
     static ValueFormat number (int decimals, juce::String unit = {});
 };
 
-} // namespace papercut
+} // namespace resamper

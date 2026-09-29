@@ -4,7 +4,7 @@
 
 #include <deque>
 
-namespace papercut
+namespace resamper
 {
 
 /** Toasts (PRD §16.7): short notes at the bottom centre for outcomes that
@@ -44,4 +44,4 @@ private:
     void timerCallback() override;
 };
 
-} // namespace papercut
+} // namespace resamper

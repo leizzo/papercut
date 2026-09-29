@@ -1,7 +1,7 @@
 #include "MainWindow.h"
 #include "Commands/ApplicationCommandTable.h"
 
-namespace papercut
+namespace resamper
 {
 
 MainWindow::MainWindow (const juce::String& title, MainComponent::Services services)
@@ -68,4 +68,4 @@ juce::PopupMenu MainWindow::getMenuForIndex (int, const juce::String& name)
     return createCommandMenu (commandManager, name);
 }
 
-} // namespace papercut
+} // namespace resamper

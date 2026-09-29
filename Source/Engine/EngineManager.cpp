@@ -5,15 +5,15 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
 {
-    class PapercutEngineBehaviour : public te::EngineBehaviour
+    class ResamperEngineBehaviour : public te::EngineBehaviour
     {
     public:
-        explicit PapercutEngineBehaviour (EngineManager::AudioDevice d) : audioDevice (d) {}
+        explicit ResamperEngineBehaviour (EngineManager::AudioDevice d) : audioDevice (d) {}
 
         bool autoInitialiseDeviceManager() override    { return audioDevice == EngineManager::AudioDevice::initialise; }
         bool shouldOpenAudioInputByDefault() override   { return true; }
@@ -35,7 +35,7 @@ namespace
 
     /** Runs engine background tasks (e.g. offline renders) to completion without
         a progress window, dispatching the message loop while waiting. */
-    class PapercutUIBehaviour : public te::UIBehaviour
+    class ResamperUIBehaviour : public te::UIBehaviour
     {
     public:
         void runTaskWithProgressBar (te::ThreadPoolJobWithProgress& job) override
@@ -48,8 +48,8 @@ namespace
 
 EngineManager::EngineManager (const juce::String& applicationName, AudioDevice audioDevice)
     : engine (std::make_unique<te::Engine> (applicationName,
-                                            std::make_unique<PapercutUIBehaviour>(),
-                                            std::make_unique<PapercutEngineBehaviour> (audioDevice)))
+                                            std::make_unique<ResamperUIBehaviour>(),
+                                            std::make_unique<ResamperEngineBehaviour> (audioDevice)))
 {
 }
 
@@ -70,4 +70,4 @@ juce::String EngineManager::describeActiveAudioDevice() const
     return "No audio device";
 }
 
-} // namespace papercut
+} // namespace resamper

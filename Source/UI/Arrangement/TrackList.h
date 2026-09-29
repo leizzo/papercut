@@ -4,7 +4,7 @@
 
 #include <map>
 
-namespace papercut
+namespace resamper
 {
 
 class ArrangementViewState;
@@ -43,4 +43,4 @@ private:
     std::map<juce::String, std::unique_ptr<TrackHeader>> headers;
 };
 
-} // namespace papercut
+} // namespace resamper

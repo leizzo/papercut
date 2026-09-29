@@ -9,7 +9,7 @@
 
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -84,4 +84,4 @@ private:
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
 };
 
-} // namespace papercut
+} // namespace resamper

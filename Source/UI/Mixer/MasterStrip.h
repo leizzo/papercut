@@ -3,7 +3,7 @@
 #include "Engine/Mixer.h"
 #include "StripParts.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -33,4 +33,4 @@ private:
     juce::Rectangle<int> headArea;
 };
 
-} // namespace papercut
+} // namespace resamper

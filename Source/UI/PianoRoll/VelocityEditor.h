@@ -4,7 +4,7 @@
 
 #include <optional>
 
-namespace papercut
+namespace resamper
 {
 
 class ArrangementViewState;
@@ -40,4 +40,4 @@ private:
     void reload();
 };
 
-} // namespace papercut
+} // namespace resamper

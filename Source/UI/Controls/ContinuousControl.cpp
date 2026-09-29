@@ -1,6 +1,6 @@
 #include "ContinuousControl.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -519,4 +519,4 @@ void ValueField::paint (juce::Graphics& g)
                         theme.textDim);
 }
 
-} // namespace papercut
+} // namespace resamper

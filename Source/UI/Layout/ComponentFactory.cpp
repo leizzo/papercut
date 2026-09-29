@@ -1,6 +1,6 @@
 #include "ComponentFactory.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -60,4 +60,4 @@ std::unique_ptr<juce::Component> ComponentFactory::createFromJson (const juce::S
     return create (root);
 }
 
-} // namespace papercut
+} // namespace resamper

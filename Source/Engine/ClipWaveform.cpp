@@ -1,7 +1,7 @@
 #include "ClipWaveform.h"
 #include "ClipWaveformImpl.h"
 
-namespace papercut
+namespace resamper
 {
 
 ClipWaveform::ClipWaveform (std::unique_ptr<Impl> i) : impl (std::move (i)) {}
@@ -51,4 +51,4 @@ void ClipWaveform::draw (juce::Graphics& g, juce::Rectangle<int> area,
     }
 }
 
-} // namespace papercut
+} // namespace resamper

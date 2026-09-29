@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 /** Loop repeats a drawn shape with the transport. Audio trigger opens an
@@ -63,4 +63,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Shaper)
 };
 
-} // namespace papercut
+} // namespace resamper

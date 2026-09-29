@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -121,4 +121,4 @@ private:
                              juce::Colour tagColour) const;
 };
 
-} // namespace papercut
+} // namespace resamper

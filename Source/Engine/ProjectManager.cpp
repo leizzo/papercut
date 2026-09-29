@@ -5,7 +5,7 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -181,4 +181,4 @@ juce::Result ProjectManager::saveAs (const juce::File& folder, const juce::var& 
     return juce::Result::ok();
 }
 
-} // namespace papercut
+} // namespace resamper

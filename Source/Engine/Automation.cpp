@@ -8,7 +8,7 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -270,4 +270,4 @@ bool Automation::clear (const juce::String& trackId, const juce::String& paramet
     return true;
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -4,7 +4,7 @@
 #include <limits>
 #include <span>
 
-namespace papercut
+namespace resamper
 {
 
 /** One row of the static table that maps JUCE ApplicationCommand IDs (menus)
@@ -72,4 +72,4 @@ const KeyBinding* findBinding (const juce::KeyPress&, int context);
 /** The args a binding passes to its Command. */
 juce::var bindingArgs (const KeyBinding&);
 
-} // namespace papercut
+} // namespace resamper

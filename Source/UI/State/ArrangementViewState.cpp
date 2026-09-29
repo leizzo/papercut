@@ -1,6 +1,6 @@
 #include "ArrangementViewState.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -110,4 +110,4 @@ int ArrangementViewState::yToRow (int y, int rowHeight) const
     return (int) std::floor ((double) (y + getScrollY()) / rowHeight);
 }
 
-} // namespace papercut
+} // namespace resamper

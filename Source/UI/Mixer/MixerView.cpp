@@ -3,7 +3,7 @@
 #include "Commands/PluginCommands.h"
 #include "UI/Controls/Menus.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -121,7 +121,7 @@ void MixerView::showEffectPicker (const juce::String& trackId, InsertSlot& slot,
 
     juce::PopupMenu menu;
     menu.addSectionHeader (replacing.isNotEmpty() ? "Replace with" : "Add effect");
-    menu.addSubMenu ("Papercut", builtIn);
+    menu.addSubMenu ("Resamper", builtIn);
     menu.addSubMenu ("Plug-Ins", external, external.getNumItems() > 0);
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&slot));
 }
@@ -355,4 +355,4 @@ void MixerView::resized()
     layoutStrips();
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -1,13 +1,13 @@
-# Papercut — Product Requirements Document
+# Resamper — Product Requirements Document
 
 | | |
 |---|---|
-| **Product** | Papercut — Digital Audio Workstation (desktop) |
+| **Product** | Resamper — Digital Audio Workstation (desktop) |
 | **Document** | Product Requirements Document (PRD) |
 | **Version** | 1.1 (draft) |
 | **Date** | 2026-09-28 (v1.0) · updated 2026-09-28 (v1.1) |
 | **Owner** | Ismail Bahtiyar |
-| **Design source** | `@design/papercut.pen` — screens + `Papercut DS — Foundations / Components / Patterns & Handoff` |
+| **Design source** | `@design/design.pen` — screens + `Resamper DS — Foundations / Components / Patterns & Handoff` |
 | **Status** | Ready for engineering review |
 
 > **How to read this document**
@@ -56,7 +56,7 @@
 
 ## 1. Summary
 
-Papercut is a dark-themed, dense, keyboard-friendly DAW for electronic producers and mix engineers. It combines:
+Resamper is a dark-themed, dense, keyboard-friendly DAW for electronic producers and mix engineers. It combines:
 
 - a **clip-launching Session view** and a **linear Arrangement view**;
 - a **rack-based device chain** (Instrument / Drum / Audio Effect racks) for sound design, edited in the arrangement or session detail view. It mixes **native devices** (edited inline on their cards) and **third-party plug-ins** (VST3 / AU / CLAP) whose own UI opens in a **floating plug-in window as soon as they are added**;
@@ -199,7 +199,7 @@ The mixer **MUST NOT** display rack devices as inserts. The **Track chain** row 
 
 | View | Tab label | Purpose | Screens |
 |---|---|---|---|
-| Session | `Session` | Clip grid, scenes, live performance | Papercut DAW |
+| Session | `Session` | Clip grid, scenes, live performance | Resamper DAW |
 | Arrangement | `Arrange` | Timeline, lanes, automation, folders | Arrangement, Arrangement · Automation, Arrangement · Folders & Buses |
 | Mixer | `Mixer` | Full console | Mixer, Mixer · Folders & Buses |
 | Piano Roll | `Piano Roll` | MIDI note + clip envelope editing | Piano Roll, Clip Automation |
@@ -259,7 +259,7 @@ Contextual to the selected track/clip:
 
 - **Clip panel** (230): clip name, colour, key props.
 - **Device chain** (fill): racks, native devices and plug-in cards, horizontal, ending in a **drop zone** ("Drop device or plug-in here") (see §9).
-- When a device's **sidechain panel** is expanded, the detail view grows to **236 px** so the panel fits without scrolling (**[Designed]** in *Papercut — Sidechain*). It returns to 192 when the panel collapses.
+- When a device's **sidechain panel** is expanded, the detail view grows to **236 px** so the panel fits without scrolling (**[Designed]** in *Resamper — Sidechain*). It returns to 192 when the panel collapses.
 - In **Arrangement · Automation**, the detail view becomes the **Automation inspector** (§12.5).
 - In **Arrangement · Folders & Buses**, it becomes the **Folder / Bus inspector** (§11.4).
 
@@ -269,7 +269,7 @@ Contextual to the selected track/clip:
 
 ## 7. Session view
 
-**Screen:** Papercut DAW **[Designed]**
+**Screen:** Resamper DAW **[Designed]**
 
 ### 7.1 Layout
 
@@ -295,7 +295,7 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 
 ## 8. Arrangement view
 
-**Screen:** Papercut — Arrangement **[Designed]**
+**Screen:** Resamper — Arrangement **[Designed]**
 
 ### 8.1 Layout
 
@@ -349,11 +349,11 @@ States per clip slot: **empty**, **stopped**, **queued** (blinking outline in tr
 
 ### 9.2 Device cards — native vs plug-in
 
-**Screen:** Papercut — Devices · Native & Plug-ins **[Designed]**
+**Screen:** Resamper — Devices · Native & Plug-ins **[Designed]**
 
 A device chain can mix two kinds of device. They share the chain (order, drag, bypass, racks, automation) but follow **different UI contracts**. Users **MUST** be able to tell them apart at a glance.
 
-- **Native devices** are built into Papercut: EQ Eight, Compressor, Glue Compressor, Echo, Saturator, Reverb, Auto Filter, Simpler and so on.
+- **Native devices** are built into Resamper: EQ Eight, Compressor, Glue Compressor, Echo, Saturator, Reverb, Auto Filter, Simpler and so on.
 - **Plug-ins** are third-party VST3, AU or CLAP devices.
 
 #### 9.2.1 Native device card (`DeviceCard/Native`)
@@ -363,7 +363,7 @@ A device chain can mix two kinds of device. They share the chain (order, drag, b
   - a power button (dark 14 px disc with a coloured dot),
   - the name (11/700, `$text-on-accent`),
   - a **save preset** icon and a **collapse** chevron.
-- **Edited inline.** Every parameter lives on the card, drawn with Papercut controls and tokens.
+- **Edited inline.** Every parameter lives on the card, drawn with Resamper controls and tokens.
 - **Live visualisation.** Examples:
   - **EQ Eight** (340 wide): an interactive curve display with numbered, colour-coded band nodes, grid and frequency labels. The selected band's params (Freq / Gain / Q, mono values) and an L/R ↔ M/S scale switch sit to the right.
   - **Compressor** (370 wide): a **GR meter** (orange, filling from the top, value readout), a **transfer-curve** display with the threshold knee and a live level dot, and a single row of knobs (Threshold, Ratio, Attack, Release).
@@ -371,6 +371,22 @@ A device chain can mix two kinds of device. They share the chain (order, drag, b
   - Drag an EQ node to change freq/gain; scroll wheel on a node changes Q; double-click a node toggles the band.
   - Drag the title bar to reorder; double-click the title to collapse the card to 28 px.
   - Click power to bypass (card drops to 50 % opacity).
+
+#### 9.2.1a Native device contract v2 **[Designed — Components › Native devices · v2]**
+
+Based on [research into Ableton Live and Bitwig Studio](docs/research/native-devices-ableton-bitwig.md): Ableton's consistent device surface + Bitwig's in-device modulation and graphs you can grab.
+
+| Rule | Detail |
+|---|---|
+| **One header** (`DeviceHeader`, 28 px, device colour) | Power · name · **preset** (hot-swap menu) · **A/B** compare · **Mods** (count) · fold · expand · options — same order on every native device. |
+| **Graph = controller** | Every EQ / dynamics / filter / saturation graph is directly editable (EQ nodes, compressor threshold line, curve). Knobs mirror the graph. |
+| **Zones** | `Input` → `Display` → `Controls` → `Output`. **Mix and Out are always the last zone**, separated by a divider. |
+| **Three sizes** | **Folded** (`Device/Folded`, 28 px strip, vertical name, Mods indicator) · **Compact** (164 px, default, never scrolls) · **Expanded** (docked or floating large editor, via the header's expand button). |
+| **Parameter state** | `Knob/Automated` (red dot) · `Knob/Modulated` (blue depth ring = mono, green = per-voice; cyan dot = live value) · `Knob/Macro` (macro badge). Shift = fine, double-click / Delete = reset, click the value to type. |
+| **Modulators on the device** | `Mods Drawer` attaches under the card: slots (LFO, Envelope, Env Follower, Steps, Random, Macro). **Routing:** click a slot's arrow (it turns blue), then drag on any parameter to set depth. Graphs show the modulation range. |
+| **Nested slots [Proposed]** | Compressor **Sidechain FX**, Reverb / Delay **Wet FX**, Delay **FB FX**, instrument **Post FX**, shown as a "+ FX" pill that opens a mini chain. |
+
+v2 devices: `Device/EQ Eight v2` (pre/post spectrum, Q-width shading, band strip 1–8 with type glyphs and on/off, Adaptive Q, audition, St / L-R / M-S, Scale + Out) · `Device/Compressor v2` (IN/GR meters, Transfer / Activity views, draggable threshold, Ratio / Attack / Release / Knee, Lookahead 0 / 1 / 10 ms, Peak / RMS / Expand, Makeup Auto / Mix / Out) · `Device/Saturator v2` (waveshape display with modulation range, type, modulated Drive, Color, Soft clip, Mix / Out) · `Device/Simpler v2` (waveform with Start / Loop / End flags and playhead, Classic / 1-Shot / Slice, drawable amp envelope, Vol / Pitch). Glue Compressor and Operator follow in the next pass.
 
 #### 9.2.2 Plug-in device card (`DeviceCard/Plugin`)
 
@@ -393,11 +409,11 @@ A device chain can mix two kinds of device. They share the chain (order, drag, b
 | Title bar | Filled device colour | `$bg-elevated` + plug icon + vendor + format badge |
 | Power | Dark disc, coloured dot | Accent ring + dot |
 | Editing | Inline on the card | In a floating **plug-in window**; card shows ≤ 4 pinned params |
-| Visual style | Papercut tokens only | Vendor UI inside the window body — never restyled by the host |
+| Visual style | Resamper tokens only | Vendor UI inside the window body — never restyled by the host |
 | On insert | Card appears, focus on first control | Card appears **and the plug-in window opens** (§9.6) |
 | Double-click title | Collapse / expand card | Open / focus window |
 | Status | — | CPU, latency, sandbox in card footer + window toolbar |
-| Presets | Papercut preset browser (save icon) | Host preset menu + A/B + undo/redo in window toolbar |
+| Presets | Resamper preset browser (save icon) | Host preset menu + A/B + undo/redo in window toolbar |
 | Automation / macros | Every control | Only parameters the plug-in exposes; pin to surface on card |
 | Failure | n/a | Red outline, "Crashed — Reload" button, audio bypassed, window closed |
 
@@ -450,7 +466,7 @@ The same distinction applies in the **Mixer**:
 |---|---|
 | Title bar (36, `$bg-panel`) | Plug icon (accent), track name › plug-in name, vendor, format badge, drag area, **Pin** (keep on top), **Close**. |
 | Host toolbar (38) | **Bypass** (power, accent when on), preset menu (prev/next, name, save), **A/B** compare + *Copy A→B*, undo/redo (plug-in parameter history), latency (samples), CPU %, sandbox status. |
-| Vendor UI (fill) | The plug-in's own editor at its native size. Papercut **never** restyles, recolours or overlays it. |
+| Vendor UI (fill) | The plug-in's own editor at its native size. Resamper **never** restyles, recolours or overlays it. |
 | Host footer (26) | "Plug-in UI · rendered by *Vendor* · *Format version* · out-of-process", UI scale (100 / 150 / 200 %), resize grip (only if the plug-in supports resizing). |
 
 **Window behaviour [Proposed]**
@@ -469,7 +485,7 @@ The same distinction applies in the **Mixer**:
 
 ### 9.7 Sidechain inputs
 
-**Screen:** Papercut — Sidechain **[Designed]**. Example: the Bass track's Compressor is keyed from the **Kick pad inside the Drums' 909 Kit rack**, tapped Pre-FX, band-passed to 40–120 Hz.
+**Screen:** Resamper — Sidechain **[Designed]**. Example: the Bass track's Compressor is keyed from the **Kick pad inside the Drums' 909 Kit rack**, tapped Pre-FX, band-passed to 40–120 Hz.
 
 #### 9.7.1 Concept
 
@@ -559,11 +575,62 @@ Hovering any badge highlights the other end (teal outline). Clicking it selects 
 | Bounce / export stems | Sidechain processing is included; exporting only the source stem is unaffected. |
 | Automation | Sidechain enable, gain, mix and filter are automatable; the source and tap are not. |
 
+### 9.8 Complex instruments: Simpler & Sampler **[Designed — *RESAMPER — Native Devices* board]**
+
+Instruments with deep editing live mostly in their **expanded editor**. The 164 px chain card is a summary: waveform or zone map, the 3–4 most used controls, output. Expanding (header button, or double-click the display) opens the editor docked full-width in the detail view, or floating.
+
+#### 9.8.1 Simpler — one sample, three modes
+
+| Mode | Behaviour | Editor specifics |
+|---|---|---|
+| **Classic** | Polyphonic; loops Loop → End with crossfade | Start / Loop / End flags, loop region + crossfade shading (`XFADE %`), playhead |
+| **1-Shot** | Plays start → end once; **Trigger** (ignores note length) or **Gate** | Fade-in / fade-out handles with ms labels, Snap (Off / Zero-crossing), Transient |
+| **Slice** | Cuts the sample; slice *n* → MIDI note C1 + *n* | Numbered slice markers with note tags, selected slice tinted, **Slice by** Transient / Beat / Region / Manual, Sensitivity, Playback Mono / Poly / Thru, **Slice to Drum Rack** |
+
+Expanded editor layout (1560 × ~480):
+1. Header.
+2. Toolbar: mode switch · sample name + format / length / root · **Warp** (mode) · Gain · Zoom.
+3. **Sample editor**: time ruler, grid, waveform, markers.
+4. **Overview strip** with a draggable view rectangle.
+5. **Control strip**:
+   - **Voice**: Voices, Glide, Spread, Retrig / Mono / Legato.
+   - **Filter**: response graph, type, Freq, Res, modulatable Env amount.
+   - **Envelopes**: Amp / Filter / Pitch tabs, drawable ADSR with point handles and values.
+   - **LFO**: shape, Rate, Amount, destination toggles.
+   - **Output**: Volume, Pan, Transpose, Detune.
+
+Interactions [Proposed]:
+- Drag a marker, flag or fade handle to move it; Shift = fine; markers snap to zero-crossings when Snap is on.
+- Double-click the waveform to add a slice (Manual), Alt-click a slice marker to delete it.
+- Drop an audio file on the card or editor to replace the sample (keeps settings).
+
+#### 9.8.2 Sampler — multi-sample instrument
+
+- **Chain card:** a mini **key × velocity map** (zones as blocks, selected zone lime) above a mini keyboard, the selected zone's name, Cutoff / Attack / Release, Vol, Voices.
+- **Tabs:** **Zones** · Sample · Pitch / Osc · Filter / Amp · **Modulation** · MIDI. Plus Import and **Auto-map** (maps dropped files by root note found in the filename or by pitch detection).
+- **Zones tab:**
+  - **Zone list**: grouped into velocity layers, with columns Sample · Root · Keys · Vel · Vol.
+  - **Key × velocity map**:
+    - zones are rectangles in layer colour; the selected zone gets lime handles and a label,
+    - root-key dots, crossfade shading,
+    - keyboard axis showing the selected zone's key range and the played key,
+    - toggles for Snap keys, Show xfade and Layer colours.
+  - **Zone inspector**: mini waveform with start / loop / end, Root key, Key range, Velocity, Tune, Gain, Pan, Loop mode Off / Fwd / Alt / Release, Crossfade.
+- **Modulation tab:**
+  - **Sources** list (Env 1 Amp, Env 2 Filter, Env 3, LFO 1–2, Velocity, Key, Mod wheel, Aftertouch), each with a live glyph and routing arrow.
+  - **Source × target matrix**: signed depth bars, blue +, orange −, with numeric value. Targets include Pitch, Filter freq, Res, Volume, Pan, Sample start, Loop pos, LFO rate.
+  - **Source editor**: shape, wave type, Rate / Phase / Fade in / Offset, Sync / Retrig / **Per-voice**.
+- Interactions [Proposed]:
+  - Drag zone edges in the map to change key or velocity range; Alt-drag makes a crossfade.
+  - Drop multiple files on the map to create zones.
+  - Click a matrix cell and drag vertically to set depth; double-click resets it to 0.
+- **Next:** Sample, Pitch / Osc, Filter / Amp and MIDI tabs; Glue Compressor and Operator v2 (see board index).
+
 ---
 
 ## 10. Mixer
 
-**Screen:** Papercut — Mixer **[Designed]**
+**Screen:** Resamper — Mixer **[Designed]**
 
 ### 10.1 Layout
 
@@ -704,7 +771,7 @@ Switching mode is done in the Folder inspector (§11.4). Switching Folder+Bus �
 
 ## 12. Automation (arrangement)
 
-**Screen:** Papercut — Arrangement · Automation **[Designed]**
+**Screen:** Resamper — Arrangement · Automation **[Designed]**
 
 ### 12.1 Entry points
 
@@ -765,7 +832,7 @@ Default mode when Automation Arm is turned on: **Touch**.
 
 ## 13. Piano roll & MIDI clip envelopes
 
-**Screens:** Papercut — Piano Roll, Papercut — Clip Automation **[Designed]**
+**Screens:** Resamper — Piano Roll, Resamper — Clip Automation **[Designed]**
 
 ### 13.1 Layout
 
@@ -821,7 +888,7 @@ Default mode when Automation Arm is turned on: **Touch**.
 
 ## 14. Audio editor & audio clip envelopes
 
-**Screens:** Papercut — Editor, Papercut — Audio Clip Automation **[Designed]**
+**Screens:** Resamper — Editor, Resamper — Audio Clip Automation **[Designed]**
 
 ### 14.1 Layout
 
@@ -863,7 +930,7 @@ Default mode when Automation Arm is turned on: **Touch**.
 
 ## 15. Design system
 
-Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, **Papercut DS — Patterns & Handoff**.
+Source boards: **Resamper DS — Foundations**, **Resamper DS — Components**, **Resamper DS — Patterns & Handoff**.
 
 ### 15.1 Colour tokens
 
@@ -918,7 +985,7 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 - **Sizing**: control 16 / 20 / 22 / 26, transport 34, toolbar 40, top bar 52; track header 200, inspector 248, strip 145, compact strip 86, bus strip 104.
 - **Elevation**: L0 flat (borders only), L1 control (`0 3 8 #00000080`), L2 popover (`0 12 32 #000000A0` + `0 2 6 #00000066`).
 
-### 15.4 Component library (69 + 90 icons)
+### 15.4 Component library (87 + 90 icons)
 
 | Category | Components |
 |---|---|
@@ -926,6 +993,8 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 | Mixer & channel | `TrackBtn/Off`, `TrackBtn/Mute On`, `TrackBtn/Solo On`, `TrackBtn/Arm On`, `Monitor Switch`, `InsertSlot/Filled · Empty · Plugin`, `SectionHeader`, `Badge/Type`, `TrackChain Link`, `Route Chip`, `Send Row`, `Meter/Stereo`, `Fader`, `Strip/Head` |
 | Arrangement | `TrackHeader`, `FolderHeader`, `AutomationLaneHeader`, `Clip`, `TreeIndent`, `Breakpoint`, `Breakpoint/Selected`, `ValueTag`, `LoopTag`, `Playhead` |
 | Devices & panels | `DeviceCard/Native`, `DeviceCard/Plugin`, `PluginWindow` (vendor UI slot), `RackBar`, `ChainRow`, `ChainRow/Selected`, `Pad`, `Pad/Selected`, `Pad/Empty`, `InspectorSection` (slot), `Popover` (slot), `Toolbar` (slots) |
+| Native devices · v2 | `DeviceHeader`, `Device/Folded`, `Mods Drawer`, `Knob/Automated`, `Knob/Modulated`, `Knob/Macro`, `Device/EQ Eight v2`, `Device/Compressor v2`, `Device/Saturator v2`, `Device/Simpler v2`, `Device/Sampler v2` (§9.2.1a, §9.8) |
+| Native devices | `Device/EQ Eight`, `Device/Compressor`, `Device/Compressor · Sidechain`, `Device/Glue Compressor`, `Device/Saturator`, `Device/Simpler`, `Device/Operator` (all built on the `DeviceCard/Native` contract, §9.2.1; 164 px high, 208 with the sidechain panel) |
 | Sidechain | `Sidechain/Badge In`, `Sidechain/Badge Out`, `Sidechain/Insert Tag`, `Sidechain/Source Select`, `Sidechain/Device Toggle`, `Sidechain/Picker Row · Selected · Disabled`, `Sidechain/Panel`, `Sidechain/Plugin Input` |
 
 ### 15.5 Interaction states (all interactive components)
@@ -970,11 +1039,11 @@ Source boards: **Papercut DS — Foundations**, **Papercut DS — Components**, 
 | `Sidechain/Badge In · Out` | `<SidechainBadge direction="in" \| "out" label />` |
 | `Icon/<name>` | `<Icon name="git-merge" size={12} />` (lucide) |
 
-Tokens ship as CSS custom properties `--papercut-<token>` (e.g. `--papercut-bg-deep`, `--papercut-radius-md: 4px`).
+Tokens ship as CSS custom properties `--resamper-<token>` (e.g. `--resamper-bg-deep`, `--resamper-radius-md: 4px`).
 
 ### 15.8 Iconography
 
-**[Designed]** in *Papercut DS — Components › Icons*: **90 reusable icon components**, each named `Icon/<name>`.
+**[Designed]** in *Resamper DS — Components › Icons*: **90 reusable icon components**, each named `Icon/<name>`.
 
 | Rule | Detail |
 |---|---|
@@ -1258,7 +1327,7 @@ Answered in #16 (2026-09-28).
 
 | # | Item | Status |
 |---|---|---|
-| 1 | #16 decision 1: compact send rows show **FX / PRE / POST** on *Papercut — Mixer* and in the `Send Row` component (Pads → A shows Pre-FX active). | ✅ Designed (v1.1) |
+| 1 | #16 decision 1: compact send rows show **FX / PRE / POST** on *Resamper — Mixer* and in the `Send Row` component (Pads → A shows Pre-FX active). | ✅ Designed (v1.1) |
 | 2 | #16 decision 2: returns **A–D** (C Plate, D Parallel) in a horizontally scrolling strips area with pinned Master, edge tab and scrollbar; send sections page `A–B` → `C–D`. | ✅ Designed (v1.1) |
 | 3 | Clicking a **native** mixer insert opens an inline native editor popover (proposed in §9.2.3). Alternative: open native devices in a window like plug-ins. | Needs decision |
 | 4 | Sidechain links in the **routing sidebar** (*Mixer · Folders & Buses*) are specified (§9.7.5) but not drawn. | Design update needed |
@@ -1273,18 +1342,18 @@ Answered in #16 (2026-09-28).
 
 | Screen (canvas frame) | View | Key content |
 |---|---|---|
-| Papercut DAW | Session | Clip grid, mini mixer, master column, device chain with racks |
-| Papercut — Arrangement | Arrange | Lanes, clips, rack-based device chain (909 Kit Drum Rack, Drum Bus Audio Effect Rack, Glue Compressor) |
-| Papercut — Mixer | Mixer | Track chain link, post inserts, send rows (FX/PRE/POST, pan, Ø) with `A–B` pager, send popover, returns A–D in a horizontally scrolling area (edge tab + scrollbar), pinned master with loudness, sidechain badges (Drums head `→1`, Bass Opto Comp `Kick` tag) |
-| Papercut — Piano Roll | Piano Roll | Clip inspector, scale, detected chords, notes, velocity lane |
-| Papercut — Editor | Editor | Sample inspector, overview, warp, stereo waveform, fades, clip gain |
-| Papercut — Arrangement · Automation | Arrange | Automation lanes, clip overlay envelope, automation inspector, automation arm + re-enable |
-| Papercut — Clip Automation | Piano Roll | MIDI clip envelopes (unlinked cutoff loop, pitch bend) |
-| Papercut — Audio Clip Automation | Editor | Audio clip envelopes (gain, pan, unlinked echo dry/wet) |
-| Papercut — Arrangement · Folders & Buses | Arrange | Folder tracks (bus / folder-only, expanded / collapsed), folder/bus inspector |
-| Papercut — Mixer · Folders & Buses | Mixer | Routing sidebar, group bands, compact strips, bus strips |
-| Papercut — Devices · Native & Plug-ins | Arrange | Native EQ Eight + Compressor cards, plug-in cards (VST3 / AU), floating plug-in window opened on insert, "plug-in added" toast |
-| Papercut — Sidechain | Arrange | Bass Compressor keyed from Drums › Kick: SC badges on both track headers, ducking trace, sidechain panel, plug-in aux input, source picker; Mixer shows SC badges on Drums head + Bass Opto Comp insert |
-| Papercut DS — Foundations | — | Tokens: colour (incl. `state-sidechain`), type, spacing, radius, sizing, elevation, rules |
-| Papercut DS — Components | — | 90 icon components (8 groups) + 69 reusable components (controls, mixer, arrangement, devices & plug-ins, sidechain) + interaction states |
-| Papercut DS — Patterns & Handoff | — | Signal flow, native vs plug-in rules, plug-in window rules, sidechain flow + rules, channel strip anatomy, tokens.css, component → code map |
+| Resamper DAW | Session | Clip grid, mini mixer, master column, device chain with racks |
+| Resamper — Arrangement | Arrange | Lanes, clips, rack-based device chain (909 Kit Drum Rack, Drum Bus Audio Effect Rack, Glue Compressor) |
+| Resamper — Mixer | Mixer | Track chain link, post inserts, send rows (FX/PRE/POST, pan, Ø) with `A–B` pager, send popover, returns A–D in a horizontally scrolling area (edge tab + scrollbar), pinned master with loudness, sidechain badges (Drums head `→1`, Bass Opto Comp `Kick` tag) |
+| Resamper — Piano Roll | Piano Roll | Clip inspector, scale, detected chords, notes, velocity lane |
+| Resamper — Editor | Editor | Sample inspector, overview, warp, stereo waveform, fades, clip gain |
+| Resamper — Arrangement · Automation | Arrange | Automation lanes, clip overlay envelope, automation inspector, automation arm + re-enable |
+| Resamper — Clip Automation | Piano Roll | MIDI clip envelopes (unlinked cutoff loop, pitch bend) |
+| Resamper — Audio Clip Automation | Editor | Audio clip envelopes (gain, pan, unlinked echo dry/wet) |
+| Resamper — Arrangement · Folders & Buses | Arrange | Folder tracks (bus / folder-only, expanded / collapsed), folder/bus inspector |
+| Resamper — Mixer · Folders & Buses | Mixer | Routing sidebar, group bands, compact strips, bus strips |
+| Resamper — Devices · Native & Plug-ins | Arrange | Native EQ Eight + Compressor cards, plug-in cards (VST3 / AU), floating plug-in window opened on insert, "plug-in added" toast |
+| Resamper — Sidechain | Arrange | Bass Compressor keyed from Drums › Kick: SC badges on both track headers, ducking trace, sidechain panel, plug-in aux input, source picker; Mixer shows SC badges on Drums head + Bass Opto Comp insert |
+| Resamper DS — Foundations | — | Tokens: colour (incl. `state-sidechain`), type, spacing, radius, sizing, elevation, rules |
+| Resamper DS — Components | — | 90 icon components (8 groups) + 69 reusable components (controls, mixer, arrangement, devices & plug-ins, sidechain) + interaction states |
+| Resamper DS — Patterns & Handoff | — | Signal flow, native vs plug-in rules, plug-in window rules, sidechain flow + rules, channel strip anatomy, tokens.css, component → code map |

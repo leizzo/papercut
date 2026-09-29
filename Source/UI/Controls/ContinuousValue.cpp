@@ -1,6 +1,6 @@
 #include "ContinuousValue.h"
 
-namespace papercut
+namespace resamper
 {
 
 ContinuousValue::ContinuousValue (Spec s) : spec (std::move (s))
@@ -113,4 +113,4 @@ void ContinuousValue::change (double newValue, bool continuesGesture)
         onChange (value, continuesGesture);
 }
 
-} // namespace papercut
+} // namespace resamper

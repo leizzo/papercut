@@ -3,7 +3,7 @@
 #include <juce_core/juce_core.h>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class ProjectManager;
@@ -53,7 +53,7 @@ public:
     bool renameScene (int index, const juce::String& name);
 
     /** Puts a WAV in an audio track's slot for the scene.
-        Fails if the track is MIDI (papercutKind == "midi"), the scene does not exist, or the file is missing.
+        Fails if the track is MIDI (resamperKind == "midi"), the scene does not exist, or the file is missing.
         The clip is parented to the ClipSlot, so it is not an Arrangement clip. */
     juce::Result addSlotClip (const juce::String& trackId, int sceneIndex, const juce::File& audioFile);
 
@@ -95,4 +95,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Session)
 };
 
-} // namespace papercut
+} // namespace resamper

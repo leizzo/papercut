@@ -3,7 +3,7 @@
 #include "UI/Layout/LayoutManager.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -44,4 +44,4 @@ void registerDeveloperCommands (CommandRegistry& registry, LayoutManager& layout
     registry.add (std::make_unique<ReloadThemeCommand> (themes, std::move (reportError)));
 }
 
-} // namespace papercut
+} // namespace resamper

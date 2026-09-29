@@ -1,6 +1,6 @@
 #include "StripParts.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -290,4 +290,4 @@ void paintColourBar (juce::Graphics& g, juce::Rectangle<float> strip, float radi
     g.fillRect (strip.withHeight ((float) StripMetrics::colourBarHeight));
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -2,7 +2,7 @@
 
 #include "Engine/PluginRack.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -78,4 +78,4 @@ void PluginEditorWindow::themeChanged()
         content->repaint();
 }
 
-} // namespace papercut
+} // namespace resamper

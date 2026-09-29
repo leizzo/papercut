@@ -6,7 +6,7 @@
 
 namespace te = tracktion;
 
-namespace papercut::test
+namespace resamper::test
 {
 
 namespace
@@ -34,7 +34,7 @@ namespace
 
 struct PluginRackTests : juce::UnitTest
 {
-    PluginRackTests() : juce::UnitTest ("Plugin Rack", "Papercut") {}
+    PluginRackTests() : juce::UnitTest ("Plugin Rack", "Resamper") {}
 
     struct Plugins : Fixture
     {
@@ -206,4 +206,4 @@ struct PluginRackTests : juce::UnitTest
 
 static PluginRackTests pluginRackTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

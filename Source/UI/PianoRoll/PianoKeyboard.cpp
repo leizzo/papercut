@@ -2,7 +2,7 @@
 #include "BeatGrid.h"
 #include "UI/State/ArrangementViewState.h"
 
-namespace papercut
+namespace resamper
 {
 
 PianoKeyboard::PianoKeyboard (ApplicationModel& m, ThemeManager& tm, ArrangementViewState& v)
@@ -54,4 +54,4 @@ void PianoKeyboard::mouseDown (const juce::MouseEvent&)
     model.selectNotes ({});
 }
 
-} // namespace papercut
+} // namespace resamper

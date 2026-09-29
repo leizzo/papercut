@@ -5,7 +5,7 @@
 
 #include <functional>
 
-namespace papercut
+namespace resamper
 {
 
 /** What model Commands need from the app beyond the Application Model.
@@ -123,4 +123,4 @@ juce::var tempoArgs (double bpm, bool continuesGesture = false);
 /** Arguments for transport.setTimeSignature. */
 juce::var timeSignatureArgs (int numerator, int denominator);
 
-} // namespace papercut
+} // namespace resamper

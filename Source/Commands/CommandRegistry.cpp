@@ -1,6 +1,6 @@
 #include "CommandRegistry.h"
 
-namespace papercut
+namespace resamper
 {
 
 void CommandRegistry::add (std::unique_ptr<Command> command)
@@ -30,4 +30,4 @@ const Command* CommandRegistry::find (const juce::String& commandId) const
     return it != commands.end() ? it->second.get() : nullptr;
 }
 
-} // namespace papercut
+} // namespace resamper

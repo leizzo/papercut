@@ -2,7 +2,7 @@
 
 #include "ProjectManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** Production operations over the current Edit (ADR-0012).
@@ -59,4 +59,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Production)
 };
 
-} // namespace papercut
+} // namespace resamper

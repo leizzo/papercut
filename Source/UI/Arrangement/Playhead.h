@@ -2,7 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
-namespace papercut
+namespace resamper
 {
 
 class ApplicationModel;
@@ -32,4 +32,4 @@ private:
     void timerCallback() override   { update(); }
 };
 
-} // namespace papercut
+} // namespace resamper

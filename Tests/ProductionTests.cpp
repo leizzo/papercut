@@ -9,7 +9,7 @@
 #include <tracktion_engine/tracktion_engine.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** Peak of a WAV, or 0 if the file is missing or empty. Same read as RenderTests. */
@@ -38,7 +38,7 @@ static juce::var sampleUIState()
 
 struct ProductionTests : juce::UnitTest
 {
-    ProductionTests() : juce::UnitTest ("Production", "Papercut") {}
+    ProductionTests() : juce::UnitTest ("Production", "Resamper") {}
 
     struct Harness
     {
@@ -257,4 +257,4 @@ struct ProductionTests : juce::UnitTest
 
 static ProductionTests productionTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

@@ -4,20 +4,20 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
 {
-    const juce::Identifier shaperFlag ("papercutShaper");
-    const juce::Identifier parameterKeyProperty ("papercutParameterKey");
-    const juce::Identifier lengthBeatsProperty ("papercutLengthBeats");
-    const juce::Identifier depthProperty ("papercutDepth");
-    const juce::Identifier attackProperty ("papercutAttackSeconds");
-    const juce::Identifier holdProperty ("papercutHoldSeconds");
-    const juce::Identifier releaseProperty ("papercutReleaseSeconds");
-    const juce::Identifier thresholdProperty ("papercutThresholdDb");
-    const juce::Identifier shapeType ("papercutShape");
+    const juce::Identifier shaperFlag ("resamperShaper");
+    const juce::Identifier parameterKeyProperty ("resamperParameterKey");
+    const juce::Identifier lengthBeatsProperty ("resamperLengthBeats");
+    const juce::Identifier depthProperty ("resamperDepth");
+    const juce::Identifier attackProperty ("resamperAttackSeconds");
+    const juce::Identifier holdProperty ("resamperHoldSeconds");
+    const juce::Identifier releaseProperty ("resamperReleaseSeconds");
+    const juce::Identifier thresholdProperty ("resamperThresholdDb");
+    const juce::Identifier shapeType ("resamperShape");
 
     te::AudioTrack* findTrack (te::Edit& edit, const juce::String& trackId)
     {
@@ -91,7 +91,7 @@ namespace
         return nullptr;
     }
 
-    bool isPapercutShaper (const te::Modifier& mod)
+    bool isResamperShaper (const te::Modifier& mod)
     {
         if (! (bool) mod.state[shaperFlag])
             return false;
@@ -137,7 +137,7 @@ namespace
 
         for (auto& point : points)
         {
-            juce::ValueTree child ("papercutShapePoint");
+            juce::ValueTree child ("resamperShapePoint");
             child.setProperty ("t", (double) point.time, nullptr);
             child.setProperty ("v", (double) point.value, nullptr);
             node.addChild (child, -1, nullptr);
@@ -255,7 +255,7 @@ namespace
     // rate is 1, so rate = (getBarFraction(quarter) * numerator) / lengthBeats
     // makes one cycle equal lengthBeats at the current time signature, for any
     // length the rate parameter can hold. Lengths outside that span cannot be
-    // represented by the rate enum, so papercutLengthBeats on the modifier
+    // represented by the rate enum, so resamperLengthBeats on the modifier
     // ValueTree is what getShapers() returns. syncType stays transport either
     // way, so the cycle still locks to playback.
     void configureLoopRate (te::Edit& edit, te::BreakpointOscillatorModifier& osc, double lengthBeats)
@@ -308,7 +308,7 @@ namespace
     // gain is the negation of the threshold, clipped to that range:
     //   gainDb = clamp(-thresholdDb, -20, 20)
     // threshold -20 dB -> gain +20 dB (sensitive); threshold 0 dB -> gain 0 dB.
-    // The requested threshold is stored as papercutThresholdDb so getShapers()
+    // The requested threshold is stored as resamperThresholdDb so getShapers()
     // round-trips values the gain parameter cannot represent.
     // Attack, hold, and release on the follower are milliseconds; the facade
     // speaks seconds and stores those seconds as app properties too.
@@ -362,7 +362,7 @@ namespace
 
             for (auto mod : list->getModifiers())
             {
-                if (mod->itemID.toString() == shaperId && isPapercutShaper (*mod))
+                if (mod->itemID.toString() == shaperId && isResamperShaper (*mod))
                 {
                     found.track = track;
                     found.modifier = mod;
@@ -534,7 +534,7 @@ std::vector<ShaperInfo> Shaper::getShapers (const juce::String& trackId) const
 
     for (auto mod : list->getModifiers())
     {
-        if (! isPapercutShaper (*mod))
+        if (! isResamperShaper (*mod))
             continue;
 
         ShaperInfo info;
@@ -579,4 +579,4 @@ std::vector<ShaperInfo> Shaper::getShapers (const juce::String& trackId) const
     return shapers;
 }
 
-} // namespace papercut
+} // namespace resamper

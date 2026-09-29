@@ -3,7 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
 
-namespace papercut
+namespace resamper
 {
 
 /** A clip's waveform, generated on a background thread by the engine's
@@ -37,4 +37,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (ClipWaveform)
 };
 
-} // namespace papercut
+} // namespace resamper

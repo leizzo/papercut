@@ -2,7 +2,7 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut
+namespace resamper
 {
 
 namespace te = tracktion;
@@ -24,4 +24,4 @@ namespace render
                         te::TimeRange range = {}, bool usePlugins = true);
 }
 
-} // namespace papercut
+} // namespace resamper

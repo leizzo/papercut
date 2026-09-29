@@ -4,7 +4,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -80,4 +80,4 @@ void TimelineHeader::mouseUp (const juce::MouseEvent&)
     repaint();
 }
 
-} // namespace papercut
+} // namespace resamper

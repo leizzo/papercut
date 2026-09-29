@@ -3,7 +3,7 @@
 #include "Commands/ApplicationCommandTable.h"
 #include "UI/Controls/Menus.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -184,7 +184,7 @@ void TopBar::paint (juce::Graphics& g)
     brand.removeFromLeft (8);
     g.setColour (theme.textPrimary);
     g.setFont (themeManager.font (TypeStyle { 15.0f, false, 700 }));
-    g.drawText ("PAPERCUT", brand, juce::Justification::centredLeft, false);
+    g.drawText ("RESAMPER", brand, juce::Justification::centredLeft, false);
 
     // Menu titles.
     g.setFont (themeManager.font (TypeStyle { 12.5f, false, 400 }));
@@ -244,7 +244,7 @@ void TopBar::resized()
     const auto menuFont = themeManager.font (TypeStyle { 12.5f, false, 400 });
     const auto numberFont = themeManager.numberFont (TypeStyle { 14.0f, true, 400 });
 
-    const auto brandWidth = 22 + 8 + stringWidth (themeManager.font (TypeStyle { 15.0f, false, 700 }), "PAPERCUT");
+    const auto brandWidth = 22 + 8 + stringWidth (themeManager.font (TypeStyle { 15.0f, false, 700 }), "RESAMPER");
     auto menuWidth = [&] (bool compact)
     {
         if (compact)
@@ -351,4 +351,4 @@ void TopBar::mouseDown (const juce::MouseEvent& e)
     }
 }
 
-} // namespace papercut
+} // namespace resamper

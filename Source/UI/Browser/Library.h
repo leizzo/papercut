@@ -7,7 +7,7 @@
 #include <optional>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 /** The Browser's categories (PRD §6.2), in display order. */
@@ -35,7 +35,7 @@ class Library
 public:
     Library (std::function<juce::Array<PluginInfo>()> catalogue, juce::File root);
 
-    /** ~/Music/Papercut. */
+    /** ~/Music/Resamper. */
     static juce::File defaultRoot();
 
     static juce::String nameOf (LibraryCategory);
@@ -68,4 +68,4 @@ class CommandRegistry;
     sample as a clip at startSeconds. */
 void dropOnTrack (CommandRegistry&, const LibraryItem&, const juce::String& trackId, double startSeconds);
 
-} // namespace papercut
+} // namespace resamper

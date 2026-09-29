@@ -19,7 +19,7 @@
 #include "UI/State/UIStateStore.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -27,7 +27,7 @@ namespace
     juce::File lastProjectFile()
     {
         return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-                   .getChildFile ("Papercut")
+                   .getChildFile ("Resamper")
                    .getChildFile ("last-project.txt");
     }
 
@@ -52,11 +52,11 @@ namespace
     }
 }
 
-class PapercutApplication : public juce::JUCEApplication,
+class ResamperApplication : public juce::JUCEApplication,
                             private juce::Timer
 {
 public:
-    const juce::String getApplicationName() override       { return "Papercut"; }
+    const juce::String getApplicationName() override       { return "Resamper"; }
     const juce::String getApplicationVersion() override    { return "0.1.0"; }
     bool moreThanOneInstanceAllowed() override             { return false; }
 
@@ -145,7 +145,7 @@ public:
                              + "\" was found. Open it?";
 
         juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon,
-                                            "Papercut", message, "Open Recovery", "Skip",
+                                            "Resamper", message, "Open Recovery", "Skip",
                                             mainWindow.get(),
                                             juce::ModalCallbackFunction::create ([this, recovery] (int result)
                                             {
@@ -236,10 +236,10 @@ private:
 
     static void reportError (const juce::String& message)
     {
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Papercut", message);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Resamper", message);
     }
 };
 
-} // namespace papercut
+} // namespace resamper
 
-START_JUCE_APPLICATION (papercut::PapercutApplication)
+START_JUCE_APPLICATION (resamper::ResamperApplication)

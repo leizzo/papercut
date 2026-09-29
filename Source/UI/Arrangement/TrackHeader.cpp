@@ -1,7 +1,7 @@
 #include "TrackHeader.h"
 #include "Commands/AppCommands.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -145,4 +145,4 @@ void TrackHeader::showMenu()
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
-} // namespace papercut
+} // namespace resamper

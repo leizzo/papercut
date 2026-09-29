@@ -1,6 +1,6 @@
 #include "InsertSlot.h"
 
-namespace papercut
+namespace resamper
 {
 
 InsertSlot::InsertSlot (ThemeManager& tm, int i) : themeManager (tm), index (i)
@@ -118,4 +118,4 @@ void InsertSlot::mouseDrag (const juce::MouseEvent& e)
     }
 }
 
-} // namespace papercut
+} // namespace resamper

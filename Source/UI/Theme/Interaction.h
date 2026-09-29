@@ -2,7 +2,7 @@
 
 #include "ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** Where an interactive component is in the PRD §15.5 state model. */
@@ -54,4 +54,4 @@ void drawNumber (juce::Graphics&, const ThemeManager&, const juce::String& text,
 void drawStyledText (juce::Graphics&, const ThemeManager&, const juce::String& text, const TypeStyle&,
                      juce::Rectangle<int> area, juce::Justification, juce::Colour);
 
-} // namespace papercut
+} // namespace resamper

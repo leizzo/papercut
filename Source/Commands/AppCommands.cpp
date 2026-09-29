@@ -5,7 +5,7 @@
 
 #include "Engine/ApplicationModel.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -974,4 +974,4 @@ juce::var clipColourArgs (const juce::String& clipId, int colourIndex)
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

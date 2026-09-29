@@ -4,7 +4,7 @@
 #include "Metering.h"
 #include "UI/Controls/ContinuousControl.h"
 
-namespace papercut
+namespace resamper
 {
 
 /** The measures every mixer strip shares (PRD §10.1), so strips line up. */
@@ -126,4 +126,4 @@ ContinuousValue::Spec gainReadoutSpec();
 /** Where the fader law puts a dB value in an area, as a y. */
 float yForDb (juce::Rectangle<float> travel, double db);
 
-} // namespace papercut
+} // namespace resamper

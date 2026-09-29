@@ -2,7 +2,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 TrackList::TrackList (CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
@@ -73,4 +73,4 @@ void TrackList::mouseDown (const juce::MouseEvent& e)
         onRowClicked (view.yToRow (e.y, view.getLaneHeight (themeManager.getMetrics().trackHeight)), e.mods);
 }
 
-} // namespace papercut
+} // namespace resamper

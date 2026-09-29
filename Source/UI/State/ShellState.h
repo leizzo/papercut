@@ -2,7 +2,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -58,4 +58,4 @@ private:
 */
 void registerShellCommands (CommandRegistry&, ShellState&);
 
-} // namespace papercut
+} // namespace resamper

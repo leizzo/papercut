@@ -4,7 +4,7 @@
 #include "UI/State/UIStateStore.h"
 #include "UI/Theme/Interaction.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -290,4 +290,4 @@ void ArrangementView::mouseMagnify (const juce::MouseEvent& e, float scaleFactor
     view.zoomAround (scaleFactor, (float) e.getEventRelativeTo (&timeline).x);
 }
 
-} // namespace papercut
+} // namespace resamper

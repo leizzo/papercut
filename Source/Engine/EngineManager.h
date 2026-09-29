@@ -5,7 +5,7 @@
 
 namespace tracktion::inline engine { class Engine; }
 
-namespace papercut
+namespace resamper
 {
 
 /** The single owner and creation point of the Tracktion Engine.
@@ -37,4 +37,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (EngineManager)
 };
 
-} // namespace papercut
+} // namespace resamper

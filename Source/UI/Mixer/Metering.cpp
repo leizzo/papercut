@@ -3,7 +3,7 @@
 #include <array>
 #include <cmath>
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -80,4 +80,4 @@ double MeterBallistics::update (double levelDb, double elapsedSeconds)
     return power <= 1.0e-10 ? FaderLaw::floorDb : std::max (FaderLaw::floorDb, 10.0 * std::log10 (power));
 }
 
-} // namespace papercut
+} // namespace resamper

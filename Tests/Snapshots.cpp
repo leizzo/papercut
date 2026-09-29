@@ -15,12 +15,12 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
-/** Not a test: renders the whole window offscreen to PNGs in /tmp/papercut-snapshots,
+/** Not a test: renders the whole window offscreen to PNGs in /tmp/resamper-snapshots,
     one per view, for eyeballing against the design. Run with
-    `PapercutTests --snapshot`. */
+    `ResamperTests --snapshot`. */
 struct Snapshots : juce::UnitTest
 {
     Snapshots() : juce::UnitTest ("Window snapshots", "Snapshot") {}
@@ -75,7 +75,7 @@ struct Snapshots : juce::UnitTest
                                 commandManager);
             main.setSize (size.x, size.y);
 
-            auto dir = juce::File ("/tmp/papercut-snapshots");
+            auto dir = juce::File ("/tmp/resamper-snapshots");
             dir.createDirectory();
 
             for (auto* view : { "session", "arrange", "mixer", "pianoRoll", "editor" })
@@ -97,4 +97,4 @@ struct Snapshots : juce::UnitTest
 
 static Snapshots snapshots;
 
-} // namespace papercut::test
+} // namespace resamper::test

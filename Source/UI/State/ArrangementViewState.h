@@ -2,7 +2,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 
-namespace papercut
+namespace resamper
 {
 
 /** Zoom and scroll for the Arrangement, and the single owner of the
@@ -70,4 +70,4 @@ private:
     double zoomMin = minPixelsPerSecond, zoomMax = maxPixelsPerSecond;
 };
 
-} // namespace papercut
+} // namespace resamper

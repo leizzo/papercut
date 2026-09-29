@@ -1,7 +1,7 @@
 #include "ShellState.h"
 #include "Commands/CommandRegistry.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -117,4 +117,4 @@ void registerShellCommands (CommandRegistry& registry, ShellState& shell)
     add ("view.toggleFollow", "Follow", [&shell] { shell.setFollowing (! shell.isFollowing()); });
 }
 
-} // namespace papercut
+} // namespace resamper

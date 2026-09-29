@@ -5,7 +5,7 @@
 #include "Engine/ApplicationModel.h"
 #include "Commands/AppCommands.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The run's single headless EngineManager (no audio device). */
@@ -45,4 +45,4 @@ struct Fixture
     returns the peak level (0 if nothing rendered). */
 float renderPeak (Fixture&);
 
-} // namespace papercut::test
+} // namespace resamper::test

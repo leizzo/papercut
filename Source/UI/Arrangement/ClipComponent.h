@@ -2,7 +2,7 @@
 
 #include "Engine/ApplicationModel.h"
 
-namespace papercut
+namespace resamper
 {
 
 class ThemeManager;
@@ -33,4 +33,4 @@ private:
     std::unique_ptr<ClipWaveform> waveform;
 };
 
-} // namespace papercut
+} // namespace resamper

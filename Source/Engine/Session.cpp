@@ -8,12 +8,12 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
 {
-    const juce::Identifier trackKindProperty ("papercutKind");
+    const juce::Identifier trackKindProperty ("resamperKind");
 
     te::AudioTrack* findTrack (te::Edit& edit, const juce::String& trackId)
     {
@@ -515,4 +515,4 @@ juce::Result Session::recordIntoArrangement()
     return juce::Result::ok();
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace papercut
+namespace resamper
 {
 
 /** `InsertSlot/Filled · Empty` (PRD §10.2, §10.6): one mixer insert slot, 19
@@ -43,4 +43,4 @@ private:
     bool dragStarted = false;
 };
 
-} // namespace papercut
+} // namespace resamper

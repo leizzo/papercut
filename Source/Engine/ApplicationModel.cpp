@@ -9,7 +9,7 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 struct ApplicationModel::Impl : private juce::ValueTree::Listener,
@@ -550,9 +550,9 @@ bool ApplicationModel::isProjectUntitled() const        { return impl->projectMa
 juce::String ApplicationModel::getProjectName() const   { return impl->projectManager.getProjectName(); }
 
 //==============================================================================
-const juce::Identifier ApplicationModel::Impl::trackKindProperty { "papercutKind" };
-const juce::Identifier ApplicationModel::Impl::noteIdProperty { "papercutNoteId" };
-const juce::Identifier ApplicationModel::Impl::trackColourProperty { "papercutColour" };
+const juce::Identifier ApplicationModel::Impl::trackKindProperty { "resamperKind" };
+const juce::Identifier ApplicationModel::Impl::noteIdProperty { "resamperNoteId" };
+const juce::Identifier ApplicationModel::Impl::trackColourProperty { "resamperColour" };
 
 bool ApplicationModel::setTrackColour (const juce::String& trackId, int colourIndex)
 {
@@ -1878,4 +1878,4 @@ std::unique_ptr<ClipWaveform> ApplicationModel::createRecordingWaveform (const j
 void ApplicationModel::addListener (Listener* l)      { impl->listeners.add (l); }
 void ApplicationModel::removeListener (Listener* l)   { impl->listeners.remove (l); }
 
-} // namespace papercut
+} // namespace resamper

@@ -1,12 +1,12 @@
 #include "TestFixture.h"
 #include "Commands/MixerCommands.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct MixerTests : juce::UnitTest
 {
-    MixerTests() : juce::UnitTest ("Mixer", "Papercut") {}
+    MixerTests() : juce::UnitTest ("Mixer", "Resamper") {}
 
     struct MixerFixture : Fixture
     {
@@ -182,4 +182,4 @@ struct MixerTests : juce::UnitTest
 
 static MixerTests mixerTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

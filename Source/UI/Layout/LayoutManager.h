@@ -2,7 +2,7 @@
 
 #include "ComponentFactory.h"
 
-namespace papercut
+namespace resamper
 {
 
 class LayoutSource;
@@ -69,4 +69,4 @@ private:
     void restoreFocus (LayoutHost&);
 };
 
-} // namespace papercut
+} // namespace resamper

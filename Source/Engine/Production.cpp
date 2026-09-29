@@ -5,7 +5,7 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -257,4 +257,4 @@ bool Production::hasNewerRecovery (const juce::File& projectFolder)
            >= projectEdits.getFirst().getLastModificationTime();
 }
 
-} // namespace papercut
+} // namespace resamper

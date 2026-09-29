@@ -5,7 +5,7 @@
 #include <map>
 #include <optional>
 
-namespace papercut
+namespace resamper
 {
 
 class ArrangementViewState;
@@ -96,4 +96,4 @@ private:
     void timerCallback() override;
 };
 
-} // namespace papercut
+} // namespace resamper

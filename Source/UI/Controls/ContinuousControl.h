@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace papercut
+namespace resamper
 {
 
 /** The accent pill that follows the pointer while a value is dragged (`ValueTag`):
@@ -182,4 +182,4 @@ private:
     bool raised = false;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -3,7 +3,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -46,4 +46,4 @@ void Playhead::paint (juce::Graphics& g)
     g.fillPath (tip);
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -1,12 +1,12 @@
 #include "TestFixture.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** Arrangement clip operations (PRD §8.2) at the Command seam. */
 struct ClipOperationTests : juce::UnitTest
 {
-    ClipOperationTests() : juce::UnitTest ("Clip Operations", "Papercut") {}
+    ClipOperationTests() : juce::UnitTest ("Clip Operations", "Resamper") {}
 
     /** An audio track with a 1 s tone at 0, and a MIDI track with a one-bar clip holding 3 notes. */
     struct Clips : Fixture
@@ -222,4 +222,4 @@ struct ClipOperationTests : juce::UnitTest
 
 static ClipOperationTests clipOperationTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

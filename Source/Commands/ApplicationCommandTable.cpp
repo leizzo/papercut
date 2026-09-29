@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -245,4 +245,4 @@ juce::var bindingArgs (const KeyBinding& b)
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -5,7 +5,7 @@
 #include "UI/Controls/Controls.h"
 #include "UI/State/ShellState.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -59,4 +59,4 @@ private:
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override   { refresh(); }
 };
 
-} // namespace papercut
+} // namespace resamper

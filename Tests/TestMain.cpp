@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 namespace
@@ -16,15 +16,15 @@ EngineManager& getEngineManager()
     return *engineManager;
 }
 
-} // namespace papercut::test
+} // namespace resamper::test
 
 int main (int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
 
     // The whole run shares one headless engine, as Tracktion's own TestRunner does.
-    papercut::EngineManager engine ("PapercutTests", papercut::EngineManager::AudioDevice::none);
-    papercut::test::engineManager = &engine;
+    resamper::EngineManager engine ("ResamperTests", resamper::EngineManager::AudioDevice::none);
+    resamper::test::engineManager = &engine;
 
     juce::UnitTestRunner runner;
     runner.setAssertOnFailure (false);
@@ -36,7 +36,7 @@ int main (int argc, char** argv)
     const auto snapshot = argc >= 2 && juce::String (argv[1]) == "--snapshot";
     const auto filter = snapshot ? (argc >= 3 ? juce::String (argv[2]) : juce::String()) : (argc >= 2 ? juce::String (argv[1]) : juce::String());
 
-    for (auto* t : juce::UnitTest::getTestsInCategory (snapshot ? "Snapshot" : "Papercut"))
+    for (auto* t : juce::UnitTest::getTestsInCategory (snapshot ? "Snapshot" : "Resamper"))
         if (filter.isEmpty() || t->getName().containsIgnoreCase (filter))
             selected.add (t);
 
@@ -47,7 +47,7 @@ int main (int argc, char** argv)
     for (int i = 0; i < runner.getNumResults(); ++i)
         failures += runner.getResult (i)->failures;
 
-    papercut::test::engineManager = nullptr;
+    resamper::test::engineManager = nullptr;
     std::cout << (failures == 0 ? "ALL TESTS PASSED" : juce::String (failures) + " FAILURE(S)") << std::endl;
     return failures == 0 ? 0 : 1;
 }

@@ -4,14 +4,14 @@
 #include "UI/Layout/Primitives.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The declarative layer's failure behaviour: broken layouts must fail loudly.
     (Rendering correctness is deliberately not covered.) */
 struct ComponentFactoryTests : juce::UnitTest
 {
-    ComponentFactoryTests() : juce::UnitTest ("ComponentFactory", "Papercut") {}
+    ComponentFactoryTests() : juce::UnitTest ("ComponentFactory", "Resamper") {}
 
     struct Setup
     {
@@ -114,4 +114,4 @@ struct ComponentFactoryTests : juce::UnitTest
 
 static ComponentFactoryTests componentFactoryTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

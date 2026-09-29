@@ -1,14 +1,14 @@
 #include "LayoutSource.h"
 
-#include <PapercutResources.h>
+#include <ResamperResources.h>
 
-namespace papercut
+namespace resamper
 {
 
 LayoutSource::LayoutSource()
 {
-   #ifdef PAPERCUT_DEV_UI_DIR
-    if (juce::File dir (PAPERCUT_DEV_UI_DIR); dir.isDirectory())
+   #ifdef RESAMPER_DEV_UI_DIR
+    if (juce::File dir (RESAMPER_DEV_UI_DIR); dir.isDirectory())
         devDirectory = dir;
    #endif
 }
@@ -38,14 +38,14 @@ juce::Result LayoutSource::readData (const juce::String& relativePath, juce::Mem
 
     const auto fileName = relativePath.fromLastOccurrenceOf ("/", false, false);
 
-    for (int i = 0; i < PapercutResources::namedResourceListSize; ++i)
+    for (int i = 0; i < ResamperResources::namedResourceListSize; ++i)
     {
-        auto* name = PapercutResources::namedResourceList[i];
+        auto* name = ResamperResources::namedResourceList[i];
 
-        if (fileName == PapercutResources::getNamedResourceOriginalFilename (name))
+        if (fileName == ResamperResources::getNamedResourceOriginalFilename (name))
         {
             int size = 0;
-            auto* bytes = PapercutResources::getNamedResource (name, size);
+            auto* bytes = ResamperResources::getNamedResource (name, size);
             data.replaceAll (bytes, (size_t) size);
             return juce::Result::ok();
         }
@@ -54,4 +54,4 @@ juce::Result LayoutSource::readData (const juce::String& relativePath, juce::Mem
     return juce::Result::fail ("UI file not embedded: " + relativePath);
 }
 
-} // namespace papercut
+} // namespace resamper

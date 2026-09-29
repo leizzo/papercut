@@ -1,7 +1,7 @@
 #include "ClipComponent.h"
 #include "UI/Theme/Interaction.h"
 
-namespace papercut
+namespace resamper
 {
 
 ClipComponent::ClipComponent (ApplicationModel& m, ThemeManager& tm, const ClipInfo& info)
@@ -124,4 +124,4 @@ void ClipComponent::paint (juce::Graphics& g)
     }
 }
 
-} // namespace papercut
+} // namespace resamper

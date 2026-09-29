@@ -1,11 +1,11 @@
 #include "TestFixture.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct ClipCommandTests : juce::UnitTest
 {
-    ClipCommandTests() : juce::UnitTest ("Clip Commands", "Papercut") {}
+    ClipCommandTests() : juce::UnitTest ("Clip Commands", "Resamper") {}
 
     void runTest() override
     {
@@ -112,4 +112,4 @@ struct ClipCommandTests : juce::UnitTest
 
 static ClipCommandTests clipCommandTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

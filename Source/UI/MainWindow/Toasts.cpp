@@ -1,6 +1,6 @@
 #include "Toasts.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -118,4 +118,4 @@ void Toasts::timerCallback()
         stopTimer();
 }
 
-} // namespace papercut
+} // namespace resamper

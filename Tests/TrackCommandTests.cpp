@@ -1,11 +1,11 @@
 #include "TestFixture.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct TrackCommandTests : juce::UnitTest
 {
-    TrackCommandTests() : juce::UnitTest ("Track Commands", "Papercut") {}
+    TrackCommandTests() : juce::UnitTest ("Track Commands", "Resamper") {}
 
     void runTest() override
     {
@@ -123,4 +123,4 @@ struct TrackCommandTests : juce::UnitTest
 
 static TrackCommandTests trackCommandTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

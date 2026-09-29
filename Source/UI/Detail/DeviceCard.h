@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -60,4 +60,4 @@ private:
     void showMenu();
 };
 
-} // namespace papercut
+} // namespace resamper

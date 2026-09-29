@@ -2,12 +2,12 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct MidiTrackTests : juce::UnitTest
 {
-    MidiTrackTests() : juce::UnitTest ("MIDI Tracks", "Papercut") {}
+    MidiTrackTests() : juce::UnitTest ("MIDI Tracks", "Resamper") {}
 
     /** Note editing is Phase 5b, so a test that needs notes places one through the engine. */
     void placeNote (Fixture& f, int pitch, double startBeat, double lengthBeats)
@@ -338,4 +338,4 @@ struct MidiTrackTests : juce::UnitTest
 
 static MidiTrackTests midiTrackTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

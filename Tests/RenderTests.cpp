@@ -2,14 +2,14 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** End-to-end audio proof without a device: Commands build the Edit, the
     engine renders it offline, and the result must be audible. */
 struct RenderTests : juce::UnitTest
 {
-    RenderTests() : juce::UnitTest ("Offline Render", "Papercut") {}
+    RenderTests() : juce::UnitTest ("Offline Render", "Resamper") {}
 
     void runTest() override
     {
@@ -83,4 +83,4 @@ struct RenderTests : juce::UnitTest
 
 static RenderTests renderTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

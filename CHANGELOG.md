@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Papercut are documented in this file.
+All notable changes to Resamper are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -12,7 +12,7 @@ release is published on GitHub as an alpha pre-release.
 ## [0.1.0] - 2026-09-28
 
 Milestone **M1 — Core**: shell, transport, Arrangement, device chain with plug-ins,
-basic Mixer, and the Papercut design system.
+basic Mixer, and the Resamper design system.
 
 ### Added
 
@@ -22,7 +22,7 @@ basic Mixer, and the Papercut design system.
 - Audio recording with input selection, live waveform and takes.
 - MIDI tracks and clips, piano roll note editing and quantize.
 - Plug-ins, mixer, shapers, session and recovery foundations.
-- Design tokens: Papercut DS colours, type and scales (#17).
+- Design tokens: Resamper DS colours, type and scales (#17).
 - Shared control library and continuous-control interaction model (#18).
 - Top bar with menu, transport, status readouts and view switcher (#19).
 - Library Browser with search, categories, drag to track and sample preview (#20).
@@ -51,5 +51,5 @@ basic Mixer, and the Papercut design system.
 - Silent tempo-tagged loops with no waveform.
 - M1 review findings and design parity in lanes, devices and the mixer.
 
-[Unreleased]: https://github.com/leizzo/papercut/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/leizzo/papercut/releases/tag/v0.1.0
+[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/leizzo/resamper/releases/tag/v0.1.0

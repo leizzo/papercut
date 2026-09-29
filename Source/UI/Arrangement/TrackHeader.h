@@ -3,7 +3,7 @@
 #include "Engine/ApplicationModel.h"
 #include "UI/Controls/Controls.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -49,4 +49,4 @@ private:
     void showMenu();
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -2,12 +2,12 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct NoteEditingTests : juce::UnitTest
 {
-    NoteEditingTests() : juce::UnitTest ("Note Editing", "Papercut") {}
+    NoteEditingTests() : juce::UnitTest ("Note Editing", "Resamper") {}
 
     /** A MIDI track and one empty one-bar clip at the playhead. At the default
         120 bpm a quarter note is half a second and the bar is two seconds. */
@@ -332,4 +332,4 @@ struct NoteEditingTests : juce::UnitTest
 
 static NoteEditingTests noteEditingTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

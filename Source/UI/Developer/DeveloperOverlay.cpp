@@ -1,6 +1,6 @@
 #include "DeveloperOverlay.h"
 
-namespace papercut
+namespace resamper
 {
 
 DeveloperOverlay::DeveloperOverlay (ThemeManager& tm)
@@ -52,4 +52,4 @@ void DeveloperOverlay::applyTheme()
     status.setColour (juce::Label::backgroundColourId, themes.getTheme().panel);
 }
 
-} // namespace papercut
+} // namespace resamper

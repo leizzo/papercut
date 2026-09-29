@@ -2,7 +2,7 @@
 
 #include "CommandRegistry.h"
 
-namespace papercut
+namespace resamper
 {
 
 class Session;
@@ -35,4 +35,4 @@ juce::var sessionSlotArgs (const juce::String& trackId, int sceneIndex);
 /** Arguments for session.launchScene. */
 juce::var sessionSceneArgs (int index);
 
-} // namespace papercut
+} // namespace resamper

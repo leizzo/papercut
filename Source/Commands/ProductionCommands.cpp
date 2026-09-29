@@ -6,7 +6,7 @@
 #include "Engine/Production.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -288,4 +288,4 @@ juce::var themeFileArgs (const juce::String& file)
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

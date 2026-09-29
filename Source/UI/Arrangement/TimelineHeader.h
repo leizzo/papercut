@@ -4,7 +4,7 @@
 
 #include <optional>
 
-namespace papercut
+namespace resamper
 {
 
 class ArrangementViewState;
@@ -35,4 +35,4 @@ private:
     std::optional<TimeRangeSeconds> draggedLoop;   ///< previewed until release
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -2,7 +2,7 @@
 #include "Commands/MixerCommands.h"
 #include "UI/Controls/Icons.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -58,4 +58,4 @@ void MasterStrip::resized()
     faderSection.setBounds (r);
 }
 
-} // namespace papercut
+} // namespace resamper

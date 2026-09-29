@@ -8,7 +8,7 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -493,4 +493,4 @@ bool Mixer::setMasterVolume (double db, bool continuesGesture)
 
 
 
-} // namespace papercut
+} // namespace resamper

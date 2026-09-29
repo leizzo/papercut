@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace papercut
+namespace resamper
 {
 
 /** Base of the design-system buttons (PRD §15.4 Controls). Paints nothing
@@ -159,4 +159,4 @@ private:
     const TypeStyle& textStyle() const;
 };
 
-} // namespace papercut
+} // namespace resamper

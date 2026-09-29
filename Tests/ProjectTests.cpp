@@ -1,11 +1,11 @@
 #include "TestFixture.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct ProjectTests : juce::UnitTest
 {
-    ProjectTests() : juce::UnitTest ("Projects", "Papercut") {}
+    ProjectTests() : juce::UnitTest ("Projects", "Resamper") {}
 
     static juce::var sampleUIState()
     {
@@ -167,4 +167,4 @@ struct ProjectTests : juce::UnitTest
 
 static ProjectTests projectTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

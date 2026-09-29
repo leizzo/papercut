@@ -3,7 +3,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 VelocityEditor::VelocityEditor (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
@@ -113,4 +113,4 @@ void VelocityEditor::mouseUp (const juce::MouseEvent& e)
     reload();
 }
 
-} // namespace papercut
+} // namespace resamper

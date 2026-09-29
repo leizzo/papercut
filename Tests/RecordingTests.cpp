@@ -5,7 +5,7 @@
 
 namespace te = tracktion;
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** Feeds audio into the engine through its hosted device, in place of a
@@ -74,7 +74,7 @@ struct HostedAudio
 
 struct RecordingTests : juce::UnitTest
 {
-    RecordingTests() : juce::UnitTest ("Recording", "Papercut") {}
+    RecordingTests() : juce::UnitTest ("Recording", "Resamper") {}
 
     /** A Project with one track, running on the hosted device (created first,
         so the Edit sees its inputs). */
@@ -570,4 +570,4 @@ struct RecordingTests : juce::UnitTest
 
 static RecordingTests recordingTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

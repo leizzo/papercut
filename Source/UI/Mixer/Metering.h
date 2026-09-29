@@ -2,7 +2,7 @@
 
 #include <juce_core/juce_core.h>
 
-namespace papercut
+namespace resamper
 {
 
 /** The fader's dB law (PRD §10.3, normative): piecewise linear between
@@ -55,4 +55,4 @@ private:
     double power = 0;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -2,7 +2,7 @@
 
 #include <juce_core/juce_core.h>
 
-namespace papercut
+namespace resamper
 {
 
 /** Reads UI files (layouts, themes, fonts) by path relative to the UI/ folder.
@@ -29,4 +29,4 @@ private:
     juce::File devDirectory;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -2,7 +2,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 
-namespace papercut
+namespace resamper
 {
 
 /** App-owned UI State (ADR-0004): zoom, scroll, focus — keyed by component ID.
@@ -29,4 +29,4 @@ private:
     juce::ValueTree root { "UIState" };
 };
 
-} // namespace papercut
+} // namespace resamper

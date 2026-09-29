@@ -1,6 +1,6 @@
 #include "Controls.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -451,4 +451,4 @@ std::unique_ptr<juce::AccessibilityHandler> Segmented::createAccessibilityHandle
                                                          juce::AccessibilityHandler::Interfaces { std::make_unique<Value> (*this) });
 }
 
-} // namespace papercut
+} // namespace resamper

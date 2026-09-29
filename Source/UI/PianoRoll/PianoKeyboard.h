@@ -3,7 +3,7 @@
 #include "Engine/ApplicationModel.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 class ArrangementViewState;
@@ -25,4 +25,4 @@ private:
     ArrangementViewState& view;
 };
 
-} // namespace papercut
+} // namespace resamper

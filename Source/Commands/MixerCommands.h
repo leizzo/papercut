@@ -3,7 +3,7 @@
 #include "CommandRegistry.h"
 #include "Engine/Mixer.h"
 
-namespace papercut
+namespace resamper
 {
 
 struct AppCommandHost;
@@ -41,4 +41,4 @@ juce::var moveToBusArgs (const juce::String& trackId, const juce::String& busTra
 /** Arguments for mixer.setMasterVolume. continuesGesture as for sendGainArgs. */
 juce::var masterVolumeArgs (double db, bool continuesGesture = false);
 
-} // namespace papercut
+} // namespace resamper

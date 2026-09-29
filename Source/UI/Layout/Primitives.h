@@ -2,7 +2,7 @@
 
 #include "ComponentFactory.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -39,4 +39,4 @@ private:
 */
 void registerPrimitives (ComponentFactory&, CommandRegistry&, ThemeManager&);
 
-} // namespace papercut
+} // namespace resamper

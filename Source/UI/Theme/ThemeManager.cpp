@@ -1,15 +1,15 @@
 #include "ThemeManager.h"
 #include "UI/Layout/LayoutSource.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
 {
-    class PapercutLookAndFeel : public juce::LookAndFeel_V4
+    class ResamperLookAndFeel : public juce::LookAndFeel_V4
     {
     public:
-        explicit PapercutLookAndFeel (const ThemeManager& tm) : themeManager (tm) {}
+        explicit ResamperLookAndFeel (const ThemeManager& tm) : themeManager (tm) {}
 
         void apply (const Theme& t)
         {
@@ -318,7 +318,7 @@ struct ThemeManager::Fonts
 ThemeManager::ThemeManager (const LayoutSource& s, juce::String file)
     : source (s), themeFile (std::move (file)),
       fonts (std::make_unique<Fonts>()),
-      lookAndFeel (std::make_unique<PapercutLookAndFeel> (*this))
+      lookAndFeel (std::make_unique<ResamperLookAndFeel> (*this))
 {
 }
 
@@ -523,7 +523,7 @@ juce::Result ThemeManager::load()
 
     theme = newTheme;
     metrics = newMetrics;
-    static_cast<PapercutLookAndFeel&> (*lookAndFeel).apply (theme);
+    static_cast<ResamperLookAndFeel&> (*lookAndFeel).apply (theme);
     return juce::Result::ok();
 }
 
@@ -536,7 +536,7 @@ juce::Result ThemeManager::reloadTheme()
         return r;
 
     theme = newTheme;
-    static_cast<PapercutLookAndFeel&> (*lookAndFeel).apply (theme);
+    static_cast<ResamperLookAndFeel&> (*lookAndFeel).apply (theme);
     listeners.call ([] (Listener& l) { l.themeChanged(); });
     return juce::Result::ok();
 }
@@ -555,4 +555,4 @@ juce::Result ThemeManager::useTheme (juce::String file)
     return juce::Result::ok();
 }
 
-} // namespace papercut
+} // namespace resamper

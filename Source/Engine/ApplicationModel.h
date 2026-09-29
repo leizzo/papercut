@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class ProjectManager;
@@ -415,4 +415,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (ApplicationModel)
 };
 
-} // namespace papercut
+} // namespace resamper

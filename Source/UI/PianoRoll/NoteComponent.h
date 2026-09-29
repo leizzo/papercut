@@ -2,7 +2,7 @@
 
 #include "Engine/ApplicationModel.h"
 
-namespace papercut
+namespace resamper
 {
 
 class ThemeManager;
@@ -23,4 +23,4 @@ private:
     MidiNoteInfo note;
 };
 
-} // namespace papercut
+} // namespace resamper

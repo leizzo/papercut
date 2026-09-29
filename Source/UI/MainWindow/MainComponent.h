@@ -15,7 +15,7 @@
 #include "Toasts.h"
 #include "TopBar.h"
 
-namespace papercut
+namespace resamper
 {
 
 class LayoutSource;
@@ -127,4 +127,4 @@ private:
     void themeChanged() override;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -1,12 +1,12 @@
 #include "TestFixture.h"
 #include "Commands/TapTempo.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 struct TransportCommandTests : juce::UnitTest
 {
-    TransportCommandTests() : juce::UnitTest ("Transport Commands", "Papercut") {}
+    TransportCommandTests() : juce::UnitTest ("Transport Commands", "Resamper") {}
 
     void runTest() override
     {
@@ -210,4 +210,4 @@ struct TransportCommandTests : juce::UnitTest
 
 static TransportCommandTests transportCommandTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

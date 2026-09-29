@@ -4,7 +4,7 @@
 #include "Engine/ApplicationModel.h"
 #include "UI/State/ShellState.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -59,4 +59,4 @@ private:
     void modelChanged() override   { refresh(); }
 };
 
-} // namespace papercut
+} // namespace resamper

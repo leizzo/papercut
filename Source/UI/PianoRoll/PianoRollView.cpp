@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -265,4 +265,4 @@ void PianoRollView::valueTreePropertyChanged (juce::ValueTree&, const juce::Iden
     playhead.update();
 }
 
-} // namespace papercut
+} // namespace resamper

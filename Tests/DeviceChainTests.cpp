@@ -8,14 +8,14 @@
 
 namespace te = tracktion;
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** A track's two chains (PRD §4.1–4.2): the device chain (sound design) and
     the mixer inserts (console processing, effects only, at most 8). */
 struct DeviceChainTests : juce::UnitTest
 {
-    DeviceChainTests() : juce::UnitTest ("Device Chain", "Papercut") {}
+    DeviceChainTests() : juce::UnitTest ("Device Chain", "Resamper") {}
 
     struct Chains : Fixture
     {
@@ -344,4 +344,4 @@ struct DeviceChainTests : juce::UnitTest
 
 static DeviceChainTests deviceChainTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

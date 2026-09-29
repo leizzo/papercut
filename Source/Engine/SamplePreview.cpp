@@ -3,7 +3,7 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut
+namespace resamper
 {
 
 struct SamplePreview::Impl
@@ -66,4 +66,4 @@ void SamplePreview::stop()
 bool SamplePreview::isPlaying() const   { return impl->transport.isPlaying(); }
 juce::File SamplePreview::getFile() const  { return impl->file; }
 
-} // namespace papercut
+} // namespace resamper

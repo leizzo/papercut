@@ -1,13 +1,13 @@
 #include "TestFixture.h"
 #include "Commands/ApplicationCommandTable.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The default shortcut map (PRD §17) and the Commands behind its rows. */
 struct ShortcutTests : juce::UnitTest
 {
-    ShortcutTests() : juce::UnitTest ("Shortcuts", "Papercut") {}
+    ShortcutTests() : juce::UnitTest ("Shortcuts", "Resamper") {}
 
     static juce::String describe (const KeyBinding& b)
     {
@@ -146,4 +146,4 @@ struct ShortcutTests : juce::UnitTest
 
 static ShortcutTests shortcutTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

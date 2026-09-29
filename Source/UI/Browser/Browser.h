@@ -3,7 +3,7 @@
 #include "Library.h"
 #include "UI/Controls/Controls.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -70,4 +70,4 @@ private:
     void timerCallback() override;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -5,16 +5,16 @@
 
 namespace te = tracktion;
 
-namespace papercut
+namespace resamper
 {
 
 namespace
 {
     /** Same property ApplicationModel writes (ADR-0011). Absent means an audio track. */
-    const juce::Identifier trackKindProperty { "papercutKind" };
+    const juce::Identifier trackKindProperty { "resamperKind" };
 
     /** On a mixer insert's state: "mixer". Absent: the device chain (so older projects' inserts land there). */
-    const juce::Identifier chainProperty { "papercutChain" };
+    const juce::Identifier chainProperty { "resamperChain" };
     const juce::String mixerChainValue { "mixer" };
 
     PluginChain chainOf (const te::Plugin& plugin)
@@ -758,4 +758,4 @@ std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& p
     return {};
 }
 
-} // namespace papercut
+} // namespace resamper

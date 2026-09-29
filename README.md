@@ -1,33 +1,33 @@
-# Papercut
+# Resamper
 
 **English** · [Türkçe](#türkçe)
 
 <p align="center">
-  <img src="docs/images/hero.png" alt="Papercut — sound design in racks, mixing on a real console. The arrangement view with the sidechain source picker and the send editor." width="100%">
+  <img src="docs/images/hero.png" alt="Resamper — sound design in racks, mixing on a real console. The arrangement view with the sidechain source picker and the send editor." width="100%">
 </p>
 
 A dark, dense, keyboard-friendly desktop DAW for electronic producers and mix engineers.
 
-> **Status: alpha.** Papercut is in early development. The current release is
-> [v0.1.0 — M1 Core](https://github.com/leizzo/papercut/releases/tag/v0.1.0), published as an alpha
+> **Status: alpha.** Resamper is in early development. The current release is
+> [v0.1.0 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.0), published as an alpha
 > pre-release. Expect missing features, rough edges and project-format changes — don't trust it with
 > your only copy of a song yet.
 
-## What is Papercut?
+## What is Resamper?
 
-Papercut takes you from idea to structure to mix in a single window. Its core principle:
+Resamper takes you from idea to structure to mix in a single window. Its core principle:
 **sound design lives in the device chain, mixing lives in the mixer** — two separate chains, with a
 signal path you can always see.
 
 ## Design preview
 
-> These images come from the product design ([`design/papercut.pen`](design/papercut.pen)) and show
-> where Papercut is heading. Several features in them belong to later milestones — see the
+> These images come from the product design ([`design/design.pen`](design/design.pen)) and show
+> where Resamper is heading. Several features in them belong to later milestones — see the
 > [roadmap](#roadmap) for what's in v0.1.0 today.
 
 ### A console, not a list
 
-<img src="docs/images/mixer.png" alt="Papercut mixer: rack chain link, post-chain mixer inserts, sends with FX / PRE / POST taps, send pan and polarity, returns A–D and a loudness-metered master." width="100%">
+<img src="docs/images/mixer.png" alt="Resamper mixer: rack chain link, post-chain mixer inserts, sends with FX / PRE / POST taps, send pan and polarity, returns A–D and a loudness-metered master." width="100%">
 
 ### Native devices inline. Plug-ins in a window.
 
@@ -67,7 +67,7 @@ Target platforms: macOS 13+ (Apple Silicon) and Windows 11 x64. The alpha curren
 ## Getting started
 
 There are no prebuilt downloads yet — build from source (see [For developers](#for-developers)),
-then open `Papercut.app`.
+then open `Resamper.app`.
 
 ### Keyboard shortcuts
 
@@ -92,47 +92,47 @@ then open `Papercut.app`.
 
 ## Feedback
 
-Found a bug or have an idea? [Open an issue](https://github.com/leizzo/papercut/issues).
+Found a bug or have an idea? [Open an issue](https://github.com/leizzo/resamper/issues).
 
 ## License
 
-Papercut's source code is released under the [MIT License](LICENSE).
+Resamper's source code is released under the [MIT License](LICENSE).
 
 ---
 
 <a id="türkçe"></a>
 
-# Papercut (Türkçe)
+# Resamper (Türkçe)
 
-[English](#papercut) · **Türkçe**
+[English](#resamper) · **Türkçe**
 
 <p align="center">
-  <img src="docs/images/hero.png" alt="Papercut — ses tasarımı rack'lerde, miks gerçek bir konsolda. Sidechain kaynak seçici ve send editörüyle arrangement görünümü." width="100%">
+  <img src="docs/images/hero.png" alt="Resamper — ses tasarımı rack'lerde, miks gerçek bir konsolda. Sidechain kaynak seçici ve send editörüyle arrangement görünümü." width="100%">
 </p>
 
 Elektronik müzik prodüktörleri ve miks mühendisleri için koyu temalı, yoğun ve klavye dostu bir
 masaüstü DAW.
 
-> **Durum: alfa.** Papercut erken geliştirme aşamasında. Güncel sürüm
-> [v0.1.0 — M1 Core](https://github.com/leizzo/papercut/releases/tag/v0.1.0), alfa ön sürümü olarak
+> **Durum: alfa.** Resamper erken geliştirme aşamasında. Güncel sürüm
+> [v0.1.0 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.0), alfa ön sürümü olarak
 > yayımlandı. Eksik özellikler, pürüzler ve proje formatında değişiklikler olabilir — şarkınızın tek
 > kopyasını henüz ona emanet etmeyin.
 
-## Papercut nedir?
+## Resamper nedir?
 
-Papercut, fikirden yapıya, yapıdan mikse tek bir pencerede ilerlemenizi sağlar. Temel ilkesi:
+Resamper, fikirden yapıya, yapıdan mikse tek bir pencerede ilerlemenizi sağlar. Temel ilkesi:
 **ses tasarımı cihaz zincirinde, miks mikserde yapılır** — iki ayrı zincir ve her zaman görebildiğiniz
 bir sinyal yolu.
 
 ## Tasarım önizlemesi
 
-> Bu görseller ürün tasarımından ([`design/papercut.pen`](design/papercut.pen)) alınmıştır ve
-> Papercut'ın nereye gittiğini gösterir. İçlerindeki bazı özellikler sonraki kilometre taşlarına
+> Bu görseller ürün tasarımından ([`design/design.pen`](design/design.pen)) alınmıştır ve
+> Resamper'ın nereye gittiğini gösterir. İçlerindeki bazı özellikler sonraki kilometre taşlarına
 > aittir — v0.1.0'da bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
 
 ### Liste değil, konsol
 
-<img src="docs/images/mixer.png" alt="Papercut mikseri: rack zinciri bağlantısı, zincir sonrası mikser insert'leri, FX / PRE / POST send'ler, send pan ve faz, A–D return kanalları ve loudness ölçümlü master." width="100%">
+<img src="docs/images/mixer.png" alt="Resamper mikseri: rack zinciri bağlantısı, zincir sonrası mikser insert'leri, FX / PRE / POST send'ler, send pan ve faz, A–D return kanalları ve loudness ölçümlü master." width="100%">
 
 ### Yerleşik cihazlar kartta. Eklentiler kendi penceresinde.
 
@@ -174,7 +174,7 @@ Hedef platformlar: macOS 13+ (Apple Silicon) ve Windows 11 x64. Alfa sürümü �
 ## Başlarken
 
 Henüz hazır indirilebilir sürüm yok — kaynaktan derleyin ([Geliştiriciler için](#for-developers)
-bölümüne bakın), ardından `Papercut.app`'i açın.
+bölümüne bakın), ardından `Resamper.app`'i açın.
 
 ### Klavye kısayolları
 
@@ -199,11 +199,11 @@ bölümüne bakın), ardından `Papercut.app`'i açın.
 
 ## Geri bildirim
 
-Bir hata mı buldunuz ya da bir fikriniz mi var? [Issue açın](https://github.com/leizzo/papercut/issues).
+Bir hata mı buldunuz ya da bir fikriniz mi var? [Issue açın](https://github.com/leizzo/resamper/issues).
 
 ## Lisans
 
-Papercut'ın kaynak kodu [MIT Lisansı](LICENSE) ile yayımlanmıştır.
+Resamper'ın kaynak kodu [MIT Lisansı](LICENSE) ile yayımlanmıştır.
 
 ---
 
@@ -213,7 +213,7 @@ Papercut'ın kaynak kodu [MIT Lisansı](LICENSE) ile yayımlanmıştır.
 
 *Teknik bölüm, komut ve kod terimleri ortak olduğu için İngilizce tutulmuştur.*
 
-Papercut is built on [JUCE](https://juce.com) + [Tracktion Engine](https://github.com/Tracktion/tracktion_engine)
+Resamper is built on [JUCE](https://juce.com) + [Tracktion Engine](https://github.com/Tracktion/tracktion_engine)
 + [GIN](https://github.com/FigBug/Gin). [PRD.md](PRD.md) is the source of truth for product behaviour;
 [CONTEXT.md](CONTEXT.md) defines the domain language.
 
@@ -239,8 +239,8 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
 
-- App: `build/Papercut_artefacts/Debug/Papercut.app`
-- Tests (headless, no audio device): `build/PapercutTests_artefacts/Debug/PapercutTests [suite-name-filter]`, or `ctest --test-dir build`
+- App: `build/Resamper_artefacts/Debug/Resamper.app`
+- Tests (headless, no audio device): `build/ResamperTests_artefacts/Debug/ResamperTests [suite-name-filter]`, or `ctest --test-dir build`
 
 ## Layout
 
@@ -266,12 +266,12 @@ In Debug builds, layouts and theme are read from `UI/` in the source tree. Edit 
 
 ## Contributing
 
-Issues are tracked on [GitHub](https://github.com/leizzo/papercut/issues). Releases follow
+Issues are tracked on [GitHub](https://github.com/leizzo/resamper/issues). Releases follow
 [Semantic Versioning](https://semver.org); each PRD milestone ships as a minor release until 1.0.0 —
 see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Papercut's own code is [MIT](LICENSE). The pinned dependencies keep their own licenses: JUCE (AGPLv3 or
-commercial), Tracktion Engine (GPLv3 or commercial) and GIN (BSD-3-Clause). A distributed Papercut
+Resamper's own code is [MIT](LICENSE). The pinned dependencies keep their own licenses: JUCE (AGPLv3 or
+commercial), Tracktion Engine (GPLv3 or commercial) and GIN (BSD-3-Clause). A distributed Resamper
 binary must also satisfy those terms.

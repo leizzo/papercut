@@ -7,7 +7,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -100,4 +100,4 @@ private:
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
 };
 
-} // namespace papercut
+} // namespace resamper

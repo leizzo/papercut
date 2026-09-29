@@ -7,7 +7,7 @@
 #include <cmath>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 /** One vertical line of the Piano Roll's beat grid, in Edit time. */
@@ -99,4 +99,4 @@ inline std::vector<BeatLine> barLines (const ApplicationModel& model, double sta
     return beatLines (model, startSeconds, endSeconds, (double) (barsPerLine * std::max (1, model.getBeatsPerBar (0.0))));
 }
 
-} // namespace papercut
+} // namespace resamper

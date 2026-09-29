@@ -2,7 +2,7 @@
 #include "Commands/CommandRegistry.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -191,4 +191,4 @@ void registerPrimitives (ComponentFactory& factory, CommandRegistry& commands, T
     });
 }
 
-} // namespace papercut
+} // namespace resamper

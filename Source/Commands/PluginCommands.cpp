@@ -3,7 +3,7 @@
 #include "AppCommands.h"
 #include "Engine/PluginRack.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace ArgKeys
@@ -226,4 +226,4 @@ juce::var pluginReplaceArgs (const juce::String& trackId, const juce::String& pl
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

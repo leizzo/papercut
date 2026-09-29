@@ -2,7 +2,7 @@
 #include "LayoutSource.h"
 #include "UI/State/UIStateStore.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -166,4 +166,4 @@ void LayoutManager::restoreFocus (LayoutHost& host)
             c->grabKeyboardFocus();
 }
 
-} // namespace papercut
+} // namespace resamper

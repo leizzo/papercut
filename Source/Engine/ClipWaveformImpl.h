@@ -4,7 +4,7 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
-namespace papercut
+namespace resamper
 {
 
 /** Either a clip's file thumbnail or a recording's growing one. */
@@ -26,4 +26,4 @@ struct ClipWaveform::Impl
     tracktion::RecordingThumbnailManager::Thumbnail::Ptr recordingThumbnail;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class ProjectManager;
@@ -50,7 +50,7 @@ struct PluginParameter
 
     A track's plug-ins run in this order, ahead of its volume plug-in (the fader):
     device chain, mixer inserts, aux sends. A mixer insert carries the
-    papercutChain = "mixer" property on its state; anything else before the
+    resamperChain = "mixer" property on its state; anything else before the
     fader (aux sends and returns and the level meter aside) is on the device
     chain, so a project saved before the split opens with its old inserts as
     the device chain, in the same order, sounding the same. The Pre-FX send tap
@@ -58,7 +58,7 @@ struct PluginParameter
 
     A new plug-in goes at the end of its chain. On a MIDI track, inserting an
     instrument into the device chain removes the built-in synth in the same
-    undo step and leaves papercutKind as "midi". Mixer inserts take
+    undo step and leaves resamperKind as "midi". Mixer inserts take
     effects only (no instruments, no MIDI effects), at most maxMixerInserts.
 
     Undo is Engine Undo: Ctrl+Z is edit.undo(). A call that would change nothing
@@ -147,4 +147,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (PluginRack)
 };
 
-} // namespace papercut
+} // namespace resamper

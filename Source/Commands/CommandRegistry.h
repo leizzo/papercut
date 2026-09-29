@@ -4,7 +4,7 @@
 #include <map>
 #include <memory>
 
-namespace papercut
+namespace resamper
 {
 
 /** A named, user-triggerable operation keyed by a string ID (e.g. "transport.play").
@@ -57,4 +57,4 @@ private:
     std::map<juce::String, std::unique_ptr<Command>> commands;
 };
 
-} // namespace papercut
+} // namespace resamper

@@ -5,7 +5,7 @@
 #include "UI/State/ArrangementViewState.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 TrackLanes::TrackLanes (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
@@ -483,4 +483,4 @@ void TrackLanes::mouseUp (const juce::MouseEvent& e)
     setTracks (model.getTracks());
 }
 
-} // namespace papercut
+} // namespace resamper

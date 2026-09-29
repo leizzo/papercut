@@ -6,7 +6,7 @@
 
 #include <algorithm>
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -363,4 +363,4 @@ void NoteGrid::mouseUp (const juce::MouseEvent& e)
     reload();
 }
 
-} // namespace papercut
+} // namespace resamper

@@ -5,7 +5,7 @@
 #include <array>
 #include <vector>
 
-namespace papercut
+namespace resamper
 {
 
 class LayoutSource;
@@ -191,4 +191,4 @@ private:
     juce::ListenerList<Listener> listeners;
 };
 
-} // namespace papercut
+} // namespace resamper

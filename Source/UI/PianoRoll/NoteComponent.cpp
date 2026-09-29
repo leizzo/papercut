@@ -1,7 +1,7 @@
 #include "NoteComponent.h"
 #include "UI/Theme/ThemeManager.h"
 
-namespace papercut
+namespace resamper
 {
 
 NoteComponent::NoteComponent (ThemeManager& tm, const MidiNoteInfo& info)
@@ -27,4 +27,4 @@ void NoteComponent::paint (juce::Graphics& g)
     g.fillRoundedRectangle (bounds, radius);
 }
 
-} // namespace papercut
+} // namespace resamper

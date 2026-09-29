@@ -1,6 +1,6 @@
 #include "ValueFormat.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -120,4 +120,4 @@ ValueFormat ValueFormat::number (int decimals, juce::String unit)
     };
 }
 
-} // namespace papercut
+} // namespace resamper

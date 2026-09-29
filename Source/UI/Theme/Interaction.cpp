@@ -2,7 +2,7 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
-namespace papercut
+namespace resamper
 {
 
 ControlState ControlState::of (const juce::Component& c, bool on, bool pressed)
@@ -137,4 +137,4 @@ void drawStyledText (juce::Graphics& g, const ThemeManager& tm, const juce::Stri
     g.drawText (style.apply (text), area, justification, true);
 }
 
-} // namespace papercut
+} // namespace resamper

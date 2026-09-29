@@ -4,7 +4,7 @@
 
 namespace juce { class String; }
 
-namespace papercut
+namespace resamper
 {
 
 class CommandRegistry;
@@ -22,4 +22,4 @@ class ThemeManager;
 void registerDeveloperCommands (CommandRegistry&, LayoutManager&, ThemeManager&,
                                 std::function<void (const juce::String&)> reportError);
 
-} // namespace papercut
+} // namespace resamper

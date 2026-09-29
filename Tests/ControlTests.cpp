@@ -4,13 +4,13 @@
 #include "UI/Controls/ValueFormat.h"
 #include "UI/Mixer/Metering.h"
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** The continuous-control model (PRD §16.2) and value text in and out. */
 struct ControlTests : juce::UnitTest
 {
-    ControlTests() : juce::UnitTest ("Controls", "Papercut") {}
+    ControlTests() : juce::UnitTest ("Controls", "Resamper") {}
 
     double parsed (const ValueFormat& format, const juce::String& text)
     {
@@ -270,4 +270,4 @@ struct ControlTests : juce::UnitTest
 
 static ControlTests controlTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

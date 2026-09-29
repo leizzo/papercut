@@ -2,7 +2,7 @@
 #include "Commands/CommandRegistry.h"
 #include "Commands/PluginCommands.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -223,4 +223,4 @@ void DeviceCard::showMenu()
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 
-} // namespace papercut
+} // namespace resamper

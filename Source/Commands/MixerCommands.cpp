@@ -1,7 +1,7 @@
 #include "MixerCommands.h"
 #include "AppCommands.h"
 
-namespace papercut
+namespace resamper
 {
 
 namespace
@@ -193,4 +193,4 @@ juce::var masterVolumeArgs (double db, bool continuesGesture)
     return args;
 }
 
-} // namespace papercut
+} // namespace resamper

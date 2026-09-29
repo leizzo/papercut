@@ -6,7 +6,7 @@
 
 namespace te = tracktion;
 
-namespace papercut::test
+namespace resamper::test
 {
 
 /** launchSlot only queues. The audio thread is what marks a slot playing;
@@ -43,7 +43,7 @@ static void markSlotPlaying (te::Edit& edit, const juce::String& clipId)
 
 struct SessionTests : juce::UnitTest
 {
-    SessionTests() : juce::UnitTest ("Session", "Papercut") {}
+    SessionTests() : juce::UnitTest ("Session", "Resamper") {}
 
     void runTest() override
     {
@@ -254,4 +254,4 @@ struct SessionTests : juce::UnitTest
 
 static SessionTests sessionTests;
 
-} // namespace papercut::test
+} // namespace resamper::test

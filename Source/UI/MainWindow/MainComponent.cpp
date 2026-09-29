@@ -6,7 +6,7 @@
 #include "UI/Layout/Primitives.h"
 #include "UI/State/UIStateStore.h"
 
-namespace papercut
+namespace resamper
 {
 
 MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
@@ -420,4 +420,4 @@ void MainComponent::registerPianoRollCommands()
         withClip ("note.selectAll", [] (const juce::String& id, const juce::var&) { return clipArgs (id); })));
 }
 
-} // namespace papercut
+} // namespace resamper
