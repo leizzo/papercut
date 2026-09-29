@@ -66,6 +66,7 @@ struct Strip
     std::vector<PluginInfo> inserts;        ///< the Mixer Inserts
     std::vector<PluginInfo> deviceChain;    ///< read-only here, edited in the Detail View
     juce::String output = "Master";         ///< the Bus it sums into, or the Master
+    int childCount = 0;                     ///< on a Bus: its direct children
 };
 
 /** The letter a Return and the Sends to it show for its bus: A for bus 0. */

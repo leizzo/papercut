@@ -144,9 +144,9 @@ namespace
     }
 
     /** Index of the track fader: the volume plug-in. The chains are before it. */
-    int faderIndex (te::AudioTrack& track)
+    int faderIndex (te::Track& track)
     {
-        if (auto* volume = track.getVolumePlugin())
+        if (auto* volume = faderOf (track))
             if (const int index = track.pluginList.indexOf (volume); index >= 0)
                 return index;
 
@@ -156,7 +156,7 @@ namespace
     /** A track's two chains, in signal order. */
     struct Chains
     {
-        te::AudioTrack* track = nullptr;
+        te::Track* track = nullptr;   ///< an audio track or a Bus
         std::vector<te::Plugin::Ptr> device, mixer;
 
         std::vector<te::Plugin::Ptr>& operator[] (PluginChain c)   { return c == PluginChain::mixer ? mixer : device; }
@@ -216,7 +216,7 @@ namespace
     Chains chainsFor (te::Edit& edit, const juce::String& trackId)
     {
         Chains chains;
-        chains.track = findAudioTrack (edit, trackId);
+        chains.track = findStripTrack (edit, trackId);
 
         if (chains.track == nullptr)
             return chains;
@@ -420,7 +420,7 @@ juce::StringArray PluginRack::getHostedFormats() const
 juce::Result PluginRack::insert (const juce::String& trackId, const juce::String& typeOrIdentifier, PluginChain chain)
 {
     auto& edit = projectManager.getEdit();
-    auto* track = findAudioTrack (edit, trackId);
+    auto* track = findStripTrack (edit, trackId);
 
     if (track == nullptr)
         return juce::Result::fail ("No track with that id");
@@ -645,10 +645,11 @@ namespace
         if (pluginId.isEmpty())
             return {};
 
-        for (auto* track : te::getAudioTracks (edit))
-            for (auto* plugin : track->pluginList)
-                if (plugin->itemID.toString() == pluginId)
-                    return plugin;
+        for (auto* track : te::getAllTracks (edit))
+            if (isStripTrack (*track))
+                for (auto* plugin : track->pluginList)
+                    if (plugin->itemID.toString() == pluginId)
+                        return plugin;
 
         return {};
     }
@@ -737,13 +738,9 @@ std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& p
     if (pluginId.isEmpty())
         return {};
 
-    auto& edit = projectManager.getEdit();
-
-    for (auto* track : te::getAudioTracks (edit))
-        for (auto* plugin : track->pluginList)
-            if (plugin->itemID.toString() == pluginId)
-                if (auto editor = plugin->createEditor())
-                    return std::unique_ptr<juce::Component> (editor.release());
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+        if (auto editor = plugin->createEditor())
+            return std::unique_ptr<juce::Component> (editor.release());
 
     return {};
 }

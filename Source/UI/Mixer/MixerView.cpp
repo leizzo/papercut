@@ -78,8 +78,11 @@ MixerView::~MixerView()
     model.removeListener (this);
 }
 
-void MixerView::showStripMenu (const juce::String& trackId, bool isReturn)
+void MixerView::showStripMenu (const Strip& strip)
 {
+    const auto trackId = strip.id;
+    const auto isReturn = strip.role == StripRole::returnTrack, isBus = strip.role == StripRole::bus;
+
     juce::PopupMenu sends, buses;
 
     for (auto& ret : mixer.getReturns())
@@ -88,10 +91,13 @@ void MixerView::showStripMenu (const juce::String& trackId, bool isReturn)
     for (auto& bus : mixer.getBuses())
         buses.addItem (bus.name, [this, trackId, id = bus.trackId] { commands.invoke (cmd::mixerMoveToBus, { trackId, id }); });
 
-    // A return doesn't send to returns or join a bus.
+    // A return doesn't send to returns or join a bus; a Bus sends, but nesting Buses is #37.
     juce::PopupMenu menu;
     menu.addSubMenu ("Add Send", sends, ! isReturn && sends.getNumItems() > 0);
-    menu.addSubMenu ("Move to Bus", buses, ! isReturn && buses.getNumItems() > 0);
+
+    if (! isBus)
+        menu.addSubMenu ("Move to Bus", buses, ! isReturn && buses.getNumItems() > 0);
+
     menu.addSeparator();
     menu.addItem (commandItem (commands, cmd::mixerAddReturn, { "Return " + juce::String (mixer.getReturns().size() + 1) }));
     menu.addItem (commandItem (commands, cmd::mixerAddBus, { "Bus " + juce::String (mixer.getBuses().size() + 1) }));
@@ -183,10 +189,6 @@ void MixerView::refresh()
 
     for (auto& stripInfo : mixer.getStrips())
     {
-        // Bus Strips are not drawn yet (#100).
-        if (stripInfo.role == StripRole::bus)
-            continue;
-
         StripState stripState { stripInfo, stripInfo.kind == TrackKind::midi ? midiInputs : audioInputs };
         const auto id = stripInfo.id;
         (stripState.isReturn() ? returnOrder : trackOrder).push_back (id);
@@ -196,9 +198,9 @@ void MixerView::refresh()
 
         if (strip == nullptr)
         {
-            strip = std::make_unique<ChannelStrip> (commands, themeManager);
+            strip = std::make_unique<ChannelStrip> (commands, themeManager, stripInfo.role);
             strip->onTrackChainClicked = [this, id] { if (onShowDeviceChain) onShowDeviceChain (id); };
-            strip->onShowMenu = [this, s = strip.get()] { showStripMenu (s->getState().strip.id, s->getState().isReturn()); };
+            strip->onShowMenu = [this, s = strip.get()] { showStripMenu (s->getState().strip); };
             strip->onFlowStageHovered = [this] (int stage) { setFlowStage (stage); };
             strip->onOpenPlugin = [this] (const juce::String& pluginId) { if (onOpenPlugin) onOpenPlugin (pluginId); };
             strip->onPickInsert = [this, id] (InsertSlot& slot, const juce::String& replacing)
@@ -234,8 +236,9 @@ void MixerView::layoutStrips()
         for (auto& id : ids)
             if (auto strip = strips.find (id); strip != strips.end())
             {
-                strip->second->setBounds (x, stripsPadding, metrics.stripWidth, juce::jmax (0, height - 2 * stripsPadding));
-                x += metrics.stripWidth + stripGap;
+                const auto width = strip->second->getState().isBus() ? metrics.stripBusWidth : metrics.stripWidth;
+                strip->second->setBounds (x, stripsPadding, width, juce::jmax (0, height - 2 * stripsPadding));
+                x += width + stripGap;
             }
     };
 

@@ -23,6 +23,7 @@ struct StripState
     juce::StringArray inputs;
 
     bool isReturn() const noexcept   { return strip.role == StripRole::returnTrack; }
+    bool isBus() const noexcept      { return strip.role == StripRole::bus; }
 };
 
 /** One mixer channel strip, 145 wide (PRD §10.2), top to bottom in signal
@@ -33,7 +34,11 @@ struct StripState
     Every change goes through a Command; a fader or knob drag is one undo step.
     Clicking the strip's background selects its track in every view. Whole
     sections can be hidden (the mixer's section chips); the fader takes the
-    freed height. */
+    freed height.
+
+    A Bus Strip (PRD §11.3) is narrower and tinted in the folder colour, with
+    the git-merge icon for a number, its input chip (← N tracks) in place of
+    the input select, a wider meter, and no Track chain row or arm. */
 class ChannelStrip : public juce::Component,
                      public juce::SettableTooltipClient,
                      public juce::DragAndDropTarget
@@ -41,7 +46,8 @@ class ChannelStrip : public juce::Component,
 public:
     enum class Section { io, inserts, sends, fader };
 
-    ChannelStrip (CommandRegistry&, ThemeManager&);
+    /** The role picks the fader geometry; a Strip's role never changes. */
+    ChannelStrip (CommandRegistry&, ThemeManager&, StripRole);
     ~ChannelStrip() override;
 
     void setState (const StripState&);

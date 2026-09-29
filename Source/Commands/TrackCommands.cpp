@@ -19,21 +19,23 @@ void registerTrackCommands (CommandRegistry& registry, ApplicationModel& model)
         model.setTrackPan (a.trackId, a.value, a.continuesGesture);
     });
 
-    // Flips mute, solo or arm on the track.
-    auto addToggle = [&registry, &model] (CommandRef<TrackArgs> ref, const char* name, bool TrackInfo::* flag,
-                                          bool (ApplicationModel::* set) (const juce::String&, bool))
+    // Mute and solo also flip on a Bus.
+    registry.add (cmd::trackToggleMute, { "Mute Track" }, [&model] (const TrackArgs& a)
     {
-        registry.add (ref, { name }, [&model, flag, set] (const TrackArgs& a)
-        {
-            for (auto& track : model.getTracks())
-                if (track.id == a.trackId)
-                    (model.*set) (a.trackId, ! (track.*flag));
-        });
-    };
+        model.setTrackMuted (a.trackId, ! model.isTrackMuted (a.trackId));
+    });
 
-    addToggle (cmd::trackToggleMute, "Mute Track", &TrackInfo::muted, &ApplicationModel::setTrackMuted);
-    addToggle (cmd::trackToggleSolo, "Solo Track", &TrackInfo::solo, &ApplicationModel::setTrackSolo);
-    addToggle (cmd::trackToggleArm, "Arm Track for Recording", &TrackInfo::armed, &ApplicationModel::setTrackArmed);
+    registry.add (cmd::trackToggleSolo, { "Solo Track" }, [&model] (const TrackArgs& a)
+    {
+        model.setTrackSolo (a.trackId, ! model.isTrackSolo (a.trackId));
+    });
+
+    registry.add (cmd::trackToggleArm, { "Arm Track for Recording" }, [&model] (const TrackArgs& a)
+    {
+        for (auto& track : model.getTracks())
+            if (track.id == a.trackId)
+                model.setTrackArmed (a.trackId, ! track.armed);
+    });
 
     // A track header's input menu.
     registry.add (cmd::trackSetInput, { "Set Track Input" }, [&model] (const TrackInputArgs& a)

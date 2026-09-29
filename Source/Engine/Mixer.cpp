@@ -22,10 +22,10 @@ namespace
     te::FolderTrack* findBus (te::Edit& edit, const juce::String& id)
     {
         auto* folder = dynamic_cast<te::FolderTrack*> (te::findTrackForID (edit, te::EditItemID::fromString (id)));
-        return folder != nullptr && folder->isSubmixFolder() ? folder : nullptr;
+        return folder != nullptr && isBus (*folder) ? folder : nullptr;
     }
 
-    te::AuxSendPlugin* findSend (te::AudioTrack& track, const juce::String& sendId)
+    te::AuxSendPlugin* findSend (te::Track& track, const juce::String& sendId)
     {
         for (auto* send : track.pluginList.getPluginsOfType<te::AuxSendPlugin>())
             if (send->itemID.toString() == sendId)
@@ -46,7 +46,7 @@ namespace
     juce::String outputOf (const te::Track& track)
     {
         for (auto* folder = track.getParentFolderTrack(); folder != nullptr; folder = folder->getParentFolderTrack())
-            if (folder->isSubmixFolder())
+            if (isBus (*folder))
                 return folder->getName();
 
         return "Master";
@@ -250,8 +250,10 @@ StereoLevel Mixer::levelOf (const juce::String& slotId, void* meterPlugin)
 
 StereoLevel Mixer::getTrackLevel (const juce::String& trackId)
 {
-    auto* track = findAudioTrack (projects.getEdit(), trackId);
-    return levelOf (trackId, track != nullptr ? track->getLevelMeterPlugin() : nullptr);
+    auto* track = findStripTrack (projects.getEdit(), trackId);
+    auto* audio = dynamic_cast<te::AudioTrack*> (track);
+    return levelOf (trackId, audio != nullptr ? audio->getLevelMeterPlugin()
+                             : track != nullptr ? meterOnTrack (*track) : nullptr);
 }
 
 void Mixer::setMeasuringRms (bool rms)
@@ -302,7 +304,7 @@ std::vector<ReturnInfo> Mixer::getReturns() const
 juce::Result Mixer::addSend (const juce::String& fromTrackId, int bus)
 {
     auto& edit = projects.getEdit();
-    auto* track = findAudioTrack (edit, fromTrackId);
+    auto* track = findStripTrack (edit, fromTrackId);
 
     if (track == nullptr)
         return juce::Result::fail ("No such track");
@@ -319,7 +321,7 @@ juce::Result Mixer::addSend (const juce::String& fromTrackId, int bus)
     projects.getUndo().beginStep ("Add Send");
     auto index = 0;
 
-    if (auto* volume = track->getVolumePlugin())
+    if (auto* volume = faderOf (*track))
         if (auto volumeIndex = track->pluginList.indexOf (volume); volumeIndex >= 0)
             index = volumeIndex;
 
@@ -330,7 +332,7 @@ juce::Result Mixer::addSend (const juce::String& fromTrackId, int bus)
 
 bool Mixer::setSendGain (const juce::String& trackId, const juce::String& sendId, double gainDb, bool continuesGesture)
 {
-    auto* track = findAudioTrack (projects.getEdit(), trackId);
+    auto* track = findStripTrack (projects.getEdit(), trackId);
     auto* send = track != nullptr ? findSend (*track, sendId) : nullptr;
 
     if (send == nullptr || send->gain == nullptr)
@@ -354,7 +356,7 @@ bool Mixer::setSendGain (const juce::String& trackId, const juce::String& sendId
 
 bool Mixer::setSendMuted (const juce::String& trackId, const juce::String& sendId, bool muted)
 {
-    auto* track = findAudioTrack (projects.getEdit(), trackId);
+    auto* track = findStripTrack (projects.getEdit(), trackId);
     auto* send = track != nullptr ? findSend (*track, sendId) : nullptr;
 
     if (send == nullptr)
@@ -383,7 +385,7 @@ bool Mixer::setSendMuted (const juce::String& trackId, const juce::String& sendI
 std::vector<SendInfo> Mixer::getSends (const juce::String& trackId) const
 {
     std::vector<SendInfo> sends;
-    auto* track = findAudioTrack (projects.getEdit(), trackId);
+    auto* track = findStripTrack (projects.getEdit(), trackId);
 
     if (track == nullptr)
         return sends;
@@ -436,7 +438,7 @@ std::vector<BusInfo> Mixer::getBuses() const
 
     for (auto* folder : te::getTracksOfType<te::FolderTrack> (projects.getEdit(), true))
     {
-        if (! folder->isSubmixFolder())
+        if (! isBus (*folder))
             continue;
 
         BusInfo info;
@@ -491,8 +493,13 @@ std::vector<Strip> Mixer::getStrips() const
         strip.id = folder.itemID.toString();
         strip.name = folder.getName();
         strip.role = StripRole::bus;
+        strip.colourIndex = colourOf (folder);
         strip.muted = folder.isMuted (false);
         strip.solo = folder.isSolo (false);
+        strip.childCount = folder.getAllSubTracks (false).size();
+        strip.sends = getSends (strip.id);
+        strip.inserts = plugins.getChain (strip.id, PluginChain::mixer);
+        strip.deviceChain = plugins.getChain (strip.id, PluginChain::device);
         strip.output = outputOf (folder);
 
         if (auto* volume = folder.getVolumePlugin())
@@ -511,7 +518,7 @@ std::vector<Strip> Mixer::getStrips() const
             for (auto* child : folder->getAllSubTracks (false))
                 visit (*child);
 
-            if (folder->isSubmixFolder())
+            if (isBus (*folder))
                 strips.push_back (busStrip (*folder));
         }
         else if (auto* audio = dynamic_cast<te::AudioTrack*> (&track))

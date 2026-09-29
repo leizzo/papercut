@@ -146,7 +146,8 @@ public:
         Returns false if there is no track to remove. */
     bool removeTrack();
 
-    /** Sets a track's volume, clamped to [minVolumeDb, maxVolumeDb].
+    /** Sets a track's volume, clamped to [minVolumeDb, maxVolumeDb]. The fader,
+        pan, mute and solo setters take a Bus's id as well as an audio track's.
 
         With continuesGesture, the change joins the undo step of the previous call
         if that was a volume change on the same track with nothing undoable in
@@ -165,6 +166,10 @@ public:
     /** Never undoable. */
     bool setTrackMuted (const juce::String& trackId, bool muted);
     bool setTrackSolo (const juce::String& trackId, bool solo);
+
+    /** False for an unknown id. */
+    bool isTrackMuted (const juce::String& trackId) const;
+    bool isTrackSolo (const juce::String& trackId) const;
 
     //==============================================================================
     // Inputs (never undoable). An audio track records from an audio input, a

@@ -239,6 +239,78 @@ struct MixerTests : juce::UnitTest
             expectWithinAbsoluteError (f.strip (f.sourceId).volumeDb, 0.0, 1.0e-2);
         }
 
+        beginTest ("The track fader, pan, mute and solo Commands work on a Bus; the fader is one undo step and re-syncs");
+        {
+            MixerFixture f;
+            f.invoke (cmd::mixerAddBus, { "Drums" });
+            const auto bus = f.busId ("Drums");
+
+            f.invoke (cmd::trackSetVolume, { bus, -6.0, false });
+            f.invoke (cmd::trackSetVolume, { bus, -9.0, true });
+            f.invoke (cmd::trackSetPan, { bus, 0.5, false });
+            f.invoke (cmd::trackToggleMute, { bus });
+            f.invoke (cmd::trackToggleSolo, { bus });
+
+            auto strip = f.strip (bus);
+            expectWithinAbsoluteError (strip.volumeDb, -9.0, 1.0e-2);
+            expectWithinAbsoluteError (strip.pan, 0.5, 1.0e-3);
+            expect (strip.muted);
+            expect (strip.solo);
+
+            f.invoke (cmd::editUndo);   // the pan
+            f.invoke (cmd::editUndo);   // the whole fader drag
+            strip = f.strip (bus);
+            expectWithinAbsoluteError (strip.volumeDb, 0.0, 1.0e-2);
+            expectWithinAbsoluteError (strip.pan, 0.0, 1.0e-3);
+            expect (strip.muted);   // mute and solo are never undo steps
+
+            auto* folder = dynamic_cast<tracktion::FolderTrack*> (tracktion::findTrackForID (f.projects.getEdit(), tracktion::EditItemID::fromString (bus)));
+            auto* fader = folder->getVolumePlugin();
+            expectWithinAbsoluteError (fader->volParam->getCurrentValue(), fader->volume.get(), 1.0e-6f);
+        }
+
+        beginTest ("A Bus takes Mixer Inserts and Sends, and its Strip lists them with its colour and child count");
+        {
+            MixerFixture f;
+            f.invoke (cmd::mixerAddReturn);
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
+            const auto tracks = f.model.getTracks();
+            f.invoke (cmd::trackSetColour, { tracks[1].id, 4 });
+
+            f.invoke (cmd::mixerAddBus, { "Drums" });
+            const auto bus = f.busId ("Drums");
+            f.invoke (cmd::mixerMoveToBus, { tracks[1].id, bus });
+            f.invoke (cmd::mixerMoveToBus, { tracks[2].id, bus });
+
+            f.invoke (cmd::pluginInsert, { bus, tracktion::ReverbPlugin::xmlTypeName, PluginChain::mixer });
+            f.invoke (cmd::mixerAddSend, { bus, f.mixer.getReturns()[0].bus });
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+
+            const auto strip = f.strip (bus);
+            expect (strip.role == StripRole::bus);
+            expectEquals ((int) strip.inserts.size(), 1);
+            expectEquals (strip.inserts[0].path, juce::String (tracktion::ReverbPlugin::xmlTypeName));
+            expect (strip.deviceChain.empty());
+            expectEquals ((int) strip.sends.size(), 1);
+            expectEquals (strip.colourIndex, 4);   // its first child's
+            expectEquals (strip.childCount, 2);
+            expectWithinAbsoluteError (f.mixer.getTrackLevel (bus).left, (float) ApplicationModel::minVolumeDb, 1.0e-3f);
+
+            // The Send sits before the Bus fader, so the fader doesn't move it.
+            auto* folder = tracktion::findTrackForID (f.projects.getEdit(), tracktion::EditItemID::fromString (bus));
+            auto& list = folder->pluginList;
+            const auto sends = list.getPluginsOfType<tracktion::AuxSendPlugin>();
+            const auto faders = list.getPluginsOfType<tracktion::VolumeAndPanPlugin>();
+            expect (! sends.isEmpty() && ! faders.isEmpty() && list.indexOf (sends.getFirst()) < list.indexOf (faders.getFirst()));
+
+            // A saved colour wins; an empty Bus takes palette 0.
+            folder->state.setProperty ("resamperColour", 2, nullptr);
+            expectEquals (f.strip (bus).colourIndex, 2);
+            f.invoke (cmd::mixerAddBus, { "Empty" });
+            expectEquals (f.strip (f.busId ("Empty")).colourIndex, 0);
+        }
+
         beginTest ("setMasterVolume changes the master only; undo restores it");
         {
             MixerFixture f;
