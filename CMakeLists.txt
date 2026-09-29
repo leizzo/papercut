@@ -21,15 +21,10 @@ set(TE_ADD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/tracktion_engine/modules/juce EXCLUDE_FROM_ALL)
 add_subdirectory(external/tracktion_engine EXCLUDE_FROM_ALL)
 
-# Plugin / synth UI uses gin_plugin. It hard-depends on gin_dsp,
-# gin_graphics, and gin_simd, so those modules are registered with it.
+# Only the GIN modules the code uses are registered (today: gin, for
+# gin::FileSystemWatcher). Add a module here and to resamper_engine when
+# code starts using it.
 juce_add_module(external/gin/modules/gin)
-juce_add_module(external/gin/modules/gin_simd)
-juce_add_module(external/gin/modules/gin_dsp)
-juce_add_module(external/gin/modules/gin_graphics)
-juce_add_module(external/gin/modules/gin_gui)
-juce_add_module(external/gin/modules/gin_svg)
-juce_add_module(external/gin/modules/gin_plugin)
 
 # ------------------------------------------------------------------------------
 # resamper_engine: the only target that sees Tracktion headers.
@@ -75,12 +70,6 @@ target_link_libraries(resamper_engine
         juce::juce_audio_utils
         juce::juce_gui_extra
         gin
-        gin_simd
-        gin_dsp
-        gin_graphics
-        gin_gui
-        gin_svg
-        gin_plugin
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags)
 
@@ -190,7 +179,7 @@ add_library(resamper_ui STATIC
     Source/UI/MainWindow/MainComponent.cpp
     Source/UI/MainWindow/MainWindow.cpp)
 resamper_use_engine_without_tracktion(resamper_ui)
-target_link_libraries(resamper_ui PUBLIC resamper_commands PRIVATE resamper_resources gin)
+target_link_libraries(resamper_ui PUBLIC resamper_commands PRIVATE resamper_resources)
 target_compile_definitions(resamper_ui PRIVATE
     $<$<CONFIG:Debug>:RESAMPER_DEV_UI_DIR="${CMAKE_CURRENT_SOURCE_DIR}/UI">)
 
