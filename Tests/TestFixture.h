@@ -15,7 +15,7 @@ EngineManager& getEngineManager();
 juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2, double acidTempo = 0);
 
 /** A fresh untitled Project in the app exactly as the app builds it, every
-    Command registered, except that file choosers and UI State are plain
+    Command registered, except that file choosers and messages are plain
     fields. The Theme is not loaded: call theme.load() before building views. */
 struct Fixture
 {
@@ -42,8 +42,6 @@ struct Fixture
     // What the choosers "pick". An invalid File means the user cancelled.
     juce::File audioFileToChoose, projectToOpen, projectSaveLocation;
 
-    // Stand-in for the UI State store.
-    juce::var uiState;
     juce::StringArray errors, notifications;
 
     juce::TemporaryFile scratch { juce::String() };

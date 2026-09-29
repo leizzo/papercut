@@ -43,6 +43,23 @@ struct AppTests : juce::UnitTest
                 if (expected (binding.commandId))
                     expect (f.commands.contains (binding.commandId), binding.commandId);
         }
+
+        beginTest ("A view Command drives the app: Esc clears the selection");
+        {
+            Fixture f;
+            f.invoke ("track.add");
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke ("clip.add");
+            f.model.selectClip (f.model.getTracks()[0].clips[0].id);
+            expect (f.model.getSelectedClipId().isNotEmpty());
+
+            expect (f.theme.load().wasOk());
+            juce::ApplicationCommandManager commandManager;
+            MainComponent main (f.app, commandManager);
+
+            expect (f.invoke ("ui.escape"));
+            expect (f.model.getSelectedClipId().isEmpty());
+        }
     }
 };
 

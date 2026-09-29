@@ -76,7 +76,7 @@ struct ProjectTests : juce::UnitTest
         {
             Fixture f;
             f.invoke ("track.add");
-            f.uiState = sampleUIState();
+            f.app.uiState.restore (sampleUIState());
             f.projectSaveLocation = f.scratchDir().getChildFile ("Json");
             f.invoke ("project.saveAs");
 
@@ -97,14 +97,14 @@ struct ProjectTests : juce::UnitTest
         beginTest ("project.open restores the UI State stored in project.json");
         {
             Fixture f;
-            f.uiState = sampleUIState();
+            f.app.uiState.restore (sampleUIState());
             f.projectSaveLocation = f.scratchDir().getChildFile ("UIStateRoundTrip");
             f.invoke ("project.saveAs");
 
             Fixture reopened;
             reopened.projectToOpen = f.projectSaveLocation;
             reopened.invoke ("project.open");
-            expectEquals ((double) reopened.uiState["arrangement"]["pixelsPerSecond"], 120.0);
+            expectEquals ((double) reopened.app.uiState.toVar()["arrangement"]["pixelsPerSecond"], 120.0);
         }
 
         beginTest ("project.save on an untitled Project falls through to Save As");
@@ -154,13 +154,13 @@ struct ProjectTests : juce::UnitTest
         {
             Fixture f;
             f.invoke ("track.add");
-            f.uiState = sampleUIState();
+            f.app.uiState.restore (sampleUIState());
             f.invoke ("project.new");
 
             expectEquals (f.numTracks(), 0);
             expect (f.model.isProjectUntitled());
             expect (! f.model.canUndo());
-            expect (f.uiState.isVoid());
+            expect (! f.app.uiState.toVar()["arrangement"].hasProperty ("pixelsPerSecond"));
         }
     }
 };

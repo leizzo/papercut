@@ -84,7 +84,7 @@ struct ProductionTests : juce::UnitTest
             auto tone = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
             f.audioFileToChoose = tone;
             f.invoke ("clip.add");
-            f.uiState = sampleUIState();
+            f.app.uiState.restore (sampleUIState());
             f.projectSaveLocation = f.scratchDir().getChildFile ("Saved");
             f.invoke ("project.saveAs");
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
@@ -106,14 +106,14 @@ struct ProductionTests : juce::UnitTest
             expectEquals ((int) tracks.size(), 1);
             expectEquals ((int) tracks[0].clips.size(), 1);
             expect (tracks[0].clips[0].file == tone);
-            expectEquals ((double) f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
+            expectEquals ((double) f.app.uiState.toVar()["arrangement"]["pixelsPerSecond"], 80.0);
         }
 
         beginTest ("autosave then track.add then recover restores the autosaved track count");
         {
             Fixture f;
             f.invoke ("track.add");
-            f.uiState = sampleUIState();
+            f.app.uiState.restore (sampleUIState());
             const auto saved = f.numTracks();
 
             expect (f.invoke ("project.autosave"));
@@ -121,19 +121,19 @@ struct ProductionTests : juce::UnitTest
             expect (f.production.hasRecovery());
 
             f.invoke ("track.add");
-            f.uiState = juce::var();
+            f.app.uiState.restore ({});
             expectEquals (f.numTracks(), saved + 1);
 
             expect (f.invoke ("project.recover"));
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
             expectEquals (f.numTracks(), saved);
-            expectEquals ((double) f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
+            expectEquals ((double) f.app.uiState.toVar()["arrangement"]["pixelsPerSecond"], 80.0);
         }
 
         beginTest ("hasNewerRecovery follows which Edit was written last");
         {
             Fixture f;
-            f.uiState = sampleUIState();
+            f.app.uiState.restore (sampleUIState());
             const auto project = f.projects.getProjectFolder();
             expect (! Production::hasNewerRecovery (project));
 

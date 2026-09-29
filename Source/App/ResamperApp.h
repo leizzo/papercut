@@ -29,7 +29,10 @@ class ThemeManager;
     messages; UI State capture and restore are wired to uiState. */
 struct ResamperApp
 {
-    ResamperApp (EngineManager&, ThemeManager&);
+    /** Opens an untitled Project on the engine and registers every facade's
+        Commands. The theme is the one file.useTheme switches; the caller
+        loads it and keeps it alive. */
+    ResamperApp (EngineManager& engine, ThemeManager& theme);
 
     EngineManager& engine;
     ThemeManager& theme;

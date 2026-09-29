@@ -33,6 +33,7 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
 {
     // Every Command a layout or the menus may name must be registered before they build.
     registerPrimitives (factory, app.commands, app.theme);
+    // Looked up per call: the platform may fill in host.reportError after the app is built.
     auto reportError = [this] (const juce::String& message) { app.host.reportError (message); };
     registerDeveloperCommands (app.commands, layouts, app.theme, reportError);
     registerShellCommands (app.commands, shell);
