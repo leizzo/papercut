@@ -136,7 +136,8 @@ namespace
 
     juce::Result parseHex (const juce::String& value, const juce::String& key, juce::Colour& out)
     {
-        if (! value.startsWith ("#") || (value.length() != 7 && value.length() != 9))
+        if (! value.startsWith ("#") || (value.length() != 7 && value.length() != 9)
+            || ! value.substring (1).containsOnly ("0123456789abcdefABCDEF"))
             return juce::Result::fail ("colors." + key + " must be \"#rrggbb\", \"#rrggbbaa\" or \"$token\"");
 
         auto hex = value.substring (1);
@@ -477,6 +478,9 @@ juce::Result ThemeManager::readMerged (const juce::String& file, juce::var& json
 
     if (auto r = juce::JSON::parse (text, json); r.failed())
         return juce::Result::fail (file + ": Theme JSON: " + r.getErrorMessage());
+
+    if (! json.isObject())
+        return juce::Result::fail (file + ": Theme JSON must be an object");
 
     const auto base = json["extends"].toString();
 

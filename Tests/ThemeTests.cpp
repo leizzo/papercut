@@ -77,6 +77,20 @@ struct ThemeTests : juce::UnitTest
             expect (r.getErrorMessage().contains ("no-such-token"), r.getErrorMessage());
         }
 
+        beginTest ("A colour with a non-hex digit fails loudly");
+        {
+            juce::String json;
+            LayoutSource source;
+            expect (source.read ("themes/dark.json", json).wasOk());
+            json = json.replace ("\"#141416\"", "\"#14141g\"");
+
+            Theme theme;
+            LayoutMetrics metrics;
+            auto r = ThemeManager::parse (json, theme, metrics);
+            expect (r.failed());
+            expect (r.getErrorMessage().contains ("#rrggbb"), r.getErrorMessage());
+        }
+
         beginTest ("Type tokens carry size, family, weight, case and tracking (§15.2)");
         {
             Setup s;

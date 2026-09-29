@@ -300,6 +300,11 @@ struct DeviceChainTests : juce::UnitTest
             f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, high, true));
             expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, high, 1.0e-4f);
 
+            auto noValue = pluginParameterArgs (pluginId, param.id, high);
+            noValue.getDynamicObject()->removeProperty ("value");
+            f.invoke ("plugin.setParameter", noValue);
+            expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, high, 1.0e-4f);
+
             f.invoke ("edit.undo");
             expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, param.value, 1.0e-4f);
             expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 1);

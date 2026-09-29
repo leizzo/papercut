@@ -462,7 +462,11 @@ namespace
 
         void execute (const juce::var& args) override
         {
-            model.setClipColour (args[ArgKeys::clipId].toString(), (int) args[ArgKeys::value]);
+            const auto value = args[ArgKeys::value];
+
+            // A missing value would otherwise read as 0, the first palette colour.
+            if (value.isInt() || value.isInt64() || value.isDouble())
+                model.setClipColour (args[ArgKeys::clipId].toString(), (int) value);
         }
     };
 

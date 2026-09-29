@@ -139,8 +139,14 @@ namespace
 
         void execute (const juce::var& args) override
         {
-            rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
-                               (float) args[ArgKeys::value], (bool) args[ArgKeys::continuesGesture]);
+            const auto value = args[ArgKeys::value];
+
+            // A missing value would otherwise read as 0 and zero the parameter.
+            if (! (value.isInt() || value.isInt64() || value.isDouble()))
+                report ("Parameter change needs a value");
+            else
+                rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
+                                   (float) value, (bool) args[ArgKeys::continuesGesture]);
         }
     };
 

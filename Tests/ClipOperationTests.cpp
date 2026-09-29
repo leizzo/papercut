@@ -172,6 +172,8 @@ struct ClipOperationTests : juce::UnitTest
 
             f.invoke ("clip.setColour", clipColourArgs (id, 4));
             expectEquals (f.audioClip().colourIndex, 4);
+            f.invoke ("clip.setColour", clipArgs (id));   // no value: not the first colour
+            expectEquals (f.audioClip().colourIndex, 4);
 
             f.invoke ("clip.reverse", clipArgs (id));
             expect (f.audioClip().reversed);
