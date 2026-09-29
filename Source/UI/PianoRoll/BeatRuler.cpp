@@ -47,7 +47,7 @@ void BeatRuler::paint (juce::Graphics& g)
 
 void BeatRuler::mouseDown (const juce::MouseEvent& e)
 {
-    commands.invoke ("transport.setPosition", transportPositionArgs (std::max (0.0, view.xToTime ((float) e.x))));
+    commands.invoke (cmd::transportSetPosition, std::max (0.0, view.xToTime ((float) e.x)));
 }
 
 } // namespace resamper

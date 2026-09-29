@@ -8,30 +8,39 @@ namespace resamper
 
 struct AppCommandHost;
 
-/** Registers the transport Commands:
+/** How Rec starts: countIn false records at once (Shift-click Rec). */
+struct RecordArgs
+{
+    bool countIn = true;
+};
 
-    transport.play  transport.stop  transport.togglePlay  transport.returnToStart
-    transport.setPosition
-    transport.record  transport.toggleLoop  transport.setLoopRange
-    transport.loopSelection  transport.playFromSelection
-    transport.setTempo  transport.tapTempo  transport.setTimeSignature  transport.toggleMetronome
-    transport.toggleCountIn
-*/
+/** A new tempo; continuesGesture joins a drag into one undo step. */
+struct TempoArgs
+{
+    double bpm = 0;
+    bool continuesGesture = false;
+};
+
+namespace cmd
+{
+    inline constexpr CommandRef<> transportPlay { "transport.play" };
+    inline constexpr CommandRef<> transportStop { "transport.stop" };
+    inline constexpr CommandRef<> transportTogglePlay { "transport.togglePlay" };
+    inline constexpr CommandRef<> transportReturnToStart { "transport.returnToStart" };
+    inline constexpr CommandRef<double> transportSetPosition { "transport.setPosition" };       ///< seconds
+    inline constexpr CommandRef<RecordArgs> transportRecord { "transport.record" };
+    inline constexpr CommandRef<> transportToggleLoop { "transport.toggleLoop" };
+    inline constexpr CommandRef<TimeRangeSeconds> transportSetLoopRange { "transport.setLoopRange" }; ///< also turns looping on
+    inline constexpr CommandRef<> transportLoopSelection { "transport.loopSelection" };
+    inline constexpr CommandRef<> transportPlayFromSelection { "transport.playFromSelection" };
+    inline constexpr CommandRef<TempoArgs> transportSetTempo { "transport.setTempo" };
+    inline constexpr CommandRef<> transportTapTempo { "transport.tapTempo" };
+    inline constexpr CommandRef<TimeSignature> transportSetTimeSignature { "transport.setTimeSignature" };
+    inline constexpr CommandRef<> transportToggleMetronome { "transport.toggleMetronome" };
+    inline constexpr CommandRef<> transportToggleCountIn { "transport.toggleCountIn" };
+}
+
+/** Registers the transport Commands above. */
 void registerTransportCommands (CommandRegistry&, ApplicationModel&, AppCommandHost&);
-
-/** Arguments for transport.record: withCountIn false records at once (Shift-click Rec). */
-juce::var recordArgs (bool withCountIn);
-
-/** Arguments for transport.setLoopRange, which also turns looping on. */
-juce::var loopRangeArgs (double startSeconds, double endSeconds);
-
-/** Arguments for transport.setPosition: where the playhead moves, in seconds. */
-juce::var transportPositionArgs (double seconds);
-
-/** Arguments for transport.setTempo; continuesGesture joins a drag into one undo step. */
-juce::var tempoArgs (double bpm, bool continuesGesture = false);
-
-/** Arguments for transport.setTimeSignature. */
-juce::var timeSignatureArgs (int numerator, int denominator);
 
 } // namespace resamper

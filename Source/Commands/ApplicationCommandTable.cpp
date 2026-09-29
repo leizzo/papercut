@@ -295,14 +295,12 @@ const KeyBinding* findBinding (const juce::KeyPress& key, int context)
     return global;
 }
 
-juce::var bindingArgs (const KeyBinding& b)
+std::any bindingArgs (const KeyBinding& b)
 {
     if (b.argument == KeyBinding::noArgument)
         return {};
 
-    auto args = new juce::DynamicObject();
-    args->setProperty ("argument", b.argument);
-    return args;
+    return b.argument;
 }
 
 } // namespace resamper

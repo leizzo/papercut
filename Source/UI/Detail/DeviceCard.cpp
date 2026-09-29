@@ -44,7 +44,7 @@ void DeviceCard::rebuildKnobs (const std::vector<PluginParameter>& parameters)
             knob->setTooltip (p.name);
             knob->onChange = [this, id = p.id] (double v, bool continues)
             {
-                commands.invoke ("plugin.setParameter", pluginParameterArgs (plugin.id, id, (float) v, continues));
+                commands.invoke (cmd::pluginSetParameter, { plugin.id, id, (float) v, continues });
             };
             addAndMakeVisible (*knob);
             knobs.push_back (std::move (knob));
@@ -189,7 +189,7 @@ void DeviceCard::mouseDown (const juce::MouseEvent& e)
     }
 
     if (powerButton().expanded (3).contains (e.getPosition()))
-        commands.invoke ("plugin.setBypassed", pluginBypassArgs (trackId, plugin.id, plugin.enabled));
+        commands.invoke (cmd::pluginSetBypassed, { trackId, plugin.id, plugin.enabled });
 }
 
 void DeviceCard::mouseDrag (const juce::MouseEvent& e)
@@ -216,10 +216,10 @@ void DeviceCard::showMenu()
     juce::PopupMenu menu;
     menu.addItem ("Open Plug-in Window", [this] { if (onOpenEditor) onOpenEditor(); });
     menu.addItem (plugin.enabled ? "Bypass" : "Enable",
-                  [this] { commands.invoke ("plugin.setBypassed", pluginBypassArgs (trackId, plugin.id, plugin.enabled)); });
+                  [this] { commands.invoke (cmd::pluginSetBypassed, { trackId, plugin.id, plugin.enabled }); });
     menu.addItem (collapsed ? "Expand" : "Collapse", [this] { if (onToggleCollapsed) onToggleCollapsed(); });
     menu.addSeparator();
-    menu.addItem ("Delete", [this] { commands.invoke ("plugin.remove", pluginArgs (trackId, plugin.id)); });
+    menu.addItem ("Delete", [this] { commands.invoke (cmd::pluginRemove, { trackId, plugin.id }); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
 }
 

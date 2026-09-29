@@ -64,7 +64,7 @@ struct ChannelStrip::SendRow : juce::Component
     void mouseDown (const juce::MouseEvent& e) override
     {
         if (e.x < 16)
-            commands.invoke ("mixer.setSendMuted", sendMutedArgs (trackId, send.id, ! send.muted));
+            commands.invoke (cmd::mixerSetSendMuted, { trackId, send.id, ! send.muted });
     }
 
     ThemeManager& themeManager;
@@ -87,21 +87,21 @@ ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
         const auto chosen = index > 0 ? state.inputs[index - 1] : juce::String();
 
         if (chosen != state.track.input)
-            commands.invoke ("track.setInput", trackInputArgs (state.track.id, chosen));
+            commands.invoke (cmd::trackSetInput, { state.track.id, chosen });
     };
 
     pan.setDialSize (panHeight);
     pan.setReadoutBeside (true);
-    pan.onChange = [this] (double v, bool continues) { commands.invoke ("track.setPan", trackPanArgs (state.track.id, v, continues)); };
+    pan.onChange = [this] (double v, bool continues) { commands.invoke (cmd::trackSetPan, { state.track.id, v, continues }); };
 
     faderSection.onVolumeChange = [this] (double db, bool continues)
     {
-        commands.invoke ("track.setVolume", trackVolumeArgs (state.track.id, db, continues));
+        commands.invoke (cmd::trackSetVolume, { state.track.id, db, continues });
     };
 
-    mute.onClick = [this] { commands.invoke ("track.toggleMute", trackArgs (state.track.id)); };
-    solo.onClick = [this] { commands.invoke ("track.toggleSolo", trackArgs (state.track.id)); };
-    arm.onClick = [this] { commands.invoke ("track.toggleArm", trackArgs (state.track.id)); };
+    mute.onClick = [this] { commands.invoke (cmd::trackToggleMute, { state.track.id }); };
+    solo.onClick = [this] { commands.invoke (cmd::trackToggleSolo, { state.track.id }); };
+    arm.onClick = [this] { commands.invoke (cmd::trackToggleArm, { state.track.id }); };
 
     for (auto* child : std::initializer_list<juce::Component*> { &input, &pan, &faderSection, &mute, &solo, &arm })
         addAndMakeVisible (child);
@@ -134,7 +134,7 @@ void ChannelStrip::setUpInsertSlot (InsertSlot& slot)
     slot.onPowerClick = [this, &slot] (const juce::MouseEvent&)
     {
         if (auto& plugin = slot.getPlugin())
-            commands.invoke ("plugin.setBypassed", pluginBypassArgs (state.track.id, plugin->id, plugin->enabled));
+            commands.invoke (cmd::pluginSetBypassed, { state.track.id, plugin->id, plugin->enabled });
     };
 
     slot.onMenu = [this, &slot] (const juce::MouseEvent&) { showInsertMenu (slot); };
@@ -171,8 +171,8 @@ void ChannelStrip::showInsertMenu (InsertSlot& slot)
 
     menu.addItem ("Replace...", [this, &slot, id] { if (onPickInsert) onPickInsert (slot, id); });
     menu.addItem (plugin->enabled ? "Bypass" : "Enable",
-                  [this, trackId, id, on = plugin->enabled] { commands.invoke ("plugin.setBypassed", pluginBypassArgs (trackId, id, on)); });
-    menu.addItem ("Remove", [this, trackId, id] { commands.invoke ("plugin.remove", pluginArgs (trackId, id)); });
+                  [this, trackId, id, on = plugin->enabled] { commands.invoke (cmd::pluginSetBypassed, { trackId, id, on }); });
+    menu.addItem ("Remove", [this, trackId, id] { commands.invoke (cmd::pluginRemove, { trackId, id }); });
     menu.addItem ("Save Preset...", false, false, nullptr);   // presets arrive with the racks work
     menu.addSeparator();
     menu.addItem ("Move to Track Chain", [this, trackId, id, name]
@@ -184,7 +184,7 @@ void ChannelStrip::showInsertMenu (InsertSlot& slot)
                                             juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<ChannelStrip> (this), trackId, id] (int result)
                                             {
                                                 if (result == 1 && safe != nullptr)
-                                                    safe->commands.invoke ("plugin.moveToDeviceChain", pluginArgs (trackId, id));
+                                                    safe->commands.invoke (cmd::pluginMoveToDeviceChain, { trackId, id });
                                             }));
     });
 
@@ -282,15 +282,15 @@ void ChannelStrip::itemDropped (const SourceDetails& details)
         const auto from = details.description["fromTrack"].toString();
 
         if (from == state.track.id)
-            commands.invoke ("plugin.move", pluginMoveArgs (state.track.id, moved, juce::jmin (index, (int) state.inserts.size() - 1)));
+            commands.invoke (cmd::pluginMove, { state.track.id, moved, juce::jmin (index, (int) state.inserts.size() - 1) });
         else
-            commands.invoke ("plugin.copyInsert", pluginCopyArgs (from, moved, state.track.id, index));
+            commands.invoke (cmd::pluginCopyInsert, { from, moved, state.track.id, index });
 
         return;
     }
 
     if (auto item = itemFromDrag (details.description))
-        commands.invoke ("plugin.insert", pluginInsertArgs (state.track.id, item->pluginPath, PluginChain::mixer));
+        commands.invoke (cmd::pluginInsert, { state.track.id, item->pluginPath, PluginChain::mixer });
 }
 
 void ChannelStrip::setState (const StripState& next)
@@ -341,7 +341,7 @@ void ChannelStrip::rebuildSends()
             row->level.onChange = [this, i] (double db, bool continues)
             {
                 if (i < state.sends.size())
-                    commands.invoke ("mixer.setSendGain", sendGainArgs (state.track.id, state.sends[i].id, db, continues));
+                    commands.invoke (cmd::mixerSetSendGain, { state.track.id, state.sends[i].id, db, continues });
             };
             addAndMakeVisible (*row);
             sendRows.push_back (std::move (row));
@@ -607,7 +607,7 @@ void ChannelStrip::mouseDown (const juce::MouseEvent& e)
     }
 
     // Selecting a strip selects its track in every view (PRD §16.1).
-    commands.invoke ("track.select", trackArgs (state.track.id));
+    commands.invoke (cmd::trackSelect, { state.track.id });
 
     if (e.mods.isPopupMenu() && onShowMenu)
         onShowMenu();

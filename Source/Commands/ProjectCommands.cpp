@@ -6,13 +6,13 @@ namespace resamper
 
 void registerProjectCommands (CommandRegistry& registry, ApplicationModel& model, AppCommandHost& host)
 {
-    registry.add ({ "project.new", "New Project" }, [&model, &host]
+    registry.add (cmd::projectNew, { "New Project" }, [&model, &host]
     {
         model.newProject();
         host.restoreUIState ({});
     });
 
-    registry.add ({ "project.open", "Open Project..." }, [&model, &host]
+    registry.add (cmd::projectOpen, { "Open Project..." }, [&model, &host]
     {
         host.chooseProjectToOpen ([&model, &host] (const juce::File& folder)
         {
@@ -26,7 +26,7 @@ void registerProjectCommands (CommandRegistry& registry, ApplicationModel& model
         });
     });
 
-    registry.add ({ "project.saveAs", "Save Project As..." }, [&model, &host]
+    registry.add (cmd::projectSaveAs, { "Save Project As..." }, [&model, &host]
     {
         host.chooseProjectSaveLocation ([&model, &host] (const juce::File& folder)
         {
@@ -35,10 +35,10 @@ void registerProjectCommands (CommandRegistry& registry, ApplicationModel& model
     });
 
     // An untitled Project has nowhere to save yet, so Save asks where, as Save As does.
-    registry.add ({ "project.save", "Save Project" }, [&model, &host, &registry]
+    registry.add (cmd::projectSave, { "Save Project" }, [&model, &host, &registry]
     {
         if (model.isProjectUntitled())
-            registry.invoke ("project.saveAs");
+            registry.invoke (cmd::projectSaveAs);
         else
             host.report (model.saveProject (host.captureUIState()));
     });

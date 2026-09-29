@@ -14,9 +14,9 @@ struct ClipEditingTests : juce::UnitTest
     {
         ClipFixture()
         {
-            invoke ("track.add");
+            invoke (cmd::trackAdd);
             audioFileToChoose = writeSineWav (scratchDir().getChildFile ("tone.wav"), 2.0);
-            invoke ("clip.add");
+            invoke (cmd::clipAdd);
         }
 
         ClipInfo clip (int track = 0, int index = 0) const   { return model.getTracks()[(size_t) track].clips[(size_t) index]; }
@@ -35,14 +35,14 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("Selecting a clip marks it, and creates no undo step");
         {
             ClipFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
 
             expect (! f.clip().selected);
             f.model.selectClip (f.clipId());
 
             expect (f.clip().selected);
 
-            f.invoke ("edit.undo");   // undoes track.add, not the selection
+            f.invoke (cmd::editUndo);   // undoes track.add, not the selection
             expectEquals (f.numTracks(), 1);
             expect (f.clip().selected);
         }
@@ -50,13 +50,13 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("clip.add goes to the selected clip's track; track.remove never takes it");
         {
             ClipFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.model.selectClip (f.clipId());
 
-            f.invoke ("clip.add");
+            f.invoke (cmd::clipAdd);
             expectEquals ((int) f.model.getTracks()[0].clips.size(), 2);
 
-            f.invoke ("track.remove");   // no track is selected: the last one goes
+            f.invoke (cmd::trackRemove);   // no track is selected: the last one goes
             expectEquals (f.numTracks(), 1);
             expectEquals ((int) f.model.getTracks()[0].clips.size(), 2);
         }
@@ -64,18 +64,18 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("A selected clip stays selected through a move, a split, and their undo");
         {
             ClipFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.model.selectClip (f.clipId());
 
-            f.invoke ("clip.move", clipMoveArgs (f.clipId(), 1.0, f.trackId (1)));
+            f.invoke (cmd::clipMove, { f.clipId(), 1.0, f.trackId (1) });
             expect (f.clip (1).selected);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.clip (0).selected);
 
             f.setPlayhead (1.0);
-            f.invoke ("clip.split");
+            f.invoke (cmd::clipSplit);
             expect (f.clip (0, 0).selected);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.clip (0, 0).selected);
         }
 
@@ -83,24 +83,24 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("clip.move changes the start, keeps the length, and is one undo step");
         {
             ClipFixture f;
-            f.invoke ("clip.move", clipMoveArgs (f.clipId(), 3.0));
+            f.invoke (cmd::clipMove, { f.clipId(), 3.0 });
 
             expectWithinAbsoluteError (f.clip().startSeconds, 3.0, 1e-6);
             expectWithinAbsoluteError (f.clip().lengthSeconds, 2.0, 1e-3);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.clip().startSeconds, 0.0, 1e-6);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[0].clips.empty());   // the next step back is clip.add
         }
 
         beginTest ("clip.move to another track moves the clip there; undo moves it back");
         {
             ClipFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto id = f.clipId();
 
-            f.invoke ("clip.move", clipMoveArgs (id, 1.0, f.trackId (1)));
+            f.invoke (cmd::clipMove, { id, 1.0, f.trackId (1) });
 
             auto tracks = f.model.getTracks();
             expect (tracks[0].clips.empty());
@@ -108,7 +108,7 @@ struct ClipEditingTests : juce::UnitTest
             expectEquals (tracks[1].clips[0].id, id);
             expectWithinAbsoluteError (tracks[1].clips[0].startSeconds, 1.0, 1e-6);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             tracks = f.model.getTracks();
             expectEquals ((int) tracks[0].clips.size(), 1);
             expect (tracks[1].clips.empty());
@@ -118,19 +118,18 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("clip.move clamps to the Edit start");
         {
             ClipFixture f;
-            f.invoke ("clip.move", clipMoveArgs (f.clipId(), 2.0));
-            f.invoke ("clip.move", clipMoveArgs (f.clipId(), -5.0));
+            f.invoke (cmd::clipMove, { f.clipId(), 2.0 });
+            f.invoke (cmd::clipMove, { f.clipId(), -5.0 });
             expectWithinAbsoluteError (f.clip().startSeconds, 0.0, 1e-6);
         }
 
         beginTest ("clip.move with an unknown clip or no change creates no undo step");
         {
             ClipFixture f;
-            f.invoke ("clip.move", clipMoveArgs ("no-such-clip", 1.0));
-            f.invoke ("clip.move", clipMoveArgs (f.clipId(), 0.0));
-            f.invoke ("clip.move", {});
+            f.invoke (cmd::clipMove, { "no-such-clip", 1.0 });
+            f.invoke (cmd::clipMove, { f.clipId(), 0.0 });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[0].clips.empty());   // straight back past clip.add
         }
 
@@ -138,20 +137,20 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("clip.resize from the end shortens the clip; undo restores it");
         {
             ClipFixture f;
-            f.invoke ("clip.resize", clipResizeArgs (f.clipId(), 0.0, 1.25));
+            f.invoke (cmd::clipResize, { f.clipId(), 0.0, 1.25 });
 
             expectWithinAbsoluteError (f.clip().startSeconds, 0.0, 1e-6);
             expectWithinAbsoluteError (f.clip().lengthSeconds, 1.25, 1e-6);
             expectWithinAbsoluteError (f.clip().sourceOffsetSeconds, 0.0, 1e-6);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.clip().lengthSeconds, 2.0, 1e-3);
         }
 
         beginTest ("clip.resize from the start trims the front and keeps the audio in place");
         {
             ClipFixture f;
-            f.invoke ("clip.resize", clipResizeArgs (f.clipId(), 0.5, 2.0));
+            f.invoke (cmd::clipResize, { f.clipId(), 0.5, 2.0 });
 
             expectWithinAbsoluteError (f.clip().startSeconds, 0.5, 1e-6);
             expectWithinAbsoluteError (f.clip().lengthSeconds, 1.5, 1e-3);
@@ -161,10 +160,10 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("clip.resize cannot reach past either end of the source audio");
         {
             ClipFixture f;
-            f.invoke ("clip.move", clipMoveArgs (f.clipId(), 1.0));
-            f.invoke ("clip.resize", clipResizeArgs (f.clipId(), 1.5, 2.5));   // trimmed to source 0.5..1.5
+            f.invoke (cmd::clipMove, { f.clipId(), 1.0 });
+            f.invoke (cmd::clipResize, { f.clipId(), 1.5, 2.5 });   // trimmed to source 0.5..1.5
 
-            f.invoke ("clip.resize", clipResizeArgs (f.clipId(), 0.0, 9.0));
+            f.invoke (cmd::clipResize, { f.clipId(), 0.0, 9.0 });
 
             expectWithinAbsoluteError (f.clip().startSeconds, 1.0, 1e-6);          // source start
             expectWithinAbsoluteError (f.clip().sourceOffsetSeconds, 0.0, 1e-6);
@@ -174,11 +173,11 @@ struct ClipEditingTests : juce::UnitTest
         beginTest ("clip.resize to an empty or inverted range changes nothing");
         {
             ClipFixture f;
-            f.invoke ("clip.resize", clipResizeArgs (f.clipId(), 1.0, 1.0));
-            f.invoke ("clip.resize", clipResizeArgs (f.clipId(), 1.5, 0.5));
+            f.invoke (cmd::clipResize, { f.clipId(), 1.0, 1.0 });
+            f.invoke (cmd::clipResize, { f.clipId(), 1.5, 0.5 });
 
             expectWithinAbsoluteError (f.clip().lengthSeconds, 2.0, 1e-3);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[0].clips.empty());
         }
 
@@ -190,7 +189,7 @@ struct ClipEditingTests : juce::UnitTest
             f.setPlayhead (0.75);
 
             expect (f.commands.find ("clip.split")->isEnabled());
-            f.invoke ("clip.split");
+            f.invoke (cmd::clipSplit);
 
             auto clips = f.model.getTracks()[0].clips;
             expectEquals ((int) clips.size(), 2);
@@ -201,7 +200,7 @@ struct ClipEditingTests : juce::UnitTest
             expectWithinAbsoluteError (clips[1].sourceOffsetSeconds, 0.75, 1e-6);
             expect (clips[1].file == clips[0].file);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             clips = f.model.getTracks()[0].clips;
             expectEquals ((int) clips.size(), 1);
             expectWithinAbsoluteError (clips[0].lengthSeconds, 2.0, 1e-3);
@@ -212,19 +211,19 @@ struct ClipEditingTests : juce::UnitTest
             ClipFixture f;
             f.setPlayhead (0.75);
             expect (! f.commands.find ("clip.split")->isEnabled());
-            f.invoke ("clip.split");
+            f.invoke (cmd::clipSplit);
 
             f.model.selectClip (f.clipId());
             f.setPlayhead (5.0);
             expect (! f.commands.find ("clip.split")->isEnabled());
-            f.invoke ("clip.split");
+            f.invoke (cmd::clipSplit);
 
             f.setPlayhead (0.0005);   // within a millisecond of the edge: the engine won't cut
             expect (! f.commands.find ("clip.split")->isEnabled());
-            f.invoke ("clip.split");
+            f.invoke (cmd::clipSplit);
 
             expectEquals ((int) f.model.getTracks()[0].clips.size(), 1);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[0].clips.empty());
         }
     }

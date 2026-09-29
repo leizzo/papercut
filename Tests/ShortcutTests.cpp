@@ -67,75 +67,75 @@ struct ShortcutTests : juce::UnitTest
         beginTest ("F1-F8 toggle the mute of tracks 1-8");
         {
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.add");
-            auto args = new juce::DynamicObject();
-            args->setProperty ("argument", 1);
-            f.invoke ("track.toggleMuteAt", juce::var (args));
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
+            auto pressF = [&f] (int keyCode)
+            {
+                auto* binding = findBinding (juce::KeyPress (keyCode), anyView);
+                return binding != nullptr && f.commands.invokeById (binding->commandId, bindingArgs (*binding));
+            };
+
+            expect (pressF (juce::KeyPress::F2Key));
             expect (! f.model.getTracks()[0].muted && f.model.getTracks()[1].muted);
 
-            auto beyond = new juce::DynamicObject();
-            beyond->setProperty ("argument", 7);
-            f.invoke ("track.toggleMuteAt", juce::var (beyond));   // no track 8: nothing happens
+            expect (pressF (juce::KeyPress::F8Key));   // no track 8: nothing happens
             expect (f.model.getTracks()[1].muted);
         }
 
         beginTest ("S solos the selected track");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.model.selectTrack (f.model.getTracks()[0].id);
-            f.invoke ("track.toggleSoloSelected");
+            f.invoke (cmd::trackToggleSoloSelected);
             expect (f.model.getTracks()[0].solo);
         }
 
         beginTest ("Mod+L loops the selected clips; with none selected it toggles the loop");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 2.0);
-            f.invoke ("clip.add");
+            f.invoke (cmd::clipAdd);
             f.model.selectClip (f.model.getTracks()[0].clips[0].id);
 
-            f.invoke ("transport.loopSelection");
+            f.invoke (cmd::transportLoopSelection);
             expect (f.model.isLooping());
             expectWithinAbsoluteError (f.model.getLoopRange().start, 0.0, 1.0e-6);
             expectWithinAbsoluteError (f.model.getLoopRange().end, 2.0, 1.0e-3);
 
             f.model.selectClip ({});
-            f.invoke ("transport.loopSelection");
+            f.invoke (cmd::transportLoopSelection);
             expect (! f.model.isLooping());
         }
 
         beginTest ("Shift+Space plays from the selection");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            f.invoke ("clip.add");
-            f.invoke ("clip.copy", clipMoveArgs (f.model.getTracks()[0].clips[0].id, 3.0));   // selects the copy
+            f.invoke (cmd::clipAdd);
+            f.invoke (cmd::clipCopy, { f.model.getTracks()[0].clips[0].id, 3.0 });   // selects the copy
 
-            f.invoke ("transport.playFromSelection");
+            f.invoke (cmd::transportPlayFromSelection);
             expect (f.model.isPlaying());
             expectWithinAbsoluteError (f.model.getTransportPositionSeconds(), 3.0, 0.05);
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
         }
 
         beginTest ("Up and Down transpose the selected notes; Mod+A selects all of a clip's notes");
         {
             Fixture f;
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             f.model.selectTrack (f.model.getTracks()[0].id);
-            f.invoke ("clip.addMidi");
+            f.invoke (cmd::clipAddMidi);
             const auto clipId = f.model.getTracks()[0].clips[0].id;
-            f.invoke ("note.add", noteAddArgs (clipId, 0.0, 0.25, 60));
-            f.invoke ("note.add", noteAddArgs (clipId, 0.5, 0.25, 64));
+            f.invoke (cmd::noteAdd, { clipId, 0.0, 0.25, 60 });
+            f.invoke (cmd::noteAdd, { clipId, 0.5, 0.25, 64 });
             f.model.selectNotes ({});
 
-            f.invoke ("note.selectAll", clipArgs (clipId));
-            auto args = clipArgs (clipId);
-            args.getDynamicObject()->setProperty ("argument", 12);
-            f.invoke ("note.transposeSelected", args);
+            f.invoke (cmd::noteSelectAll, { clipId });
+            f.invoke (cmd::noteTransposeSelected, { clipId, 12 });
 
             const auto notes = f.model.getTracks()[0].clips[0].notes;
             expectEquals (notes[0].pitch, 72);

@@ -19,6 +19,20 @@ namespace resamper
 
 class LayoutSource;
 
+/** The Commands of the window's views: they act on the view in front. */
+namespace cmd
+{
+    inline constexpr CommandRef<> uiEscape { "ui.escape" };
+    inline constexpr CommandRef<> devToggleOverlay { "dev.toggleOverlay" };
+    inline constexpr CommandRef<> arrangeZoomIn { "arrange.zoomIn" };
+    inline constexpr CommandRef<> arrangeZoomOut { "arrange.zoomOut" };
+    inline constexpr CommandRef<> arrangeZoomToSelection { "arrange.zoomToSelection" };
+    inline constexpr CommandRef<> arrangeZoomToSong { "arrange.zoomToSong" };
+    inline constexpr CommandRef<> pianoRollQuantize { "pianoRoll.quantize" };
+    inline constexpr CommandRef<int> pianoRollTranspose { "pianoRoll.transpose" };   ///< semitones
+    inline constexpr CommandRef<> pianoRollSelectAll { "pianoRoll.selectAll" };
+}
+
 /** The MainWindow's content (PRD §5–6): the top bar, then the view the shell
     shows. Session and Arrange sit between the Browser (left) and the detail
     view (bottom); Mixer, Piano Roll and Editor fill the window. Views are kept

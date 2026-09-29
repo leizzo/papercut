@@ -6,31 +6,54 @@
 namespace resamper
 {
 
-/** Registers the track Commands:
+/** Names one track. */
+struct TrackArgs
+{
+    juce::String trackId;
+};
 
-    track.add    track.addMidi   track.remove
-    track.setVolume  track.setPan  track.toggleMute  track.toggleSolo
-    track.setInput   track.toggleArm   track.setColour   track.select
-    track.toggleMuteAt (args: argument = track index)   track.toggleSoloSelected
-*/
-void registerTrackCommands (CommandRegistry&, ApplicationModel&);
-
-/** Arguments for track.toggleMute, track.toggleSolo, track.toggleArm and track.select. */
-juce::var trackArgs (const juce::String& trackId);
-
-/** Arguments for track.setVolume. A continuous gesture (a fader drag) passes
+/** A track fader or pan knob. A continuous gesture (a fader drag) passes
     continuesGesture for every value after its first, making the whole gesture
     one undo step. */
-juce::var trackVolumeArgs (const juce::String& trackId, double db, bool continuesGesture = false);
+struct TrackControlArgs
+{
+    juce::String trackId;
+    double value = 0;              ///< volume in dB, or pan from -1 (left) to 1 (right)
+    bool continuesGesture = false;
+};
 
-/** Arguments for track.setPan (-1 left to 1 right); continuesGesture as for trackVolumeArgs. */
-juce::var trackPanArgs (const juce::String& trackId, double pan, bool continuesGesture = false);
+/** A track's input: one named by ApplicationModel::getAudioInputs(), or empty for none. */
+struct TrackInputArgs
+{
+    juce::String trackId;
+    juce::String input;
+};
 
-/** Arguments for track.setColour: an index into the track palette. */
-juce::var trackColourArgs (const juce::String& trackId, int colourIndex);
+/** A track's colour: an index into the track palette. */
+struct TrackColourArgs
+{
+    juce::String trackId;
+    int colourIndex = 0;
+};
 
-/** Arguments for track.setInput: an input named by ApplicationModel::getAudioInputs(),
-    or empty for none. */
-juce::var trackInputArgs (const juce::String& trackId, const juce::String& inputName);
+namespace cmd
+{
+    inline constexpr CommandRef<> trackAdd { "track.add" };
+    inline constexpr CommandRef<> trackAddMidi { "track.addMidi" };
+    inline constexpr CommandRef<> trackRemove { "track.remove" };
+    inline constexpr CommandRef<TrackControlArgs> trackSetVolume { "track.setVolume" };
+    inline constexpr CommandRef<TrackControlArgs> trackSetPan { "track.setPan" };
+    inline constexpr CommandRef<TrackArgs> trackToggleMute { "track.toggleMute" };
+    inline constexpr CommandRef<TrackArgs> trackToggleSolo { "track.toggleSolo" };
+    inline constexpr CommandRef<TrackArgs> trackToggleArm { "track.toggleArm" };
+    inline constexpr CommandRef<TrackInputArgs> trackSetInput { "track.setInput" };
+    inline constexpr CommandRef<TrackColourArgs> trackSetColour { "track.setColour" };
+    inline constexpr CommandRef<TrackArgs> trackSelect { "track.select" };          ///< in every view; never undoable
+    inline constexpr CommandRef<int> trackToggleMuteAt { "track.toggleMuteAt" };    ///< F1-F8: the track's 0-based index
+    inline constexpr CommandRef<> trackToggleSoloSelected { "track.toggleSoloSelected" };
+}
+
+/** Registers the track Commands above. */
+void registerTrackCommands (CommandRegistry&, ApplicationModel&);
 
 } // namespace resamper

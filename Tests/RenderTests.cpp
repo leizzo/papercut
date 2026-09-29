@@ -16,9 +16,9 @@ struct RenderTests : juce::UnitTest
         beginTest ("An Edit with a WAV clip on an audio track renders non-silent audio");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            f.invoke ("clip.add");
+            f.invoke (cmd::clipAdd);
             expectGreaterThan (renderPeak (f), 0.1f);
         }
 
@@ -26,29 +26,29 @@ struct RenderTests : juce::UnitTest
         {
             // A tone on track 0; track 1 stays empty.
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
             f.model.selectTrack (f.model.getTracks()[0].id);
-            f.invoke ("clip.add");
+            f.invoke (cmd::clipAdd);
             const auto tone = f.model.getTracks()[0].id, empty = f.model.getTracks()[1].id;
 
             const auto fullPeak = renderPeak (f);
-            f.invoke ("track.setVolume", trackVolumeArgs (tone, -12.0));
+            f.invoke (cmd::trackSetVolume, { tone, -12.0 });
             expectWithinAbsoluteError (renderPeak (f), fullPeak * juce::Decibels::decibelsToGain (-12.0f), fullPeak * 0.05f);
 
-            f.invoke ("track.setVolume", trackVolumeArgs (tone, ApplicationModel::minVolumeDb));
+            f.invoke (cmd::trackSetVolume, { tone, ApplicationModel::minVolumeDb });
             expectLessThan (renderPeak (f), 1e-4f);
-            f.invoke ("edit.undo");
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
+            f.invoke (cmd::editUndo);
 
-            f.invoke ("track.toggleMute", trackArgs (tone));
+            f.invoke (cmd::trackToggleMute, { tone });
             expectLessThan (renderPeak (f), 1e-4f);
-            f.invoke ("track.toggleMute", trackArgs (tone));
+            f.invoke (cmd::trackToggleMute, { tone });
 
-            f.invoke ("track.toggleSolo", trackArgs (empty));
+            f.invoke (cmd::trackToggleSolo, { empty });
             expectLessThan (renderPeak (f), 1e-4f);
-            f.invoke ("track.toggleSolo", trackArgs (tone));
+            f.invoke (cmd::trackToggleSolo, { tone });
             expectGreaterThan (renderPeak (f), 0.1f);
         }
 
@@ -58,9 +58,9 @@ struct RenderTests : juce::UnitTest
             // compiled in, or if nothing starts rendering it, the clip is silent and
             // has no waveform (and an offline render waits for it forever).
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 2.0, 2, 172.0);
-            f.invoke ("clip.add");
+            f.invoke (cmd::clipAdd);
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
 
             auto* clip = dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);

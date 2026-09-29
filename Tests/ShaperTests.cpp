@@ -12,7 +12,7 @@ struct ShaperTests : juce::UnitTest
     {
         ShapeFixture()
         {
-            invoke ("track.add");
+            invoke (cmd::trackAdd);
         }
 
         juce::String trackId() const { return model.getTracks()[0].id; }
@@ -32,7 +32,7 @@ struct ShaperTests : juce::UnitTest
         beginTest ("shaper.add loop assigns volume; undo and shaper.remove drop it");
         {
             ShapeFixture f;
-            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "volume", ShaperMode::loop)));
+            expect (f.invoke (cmd::shaperAdd, { f.trackId(), "volume", ShaperMode::loop }));
 
             auto added = f.shaper.getShapers (f.trackId());
             expectEquals ((int) added.size(), 1);
@@ -40,16 +40,16 @@ struct ShaperTests : juce::UnitTest
             expectEquals (added[0].parameterKey, juce::String ("volume"));
             expectEquals (added[0].trackId, f.trackId());
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.shaper.getShapers (f.trackId()).size(), 0);
             expectEquals (f.numTracks(), 1);
 
-            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "volume", ShaperMode::loop)));
+            expect (f.invoke (cmd::shaperAdd, { f.trackId(), "volume", ShaperMode::loop }));
             const auto again = f.shaper.getShapers (f.trackId())[0].id;
-            expect (f.invoke ("shaper.remove", shaperRemoveArgs (again)));
+            expect (f.invoke (cmd::shaperRemove, { again }));
             expectEquals ((int) f.shaper.getShapers (f.trackId()).size(), 0);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             auto restored = f.shaper.getShapers (f.trackId());
             expectEquals ((int) restored.size(), 1);
             expectEquals (restored[0].id, again);
@@ -64,7 +64,7 @@ struct ShaperTests : juce::UnitTest
             expect (mixer.addSend (f.trackId(), mixer.getReturns()[0].bus).wasOk());
             const auto key = "send:" + mixer.getSends (f.trackId())[0].id;
 
-            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), key, ShaperMode::loop)));
+            expect (f.invoke (cmd::shaperAdd, { f.trackId(), key, ShaperMode::loop }));
             expectEquals (f.shaperWithKey (key).parameterKey, key);
             expect (f.shaperWithKey (key).mode == ShaperMode::loop);
         }
@@ -72,7 +72,7 @@ struct ShaperTests : juce::UnitTest
         beginTest ("setLoop round-trips length, depth, and shape");
         {
             ShapeFixture f;
-            f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "volume", ShaperMode::loop));
+            f.invoke (cmd::shaperAdd, { f.trackId(), "volume", ShaperMode::loop });
             const auto id = f.shaper.getShapers (f.trackId())[0].id;
             const std::vector<ShaperShapePoint> shape { { 0.0f, 0.0f }, { 0.5f, 1.0f }, { 1.0f, 0.25f } };
 
@@ -95,7 +95,7 @@ struct ShaperTests : juce::UnitTest
         beginTest ("shaper.add audioTrigger on pan round-trips the envelope");
         {
             ShapeFixture f;
-            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "pan", ShaperMode::audioTrigger)));
+            expect (f.invoke (cmd::shaperAdd, { f.trackId(), "pan", ShaperMode::audioTrigger }));
             const auto id = f.shaper.getShapers (f.trackId())[0].id;
 
             expect (f.shaper.setAudioTrigger (id, 0.05f, 0.02f, 0.4f, -18.0f, 0.6f));
@@ -113,7 +113,7 @@ struct ShaperTests : juce::UnitTest
         beginTest ("setLoop on an audio-trigger shaper switches mode; one undo restores it");
         {
             ShapeFixture f;
-            f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "pan", ShaperMode::audioTrigger));
+            f.invoke (cmd::shaperAdd, { f.trackId(), "pan", ShaperMode::audioTrigger });
             const auto id = f.shaper.getShapers (f.trackId())[0].id;
             expect (f.shaper.setAudioTrigger (id, 0.05f, 0.02f, 0.4f, -18.0f, 0.6f));
 
@@ -127,7 +127,7 @@ struct ShaperTests : juce::UnitTest
             expectWithinAbsoluteError (switched[0].lengthBeats, 4.0, 1.0e-6);
             expectEquals ((int) switched[0].shape.size(), 2);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             auto restored = f.shaper.getShapers (f.trackId());
             expectEquals ((int) restored.size(), 1);
             expect (restored[0].mode == ShaperMode::audioTrigger);
@@ -141,17 +141,17 @@ struct ShaperTests : juce::UnitTest
         beginTest ("Two shapers on one track are independent");
         {
             ShapeFixture f;
-            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "volume", ShaperMode::loop)));
-            expect (f.invoke ("shaper.add", shaperAddArgs (f.trackId(), "pan", ShaperMode::audioTrigger)));
+            expect (f.invoke (cmd::shaperAdd, { f.trackId(), "volume", ShaperMode::loop }));
+            expect (f.invoke (cmd::shaperAdd, { f.trackId(), "pan", ShaperMode::audioTrigger }));
             expectEquals ((int) f.shaper.getShapers (f.trackId()).size(), 2);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             auto onlyLoop = f.shaper.getShapers (f.trackId());
             expectEquals ((int) onlyLoop.size(), 1);
             expect (onlyLoop[0].mode == ShaperMode::loop);
             expectEquals (onlyLoop[0].parameterKey, juce::String ("volume"));
 
-            f.invoke ("edit.redo");
+            f.invoke (cmd::editRedo);
             expectEquals ((int) f.shaper.getShapers (f.trackId()).size(), 2);
 
             const auto volumeId = f.shaperWithKey ("volume").id;
@@ -175,7 +175,7 @@ struct ShaperTests : juce::UnitTest
             expectWithinAbsoluteError ((double) pan.thresholdDb, -12.0, 1.0e-4);
             expectWithinAbsoluteError ((double) pan.depth, 0.5, 1.0e-5);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.shaperWithKey ("volume").mode == ShaperMode::loop);
             expectWithinAbsoluteError (f.shaperWithKey ("volume").lengthBeats, 3.0, 1.0e-6);
             expect (f.shaperWithKey ("pan").mode == ShaperMode::audioTrigger);

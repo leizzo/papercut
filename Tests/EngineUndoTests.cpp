@@ -22,9 +22,9 @@ struct EngineUndoTests : juce::UnitTest
 
         UndoFixture()
         {
-            invoke ("track.add");
+            invoke (cmd::trackAdd);
             trackId = model.getTracks()[0].id;
-            invoke ("plugin.insert", pluginInsertArgs (trackId, te::ReverbPlugin::xmlTypeName));
+            invoke (cmd::pluginInsert, { trackId, te::ReverbPlugin::xmlTypeName });
             pluginId = plugins.getChain (trackId, PluginChain::device)[0].id;
         }
 
@@ -43,11 +43,11 @@ struct EngineUndoTests : juce::UnitTest
         beginTest ("A track volume drag never joins a plug-in step made during it");
         {
             UndoFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId, -3.0));
-            f.invoke ("plugin.setBypassed", pluginBypassArgs (f.trackId, f.pluginId, true));
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId, -6.0, true));
+            f.invoke (cmd::trackSetVolume, { f.trackId, -3.0 });
+            f.invoke (cmd::pluginSetBypassed, { f.trackId, f.pluginId, true });
+            f.invoke (cmd::trackSetVolume, { f.trackId, -6.0, true });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.model.getTracks()[0].volumeDb, -3.0, 1e-3);
             expect (f.bypassed(), "the bypass step survives");
         }
@@ -58,11 +58,11 @@ struct EngineUndoTests : juce::UnitTest
             const auto param = f.plugins.getParameters (f.pluginId)[0];
             const auto low = f.parameterAt (0.6f), high = f.parameterAt (0.9f);
 
-            f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, low));
-            f.invoke ("track.add");
-            f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, high, true));
+            f.invoke (cmd::pluginSetParameter, { f.pluginId, param.id, low });
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::pluginSetParameter, { f.pluginId, param.id, high, true });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.plugins.getParameters (f.pluginId)[0].value, low, 1.0e-4f);
             expectEquals (f.numTracks(), 2, "the track step survives");
         }
@@ -70,11 +70,11 @@ struct EngineUndoTests : juce::UnitTest
         beginTest ("A master volume drag never joins a plug-in step made during it");
         {
             UndoFixture f;
-            f.invoke ("mixer.setMasterVolume", masterVolumeArgs (-3.0));
-            f.invoke ("plugin.setBypassed", pluginBypassArgs (f.trackId, f.pluginId, true));
-            f.invoke ("mixer.setMasterVolume", masterVolumeArgs (-6.0, true));
+            f.invoke (cmd::mixerSetMasterVolume, { -3.0 });
+            f.invoke (cmd::pluginSetBypassed, { f.trackId, f.pluginId, true });
+            f.invoke (cmd::mixerSetMasterVolume, { -6.0, true });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.mixer.getMaster().volumeDb, -3.0, 1e-3);
             expect (f.bypassed(), "the bypass step survives");
         }
@@ -85,12 +85,12 @@ struct EngineUndoTests : juce::UnitTest
             const auto param = f.plugins.getParameters (f.pluginId)[0];
             const auto low = f.parameterAt (0.6f), high = f.parameterAt (0.9f);
 
-            f.invoke ("plugin.setBypassed", pluginBypassArgs (f.trackId, f.pluginId, true));
-            f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, low));
-            f.invoke ("edit.undo");
-            f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, high, true));
+            f.invoke (cmd::pluginSetBypassed, { f.trackId, f.pluginId, true });
+            f.invoke (cmd::pluginSetParameter, { f.pluginId, param.id, low });
+            f.invoke (cmd::editUndo);
+            f.invoke (cmd::pluginSetParameter, { f.pluginId, param.id, high, true });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.plugins.getParameters (f.pluginId)[0].value, param.value, 1.0e-4f);
             expect (f.bypassed(), "the bypass step survives");
         }

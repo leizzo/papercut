@@ -180,13 +180,18 @@ void registerPrimitives (ComponentFactory& factory, CommandRegistry& commands, T
         if (! commands.contains (commandId))
             throw LayoutError ("Button \"" + node["id"].toString() + "\" refers to unknown Command \"" + commandId + "\"");
 
+        // A button invokes its Command without args, so it may only name one that takes none.
+        if (commands.find (commandId)->getArgsType() != typeid (void))
+            throw LayoutError ("Button \"" + node["id"].toString() + "\" refers to Command \"" + commandId
+                               + "\", which needs args a button can't give");
+
         auto button = std::make_unique<juce::TextButton> (requireString (node, "text"));
         button->setTooltip (commands.find (commandId)->getName());
 
         // Keyboard shortcuts (e.g. space for play) must reach the Command table,
         // not trigger whichever button was clicked last.
         button->setWantsKeyboardFocus (false);
-        button->onClick = [&commands, commandId] { commands.invoke (commandId); };
+        button->onClick = [&commands, commandId] { commands.invokeById (commandId); };
         return button;
     });
 }

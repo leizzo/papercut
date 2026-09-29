@@ -96,8 +96,8 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
     {
         layoutWatch = std::make_unique<LayoutWatcher> (dir.getChildFile ("layouts"));
         themeWatch = std::make_unique<LayoutWatcher> (dir.getChildFile ("themes"));
-        layoutWatch->onJsonUpdated = [this] (const juce::File&) { app.commands.invoke ("dev.reloadLayout"); };
-        themeWatch->onJsonUpdated = [this] (const juce::File&) { app.commands.invoke ("dev.reloadTheme"); };
+        layoutWatch->onJsonUpdated = [this] (const juce::File&) { app.commands.invoke (cmd::devReloadLayout); };
+        themeWatch->onJsonUpdated = [this] (const juce::File&) { app.commands.invoke (cmd::devReloadTheme); };
     }
 
     app.model.addListener (this);
@@ -116,35 +116,35 @@ MainComponent::~MainComponent()
 void MainComponent::registerArrangementZoomCommands()
 {
     // Zoom is for the Arrangement, so these only act while it shows.
-    auto add = [this] (const char* id, const char* name, void (ArrangementView::*fn)())
+    auto add = [this] (CommandRef<> ref, const char* name, void (ArrangementView::*fn)())
     {
-        app.commands.add ({ id, name }, [this, fn]
+        app.commands.add (ref, { name }, [this, fn]
         {
             if (arrangement.isShowing())
                 (arrangement.*fn)();
         });
     };
 
-    add ("arrange.zoomIn", "Zoom In", &ArrangementView::zoomIn);
-    add ("arrange.zoomOut", "Zoom Out", &ArrangementView::zoomOut);
-    add ("arrange.zoomToSelection", "Zoom to Selection", &ArrangementView::zoomToSelection);
-    add ("arrange.zoomToSong", "Zoom to Song", &ArrangementView::zoomToSong);
+    add (cmd::arrangeZoomIn, "Zoom In", &ArrangementView::zoomIn);
+    add (cmd::arrangeZoomOut, "Zoom Out", &ArrangementView::zoomOut);
+    add (cmd::arrangeZoomToSelection, "Zoom to Selection", &ArrangementView::zoomToSelection);
+    add (cmd::arrangeZoomToSong, "Zoom to Song", &ArrangementView::zoomToSong);
 }
 
 void MainComponent::registerEscapeCommand()
 {
     // Esc (PRD §16.1): closes popovers and menus, cancels a drag, clears the selection.
-    app.commands.add ({ "ui.escape", "Clear Selection" }, [this]
+    app.commands.add (cmd::uiEscape, { "Clear Selection" }, [this]
     {
         juce::PopupMenu::dismissAllActiveMenus();
         arrangement.cancelDrag();
-        app.commands.invoke ("edit.deselectAll");
+        app.commands.invoke (cmd::editDeselectAll);
     });
 }
 
 void MainComponent::registerDeveloperOverlayCommand()
 {
-    app.commands.add ({ "dev.toggleOverlay", "Developer Overlay" }, [this] { toggleDeveloperOverlay(); });
+    app.commands.add (cmd::devToggleOverlay, { "Developer Overlay" }, [this] { toggleDeveloperOverlay(); });
 }
 
 void MainComponent::toggleDeveloperOverlay()
@@ -159,7 +159,7 @@ void MainComponent::toggleDeveloperOverlay()
 
 void MainComponent::showToast (const juce::String& message, bool undoable, bool isError)
 {
-    toasts.show (message, undoable ? std::function<void()> ([this] { app.commands.invoke ("edit.undo"); })
+    toasts.show (message, undoable ? std::function<void()> ([this] { app.commands.invoke (cmd::editUndo); })
                                    : std::function<void()>(),
                  isError);
 }
@@ -321,7 +321,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
 bool MainComponent::perform (const InvocationInfo& invocation)
 {
     if (auto* entry = findApplicationCommand (invocation.commandID))
-        return app.commands.invoke (entry->commandId);
+        return app.commands.invokeById (entry->commandId);
 
     return false;
 }
@@ -357,35 +357,35 @@ bool MainComponent::ShortcutListener::keyPressed (const juce::KeyPress& key, juc
     if (! owner.app.commands.contains (binding->commandId))
         return false;
 
-    owner.app.commands.invoke (binding->commandId, bindingArgs (*binding));
+    owner.app.commands.invokeById (binding->commandId, bindingArgs (*binding));
     return true;
 }
 
 void MainComponent::registerPianoRollCommands()
 {
-    // The Piano Roll's keys act on the clip it has open.
-    auto withClip = [this] (const char* commandId, std::function<juce::var (const juce::String&, const juce::var&)> makeArgs)
+    // The Piano Roll's keys act on the clip it has open, while it shows.
+    auto openClip = [this]
     {
-        return [this, commandId, makeArgs] (const juce::var& args)
-        {
-            if (auto clipId = pianoRoll.openClipId(); clipId.isNotEmpty() && pianoRoll.isShowing())
-                app.commands.invoke (commandId, makeArgs (clipId, args));
-        };
+        return pianoRoll.isShowing() ? pianoRoll.openClipId() : juce::String();
     };
 
-    app.commands.add ({ "pianoRoll.quantize", "Quantize" },
-        withClip ("note.quantize", [] (const juce::String& id, const juce::var&) { return noteQuantizeArgs (id, "1/16"); }));
+    app.commands.add (cmd::pianoRollQuantize, { "Quantize" }, [this, openClip]
+    {
+        if (auto clipId = openClip(); clipId.isNotEmpty())
+            app.commands.invoke (cmd::noteQuantize, { clipId, "1/16" });
+    });
 
-    app.commands.add ({ "pianoRoll.transpose", "Transpose" },
-        withClip ("note.transposeSelected", [] (const juce::String& id, const juce::var& args)
-        {
-            auto a = clipArgs (id);
-            a.getDynamicObject()->setProperty ("argument", args["argument"]);
-            return a;
-        }));
+    app.commands.add (cmd::pianoRollTranspose, { "Transpose" }, [this, openClip] (const int& semitones)
+    {
+        if (auto clipId = openClip(); clipId.isNotEmpty())
+            app.commands.invoke (cmd::noteTransposeSelected, { clipId, semitones });
+    });
 
-    app.commands.add ({ "pianoRoll.selectAll", "Select All Notes" },
-        withClip ("note.selectAll", [] (const juce::String& id, const juce::var&) { return clipArgs (id); }));
+    app.commands.add (cmd::pianoRollSelectAll, { "Select All Notes" }, [this, openClip]
+    {
+        if (auto clipId = openClip(); clipId.isNotEmpty())
+            app.commands.invoke (cmd::noteSelectAll, { clipId });
+    });
 }
 
 } // namespace resamper

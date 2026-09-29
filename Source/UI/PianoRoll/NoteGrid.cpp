@@ -334,12 +334,12 @@ void NoteGrid::mouseUp (const juce::MouseEvent& e)
             for (auto& note : released.original)
                 ids.add (note.id);
 
-            commands.invoke ("note.move", noteMoveArgs (clip.id, ids, deltaSeconds, deltaPitch));
+            commands.invoke (cmd::noteMove, { clip.id, ids, deltaSeconds, deltaPitch });
         }
         else
         {
             const auto& to = released.preview.front();
-            commands.invoke ("note.resize", noteResizeArgs (clip.id, to.id, to.startSeconds, to.startSeconds + to.lengthSeconds));
+            commands.invoke (cmd::noteResize, { clip.id, to.id, to.startSeconds, to.startSeconds + to.lengthSeconds });
         }
     }
     else if (clickOnEmpty && ! e.mouseWasDraggedSinceMouseDown() && clip.id.isNotEmpty())
@@ -353,8 +353,8 @@ void NoteGrid::mouseUp (const juce::MouseEvent& e)
             const auto length = model.beatsToSeconds (beat + 1.0) - editTime;
 
             if (length > 0.0)
-                commands.invoke ("note.add", noteAddArgs (clip.id, local, length,
-                                                          pitchAtY (view, e.y, themeManager.getMetrics().pianoKeyHeight)));
+                commands.invoke (cmd::noteAdd, { clip.id, local, length,
+                                                          pitchAtY (view, e.y, themeManager.getMetrics().pianoKeyHeight) });
         }
     }
 

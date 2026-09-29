@@ -75,7 +75,7 @@ TopBar::TopBar (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, Shell
     tempo.setValueStyle (TypeStyle { 15.0f, true, 500 });
     tempo.setSuffix ("BPM");
     tempo.setRaised (true);
-    tempo.onChange = [this] (double bpm, bool continues) { commands.invoke ("transport.setTempo", tempoArgs (bpm, continues)); };
+    tempo.onChange = [this] (double bpm, bool continues) { commands.invoke (cmd::transportSetTempo, { bpm, continues }); };
 
     signature.setNumeric (true);
     signature.setTooltip ("Time signature");
@@ -88,26 +88,27 @@ TopBar::TopBar (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, Shell
     metronome.setTooltip (tooltipFor ("Metronome", "transport.toggleMetronome"));
     follow.setTooltip (tooltipFor ("Follow", "view.toggleFollow"));
 
-    prev.onClick = [this] { commands.invoke ("transport.returnToStart"); };
+    prev.onClick = [this] { commands.invoke (cmd::transportReturnToStart); };
     // Shift-click records at once, skipping the count-in.
     record.onClick = [this]
     {
-        commands.invoke ("transport.record", recordArgs (! juce::ModifierKeys::getCurrentModifiers().isShiftDown()));
+        commands.invoke (cmd::transportRecord, { ! juce::ModifierKeys::getCurrentModifiers().isShiftDown() });
     };
     record.setIconColour (themeManager.getTheme().rec);
     record.setActiveColour (themeManager.getTheme().rec);
     automationArm.setOutlineWhenActive (true);
     automationArm.setEnabled (false);
-    play.onClick = [this] { commands.invoke ("transport.play"); };
-    stop.onClick = [this] { commands.invoke ("transport.stop"); };
-    metronome.onClick = [this] { commands.invoke ("transport.toggleMetronome"); };
-    follow.onClick = [this] { commands.invoke ("view.toggleFollow"); };
+    play.onClick = [this] { commands.invoke (cmd::transportPlay); };
+    stop.onClick = [this] { commands.invoke (cmd::transportStop); };
+    metronome.onClick = [this] { commands.invoke (cmd::transportToggleMetronome); };
+    follow.onClick = [this] { commands.invoke (cmd::viewToggleFollow); };
 
     views.setTitle ("View");
     views.onChange = [this] (int index)
     {
-        static const char* const ids[] = { "view.session", "view.arrange", "view.mixer", "view.pianoRoll", "view.editor" };
-        commands.invoke (ids[index]);
+        static constexpr CommandRef<> viewCommands[] = { cmd::viewSession, cmd::viewArrange, cmd::viewMixer,
+                                                         cmd::viewPianoRoll, cmd::viewEditor };
+        commands.invoke (viewCommands[index]);
     };
 
     for (auto* child : std::initializer_list<juce::Component*> { &tempo, &signature, &prev, &record, &automationArm, &play,
@@ -163,7 +164,7 @@ void TopBar::showSignatureMenu()
                          std::pair (7, 8), std::pair (9, 8), std::pair (12, 8) })
         menu.addItem (juce::String (sig.first) + " / " + juce::String (sig.second), true,
                       current.numerator == sig.first && current.denominator == sig.second,
-                      [this, sig] { commands.invoke ("transport.setTimeSignature", timeSignatureArgs (sig.first, sig.second)); });
+                      [this, sig] { commands.invoke (cmd::transportSetTimeSignature, { sig.first, sig.second }); });
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&signature));
 }

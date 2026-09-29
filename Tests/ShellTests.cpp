@@ -22,9 +22,9 @@ struct ShellTests : juce::UnitTest
             registerShellCommands (commands, shell);
 
             expect (shell.getView() == View::arrange);
-            commands.invoke ("view.mixer");
+            commands.invoke (cmd::viewMixer);
             expect (shell.getView() == View::mixer);
-            commands.invoke ("view.editor");
+            commands.invoke (cmd::viewEditor);
             expect (shell.getView() == View::editor);
         }
 
@@ -35,13 +35,13 @@ struct ShellTests : juce::UnitTest
             CommandRegistry commands;
             registerShellCommands (commands, shell);
 
-            commands.invoke ("view.toggleSessionArrange");
+            commands.invoke (cmd::viewToggleSessionArrange);
             expect (shell.getView() == View::session);
-            commands.invoke ("view.mixer");
+            commands.invoke (cmd::viewMixer);
             expect (shell.getLastTimelineView() == View::session);
-            commands.invoke ("view.toggleSessionArrange");
+            commands.invoke (cmd::viewToggleSessionArrange);
             expect (shell.getView() == View::session);
-            commands.invoke ("view.toggleSessionArrange");
+            commands.invoke (cmd::viewToggleSessionArrange);
             expect (shell.getView() == View::arrange);
         }
 
@@ -59,9 +59,9 @@ struct ShellTests : juce::UnitTest
             expectEquals (shell.getDetailHeight(), 420);
 
             expect (shell.isBrowserVisible() && ! shell.isDetailCollapsed() && shell.isFollowing());
-            commands.invoke ("view.toggleBrowser");
-            commands.invoke ("view.toggleDetail");
-            commands.invoke ("view.toggleFollow");
+            commands.invoke (cmd::viewToggleBrowser);
+            commands.invoke (cmd::viewToggleDetail);
+            commands.invoke (cmd::viewToggleFollow);
             expect (! shell.isBrowserVisible() && shell.isDetailCollapsed() && ! shell.isFollowing());
         }
 

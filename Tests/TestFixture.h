@@ -1,6 +1,11 @@
 #pragma once
 
 #include "App/ResamperApp.h"
+#include "Commands/AutomationCommands.h"
+#include "Commands/MixerCommands.h"
+#include "Commands/PluginCommands.h"
+#include "Commands/ProductionCommands.h"
+#include "Commands/SessionCommands.h"
 #include "UI/Layout/LayoutSource.h"
 #include "UI/Theme/ThemeManager.h"
 
@@ -47,7 +52,12 @@ struct Fixture
     juce::TemporaryFile scratch { juce::String() };
     juce::File scratchDir() const   { return scratch.getFile(); }
 
-    bool invoke (const char* commandId, const juce::var& args = {})   { return commands.invoke (commandId, args); }
+    template <typename Args>
+    bool invoke (CommandRef<Args> command, std::type_identity_t<Args> args)   { return commands.invoke (command, std::move (args)); }
+
+    template <typename Args>
+    bool invoke (CommandRef<Args> command)                                   { return commands.invoke (command); }
+
     int numTracks() const                 { return (int) model.getTracks().size(); }
 };
 

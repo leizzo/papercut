@@ -83,18 +83,18 @@ void MixerView::showStripMenu (const juce::String& trackId, bool isReturn)
     juce::PopupMenu sends, buses;
 
     for (auto& ret : mixer.getReturns())
-        sends.addItem (ret.name, [this, trackId, bus = ret.bus] { commands.invoke ("mixer.addSend", sendArgs (trackId, bus)); });
+        sends.addItem (ret.name, [this, trackId, bus = ret.bus] { commands.invoke (cmd::mixerAddSend, { trackId, bus }); });
 
     for (auto& bus : mixer.getBuses())
-        buses.addItem (bus.name, [this, trackId, id = bus.trackId] { commands.invoke ("mixer.moveToBus", moveToBusArgs (trackId, id)); });
+        buses.addItem (bus.name, [this, trackId, id = bus.trackId] { commands.invoke (cmd::mixerMoveToBus, { trackId, id }); });
 
     // A return doesn't send to returns or join a bus.
     juce::PopupMenu menu;
     menu.addSubMenu ("Add Send", sends, ! isReturn && sends.getNumItems() > 0);
     menu.addSubMenu ("Move to Bus", buses, ! isReturn && buses.getNumItems() > 0);
     menu.addSeparator();
-    menu.addItem (commandItem (commands, "mixer.addReturn", returnArgs ("Return " + juce::String (mixer.getReturns().size() + 1))));
-    menu.addItem (commandItem (commands, "mixer.addBus", busArgs ("Bus " + juce::String (mixer.getBuses().size() + 1))));
+    menu.addItem (commandItem (commands, cmd::mixerAddReturn, { "Return " + juce::String (mixer.getReturns().size() + 1) }));
+    menu.addItem (commandItem (commands, cmd::mixerAddBus, { "Bus " + juce::String (mixer.getBuses().size() + 1) }));
     menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
@@ -111,9 +111,9 @@ void MixerView::showEffectPicker (const juce::String& trackId, InsertSlot& slot,
         auto action = [this, trackId, replacing, path = info.path]
         {
             if (replacing.isNotEmpty())
-                commands.invoke ("plugin.replace", pluginReplaceArgs (trackId, replacing, path));
+                commands.invoke (cmd::pluginReplace, { trackId, replacing, path });
             else
-                commands.invoke ("plugin.insert", pluginInsertArgs (trackId, path, PluginChain::mixer));
+                commands.invoke (cmd::pluginInsert, { trackId, path, PluginChain::mixer });
         };
 
         (info.external ? external : builtIn).addItem (info.name, action);

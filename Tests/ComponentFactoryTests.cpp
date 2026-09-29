@@ -17,16 +17,10 @@ struct ComponentFactoryTests : juce::UnitTest
     {
         Setup()
         {
-            commands.add (std::make_unique<Probe> (invocations));
+            commands.add (CommandRef<> { "test.probe" }, { "Probe" }, [this] { ++invocations; });
+            commands.add (CommandRef<int> { "test.withArgs" }, { "With Args" }, [this] (const int&) { ++invocations; });
             registerPrimitives (factory, commands, themes);
         }
-
-        struct Probe : Command
-        {
-            explicit Probe (int& n) : Command ("test.probe", "Probe"), count (n) {}
-            void execute (const juce::var&) override   { ++count; }
-            int& count;
-        };
 
         int invocations = 0;
         LayoutSource source;
@@ -71,6 +65,13 @@ struct ComponentFactoryTests : juce::UnitTest
             Setup s;
             expectLayoutError ([&] { s.factory.createFromJson (R"({ "type": "button", "id": "b", "text": "Go", "command": "no.such" })"); },
                                "no.such");
+        }
+
+        beginTest ("A button naming a Command that takes args fails loudly");
+        {
+            Setup s;
+            expectLayoutError ([&] { s.factory.createFromJson (R"({ "type": "button", "id": "b", "text": "Go", "command": "test.withArgs" })"); },
+                               "test.withArgs");
         }
 
         beginTest ("Malformed JSON fails loudly");

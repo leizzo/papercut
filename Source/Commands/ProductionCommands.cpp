@@ -1,7 +1,6 @@
 #include "ProductionCommands.h"
 
 #include "AppCommandHost.h"
-#include "ArgKeys.h"
 #include "CommandRegistry.h"
 #include "Engine/ApplicationModel.h"
 #include "Engine/Production.h"
@@ -12,9 +11,6 @@ namespace resamper
 
 namespace
 {
-    juce::String trackIdFrom (const juce::var& args)    { return args[ArgKeys::trackId].toString(); }
-    juce::String fileFrom (const juce::var& args)       { return args[ArgKeys::file].toString(); }
-
     /** Opens a Project folder through the model, so it drops the old Edit's listener, and restores its UI State. */
     juce::Result openAndRestore (ApplicationModel& model, AppCommandHost& host, const juce::File& folder)
     {
@@ -31,31 +27,27 @@ namespace
 void registerProductionCommands (CommandRegistry& registry, Production& production, ApplicationModel& model,
                                  ThemeManager& themes, AppCommandHost& host)
 {
-    registry.add ({ "track.freeze", "Freeze Track" }, [&production, &host] (const juce::var& args)
+    registry.add (cmd::trackFreeze, { "Freeze Track" }, [&production, &host] (const TrackArgs& a)
     {
-        auto id = trackIdFrom (args);
-        host.report (id.isEmpty() ? juce::Result::fail ("track.freeze needs a track") : production.freezeTrack (id));
+        host.report (a.trackId.isEmpty() ? juce::Result::fail ("track.freeze needs a track") : production.freezeTrack (a.trackId));
     });
 
-    registry.add ({ "track.unfreeze", "Unfreeze Track" }, [&production, &host] (const juce::var& args)
+    registry.add (cmd::trackUnfreeze, { "Unfreeze Track" }, [&production, &host] (const TrackArgs& a)
     {
-        auto id = trackIdFrom (args);
-        host.report (id.isEmpty() ? juce::Result::fail ("track.unfreeze needs a track") : production.unfreezeTrack (id));
+        host.report (a.trackId.isEmpty() ? juce::Result::fail ("track.unfreeze needs a track") : production.unfreezeTrack (a.trackId));
     });
 
-    registry.add ({ "track.bounce", "Bounce Track..." }, [&production, &host] (const juce::var& args)
+    registry.add (cmd::trackBounce, { "Bounce Track..." }, [&production, &host] (const BounceArgs& a)
     {
-        auto id = trackIdFrom (args);
-
-        if (id.isEmpty())
+        if (a.trackId.isEmpty())
         {
             host.report (juce::Result::fail ("track.bounce needs a track"));
             return;
         }
 
-        if (auto file = fileFrom (args); file.isNotEmpty())
+        if (a.file.isNotEmpty())
         {
-            host.report (production.bounceTrack (id, file));
+            host.report (production.bounceTrack (a.trackId, a.file));
             return;
         }
 
@@ -65,17 +57,17 @@ void registerProductionCommands (CommandRegistry& registry, Production& producti
             return;
         }
 
-        host.chooseProjectSaveLocation ([&production, &host, id] (const juce::File& chosen)
+        host.chooseProjectSaveLocation ([&production, &host, id = a.trackId] (const juce::File& chosen)
         {
             host.report (production.bounceTrack (id, chosen));
         });
     });
 
-    registry.add ({ "file.exportMix", "Export Mix..." }, [&production, &host] (const juce::var& args)
+    registry.add (cmd::fileExportMix, { "Export Mix..." }, [&production, &host] (const FileArgs& a)
     {
-        if (auto file = fileFrom (args); file.isNotEmpty())
+        if (a.file.isNotEmpty())
         {
-            host.report (production.exportMix (file));
+            host.report (production.exportMix (a.file));
             return;
         }
 
@@ -91,88 +83,39 @@ void registerProductionCommands (CommandRegistry& registry, Production& producti
         });
     });
 
-    registry.add ({ "project.saveTemplate", "Save Template" }, [&production, &host] (const juce::var& args)
+    registry.add (cmd::projectSaveTemplate, { "Save Template" }, [&production, &host] (const FolderArgs& a)
     {
-        auto folder = args[ArgKeys::folder].toString();
-        host.report (folder.isEmpty() ? juce::Result::fail ("project.saveTemplate needs a folder") : production.saveTemplate (folder));
+        host.report (a.folder.isEmpty() ? juce::Result::fail ("project.saveTemplate needs a folder") : production.saveTemplate (a.folder));
     });
 
-    registry.add ({ "project.newFromTemplate", "New from Template" }, [&production, &model, &host] (const juce::var& args)
+    registry.add (cmd::projectNewFromTemplate, { "New from Template" }, [&production, &model, &host] (const NewFromTemplateArgs& a)
     {
-        auto source = args[ArgKeys::templateFolder].toString();
-        auto dest = args[ArgKeys::dest].toString();
-
-        if (source.isEmpty() || dest.isEmpty())
+        if (a.templateFolder.isEmpty() || a.destFolder.isEmpty())
         {
             host.report (juce::Result::fail ("project.newFromTemplate needs template and dest folders"));
             return;
         }
 
         // Copy first, then open the copy.
-        auto r = production.newFromTemplate (source, dest);
-        host.report (r.wasOk() ? openAndRestore (model, host, dest) : r);
+        auto r = production.newFromTemplate (a.templateFolder, a.destFolder);
+        host.report (r.wasOk() ? openAndRestore (model, host, a.destFolder) : r);
     });
 
-    registry.add ({ "project.autosave", "Autosave" }, [&production, &host]
+    registry.add (cmd::projectAutosave, { "Autosave" }, [&production, &host]
     {
         host.report (production.autosave (host.captureUIState ? host.captureUIState() : juce::var()));
     });
 
-    registry.add ({ "project.recover", "Recover", [&production] { return production.hasRecovery(); } }, [&production, &model, &host]
+    registry.add (cmd::projectRecover, { "Recover", [&production] { return production.hasRecovery(); } }, [&production, &model, &host]
     {
         host.report (production.hasRecovery() ? openAndRestore (model, host, production.getRecoveryFolder())
                                               : juce::Result::fail ("No recovery copy"));
     });
 
-    registry.add ({ "theme.use", "Use Theme" }, [&themes, &host] (const juce::var& args)
+    registry.add (cmd::themeUse, { "Use Theme" }, [&themes, &host] (const FileArgs& a)
     {
-        auto file = fileFrom (args);
-        host.report (file.isEmpty() ? juce::Result::fail ("theme.use needs a file") : themes.useTheme (file));
+        host.report (a.file.isEmpty() ? juce::Result::fail ("theme.use needs a file") : themes.useTheme (a.file));
     });
-}
-
-juce::var trackIdArgs (const juce::String& trackId)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::trackId, trackId);
-    return args;
-}
-
-juce::var bounceArgs (const juce::String& trackId, const juce::String& file)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::trackId, trackId);
-    args->setProperty (ArgKeys::file, file);
-    return args;
-}
-
-juce::var exportMixArgs (const juce::String& file)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::file, file);
-    return args;
-}
-
-juce::var saveTemplateArgs (const juce::String& folder)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::folder, folder);
-    return args;
-}
-
-juce::var newFromTemplateArgs (const juce::String& templateFolder, const juce::String& destFolder)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::templateFolder, templateFolder);
-    args->setProperty (ArgKeys::dest, destFolder);
-    return args;
-}
-
-juce::var themeFileArgs (const juce::String& file)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::file, file);
-    return args;
 }
 
 } // namespace resamper

@@ -8,31 +8,34 @@ namespace resamper
 class Session;
 struct AppCommandHost;
 
-/** Registers Session commands. File choice for session.addSlotClip goes through
-    AppCommandHost::chooseAudioFile, the same way clip.add does.
+/** A scene's new name. */
+struct SceneNameArgs
+{
+    int index = 0;
+    juce::String name;
+};
 
-    session.setSceneCount   count
-    session.renameScene     index, name
-    session.addSlotClip     trackId, scene
-    session.addMidiSlotClip trackId, scene
-    session.clearSlot       trackId, scene
-    session.launchSlot      trackId, scene
-    session.launchScene     index
-    session.stopAll
-    session.recordToArrangement
-*/
+/** One slot: a track's clip in a scene. */
+struct SlotArgs
+{
+    juce::String trackId;
+    int scene = 0;
+};
+
+namespace cmd
+{
+    inline constexpr CommandRef<int> sessionSetSceneCount { "session.setSceneCount" };
+    inline constexpr CommandRef<SceneNameArgs> sessionRenameScene { "session.renameScene" };
+    inline constexpr CommandRef<SlotArgs> sessionAddSlotClip { "session.addSlotClip" };    ///< asks AppCommandHost::chooseAudioFile, as clip.add does
+    inline constexpr CommandRef<SlotArgs> sessionAddMidiSlotClip { "session.addMidiSlotClip" };
+    inline constexpr CommandRef<SlotArgs> sessionClearSlot { "session.clearSlot" };
+    inline constexpr CommandRef<SlotArgs> sessionLaunchSlot { "session.launchSlot" };
+    inline constexpr CommandRef<int> sessionLaunchScene { "session.launchScene" };          ///< the scene's index
+    inline constexpr CommandRef<> sessionStopAll { "session.stopAll" };
+    inline constexpr CommandRef<> sessionRecordToArrangement { "session.recordToArrangement" };
+}
+
+/** Registers the Session Commands above. */
 void registerSessionCommands (CommandRegistry&, Session&, AppCommandHost&);
-
-/** Arguments for session.setSceneCount. */
-juce::var sessionSceneCountArgs (int count);
-
-/** Arguments for session.renameScene. */
-juce::var sessionRenameSceneArgs (int index, const juce::String& name);
-
-/** Arguments for session.addSlotClip, session.clearSlot and session.launchSlot. */
-juce::var sessionSlotArgs (const juce::String& trackId, int sceneIndex);
-
-/** Arguments for session.launchScene. */
-juce::var sessionSceneArgs (int index);
 
 } // namespace resamper

@@ -12,7 +12,7 @@ struct AutomationTests : juce::UnitTest
     {
         AutoFixture()
         {
-            invoke ("track.add");
+            invoke (cmd::trackAdd);
         }
 
         juce::String trackId() const { return model.getTracks()[0].id; }
@@ -28,7 +28,7 @@ struct AutomationTests : juce::UnitTest
             expectEquals (targets[0].key, juce::String ("volume"));
             expectEquals (targets[1].key, juce::String ("pan"));
 
-            expect (f.invoke ("automation.addPoint", automationPointArgs (f.trackId(), "volume", 1.0, -12.0f)));
+            expect (f.invoke (cmd::automationAddPoint, { f.trackId(), "volume", 1.0, -12.0f }));
 
             auto points = f.automation.getPoints (f.trackId(), "volume");
             expectEquals ((int) points.size(), 1);
@@ -36,7 +36,7 @@ struct AutomationTests : juce::UnitTest
             expectWithinAbsoluteError (points[0].timeSeconds, 1.0, 1.0e-4);
             expectWithinAbsoluteError ((double) points[0].value, -12.0, 1.0e-3);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.automation.getPoints (f.trackId(), "volume").size(), 0);
             expectEquals (f.numTracks(), 1);
         }
@@ -44,15 +44,15 @@ struct AutomationTests : juce::UnitTest
         beginTest ("automation.movePoint changes time and value; undo restores them");
         {
             AutoFixture f;
-            f.invoke ("automation.addPoint", automationPointArgs (f.trackId(), "volume", 1.0, -12.0f));
-            expect (f.invoke ("automation.movePoint", automationMoveArgs (f.trackId(), "volume", 0, 2.5, -6.0f)));
+            f.invoke (cmd::automationAddPoint, { f.trackId(), "volume", 1.0, -12.0f });
+            expect (f.invoke (cmd::automationMovePoint, { f.trackId(), "volume", 0, 2.5, -6.0f }));
 
             auto moved = f.automation.getPoints (f.trackId(), "volume");
             expectEquals ((int) moved.size(), 1);
             expectWithinAbsoluteError (moved[0].timeSeconds, 2.5, 1.0e-4);
             expectWithinAbsoluteError ((double) moved[0].value, -6.0, 1.0e-3);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             auto restored = f.automation.getPoints (f.trackId(), "volume");
             expectEquals ((int) restored.size(), 1);
             expectWithinAbsoluteError (restored[0].timeSeconds, 1.0, 1.0e-4);
@@ -62,16 +62,16 @@ struct AutomationTests : juce::UnitTest
         beginTest ("automation.removePoint drops one point; automation.clear drops the rest");
         {
             AutoFixture f;
-            f.invoke ("automation.addPoint", automationPointArgs (f.trackId(), "volume", 1.0, -12.0f));
-            f.invoke ("automation.addPoint", automationPointArgs (f.trackId(), "volume", 3.0, -6.0f));
-            expect (f.invoke ("automation.removePoint", automationRemoveArgs (f.trackId(), "volume", 0)));
+            f.invoke (cmd::automationAddPoint, { f.trackId(), "volume", 1.0, -12.0f });
+            f.invoke (cmd::automationAddPoint, { f.trackId(), "volume", 3.0, -6.0f });
+            expect (f.invoke (cmd::automationRemovePoint, { f.trackId(), "volume", 0 }));
 
             auto left = f.automation.getPoints (f.trackId(), "volume");
             expectEquals ((int) left.size(), 1);
             expectWithinAbsoluteError (left[0].timeSeconds, 3.0, 1.0e-4);
             expectWithinAbsoluteError ((double) left[0].value, -6.0, 1.0e-3);
 
-            expect (f.invoke ("automation.clear", automationClearArgs (f.trackId(), "volume")));
+            expect (f.invoke (cmd::automationClear, { f.trackId(), "volume" }));
             expectEquals ((int) f.automation.getPoints (f.trackId(), "volume").size(), 0);
         }
 
@@ -90,13 +90,13 @@ struct AutomationTests : juce::UnitTest
                 listed = listed || target.key == key;
 
             expect (listed);
-            expect (f.invoke ("automation.addPoint", automationPointArgs (trackId, key, 1.0, -12.0f)));
+            expect (f.invoke (cmd::automationAddPoint, { trackId, key, 1.0, -12.0f }));
 
             auto points = f.automation.getPoints (trackId, key);
             expectEquals ((int) points.size(), 1);
             expectWithinAbsoluteError ((double) points[0].value, -12.0, 1.0e-2);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.automation.getPoints (trackId, key).size(), 0);
         }
 
@@ -106,7 +106,7 @@ struct AutomationTests : juce::UnitTest
             expect (! f.automation.addPoint (f.trackId(), "not-a-parameter", 1.0, -12.0f));
             expect (f.automation.getPoints (f.trackId(), "not-a-parameter").empty());
 
-            expect (f.invoke ("edit.undo"));
+            expect (f.invoke (cmd::editUndo));
             expectEquals (f.numTracks(), 0);
         }
     }

@@ -1,20 +1,22 @@
 #pragma once
 
-#include <functional>
+#include "Commands/CommandRegistry.h"
 
-namespace juce { class String; }
+#include <functional>
 
 namespace resamper
 {
 
-class CommandRegistry;
 class LayoutManager;
 class ThemeManager;
 
-/** Registers the Developer Mode reload Commands:
+namespace cmd
+{
+    inline constexpr CommandRef<> devReloadLayout { "dev.reloadLayout" };   ///< rebuild the layout hosts whose file changed
+    inline constexpr CommandRef<> devReloadTheme { "dev.reloadTheme" };     ///< re-read the Theme and re-style in place
+}
 
-    dev.reloadLayout   rebuild the layout hosts whose file changed
-    dev.reloadTheme    re-read the Theme and re-style in place (geometry untouched)
+/** Registers the Developer Mode reload Commands above.
 
     dev.toggleOverlay (show the status bar and developer overlay) belongs to
     MainComponent, which owns both.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <any>
 #include <limits>
 #include <span>
 
@@ -37,7 +38,7 @@ struct KeyBinding
     int keyCode;
     int modifiers;          ///< juce::ModifierKeys flags
     int contexts;           ///< ShortcutContext flags; anyView for a global shortcut
-    int argument = noArgument;   ///< passed to the Command as args["argument"] (F1-F8's track, a transpose)
+    int argument = noArgument;   ///< passed to the Command as its int args (F1-F8's track, a transpose)
 
     static constexpr int noArgument = std::numeric_limits<int>::min();
 };
@@ -70,7 +71,7 @@ juce::KeyPress findShortcut (const juce::String& commandId);
     contextual binding wins over a global one. */
 const KeyBinding* findBinding (const juce::KeyPress&, int context);
 
-/** The args a binding passes to its Command. */
-juce::var bindingArgs (const KeyBinding&);
+/** The args a binding passes to its Command: its int argument, or none. */
+std::any bindingArgs (const KeyBinding&);
 
 } // namespace resamper
