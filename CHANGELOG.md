@@ -9,6 +9,31 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-29
+
+Fixes and groundwork on top of **M1 — Core**.
+
+### Changed
+
+- The product is renamed from Papercut to Resamper. Projects saved by 0.1.0 are not
+  migrated: re-create them in 0.1.1.
+- A JSON layout button that names a Command needing arguments fails to load with a
+  layout error, as a button naming an unknown Command already did.
+- Internal: the app, tests and snapshots are built from one composition root; each
+  Command is declared once, invoked through a typed handle whose arguments the
+  compiler checks, and menu items get their IDs from the menus' order.
+
+### Fixed
+
+- Undo: a continued drag no longer merges into an undo step another part of the app
+  started, so one Undo reverts only one change (for example, a volume drag and a
+  plug-in bypass are now two steps).
+- Plug-in scans: stopping a scan (including on quit) no longer blocks for up to
+  two minutes or crashes afterwards.
+- A missing value no longer zeroes a plug-in parameter or picks the first clip colour.
+- A theme file whose JSON isn't an object is reported instead of crashing, and
+  theme colours reject non-hex digits.
+
 ## [0.1.0] - 2026-09-28
 
 Milestone **M1 — Core**: shell, transport, Arrangement, device chain with plug-ins,
@@ -51,5 +76,6 @@ basic Mixer, and the Resamper design system.
 - Silent tempo-tagged loops with no waveform.
 - M1 review findings and design parity in lanes, devices and the mixer.
 
-[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/leizzo/resamper/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leizzo/resamper/releases/tag/v0.1.0
