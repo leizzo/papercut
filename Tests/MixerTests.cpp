@@ -184,13 +184,12 @@ struct MixerTests : juce::UnitTest
 
             for (auto& s : f.mixer.getStrips())
             {
-                order.add (s.name);
+                order.add (s.id);
                 outputs.add (s.output);
             }
 
-            const auto name = [&] (const juce::String& id) { return f.strip (id)->name; };
             expectEquals (order.joinIntoString (","),
-                          juce::StringArray { name (t3), name (t1), name (t2), "Kick", "Drums", name (t4), name (returnId) }.joinIntoString (","));
+                          juce::StringArray { t3, t1, t2, kick, drums, t4, returnId }.joinIntoString (","));
             expectEquals (outputs.joinIntoString (","), juce::String ("Master,Drums,Kick,Drums,Master,Master,Master"));
 
             expect (f.strip (drums)->role == StripRole::bus);
