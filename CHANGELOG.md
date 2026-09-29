@@ -9,6 +9,11 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+### Added
+
+- Each GitHub release ships the macOS app (Apple Silicon, signed and notarized) as a DMG, and its
+  notes list every change with links to the commits and pull requests.
+
 ## [0.1.1] - 2026-09-29
 
 Fixes and groundwork on top of **M1 — Core**.

@@ -1,0 +1,60 @@
+# git-cliff configuration: https://git-cliff.org/docs/configuration
+#
+# Renders the commit list appended to a GitHub release (see
+# .github/workflows/release.yml). CHANGELOG.md stays hand-written.
+# Preview the list for the latest tag with: git cliff --latest
+#
+# Commit subjects are "<gitmoji> <type>(<scope>): <summary>". The emoji comes
+# before the type, which the conventional-commit parser rejects, so commits
+# are grouped by regex on the raw subject instead.
+
+[changelog]
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+#### {{ group | striptags | trim }}
+{% for commit in commits %}
+{%- if commit.message is starting_with("Merge pull request #") %}
+- {{ commit.message | split(pat=" ") | nth(n=3) }} {{ commit.message | split(pat="\n") | slice(start=2) | join(sep=" ") | trim }}\
+{% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %}
+{%- else %}
+- {{ commit.message | split(pat="\n") | first | trim }} \
+([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/commit/{{ commit.id }}))\
+{% if commit.remote.pr_number %} in #{{ commit.remote.pr_number }}{% endif %}\
+{% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %}
+{%- endif %}
+{%- endfor %}
+{% endfor %}
+{%- set new_contributors = github.contributors | filter(attribute="is_first_time", value=true) %}
+{%- if new_contributors | length != 0 %}
+#### New contributors
+{% for contributor in new_contributors %}
+- @{{ contributor.username }} made their first contribution\
+{% if contributor.pr_number %} in #{{ contributor.pr_number }}{% endif %}
+{%- endfor %}
+{% endif %}
+"""
+trim = true
+
+[git]
+conventional_commits = false
+filter_unconventional = false
+commit_parsers = [
+    { message = "^Merge pull request #", group = "<!-- 0 -->🔀 Pull requests" },
+    { message = "^Merge ", skip = true },
+    { message = "^\\S+ chore\\(release\\)", skip = true },
+    { message = "^\\S+ feat", group = "<!-- 1 -->✨ Features" },
+    { message = "^\\S+ fix", group = "<!-- 2 -->🐛 Fixes" },
+    { message = "^\\S+ perf", group = "<!-- 3 -->⚡️ Performance" },
+    { message = "^\\S+ refactor", group = "<!-- 4 -->♻️ Refactoring" },
+    { message = "^\\S+ test", group = "<!-- 5 -->✅ Tests" },
+    { message = "^\\S+ docs", group = "<!-- 6 -->📝 Documentation" },
+    { message = "^\\S+ (build|ci)", group = "<!-- 7 -->👷 Build & CI" },
+    { message = ".*", group = "<!-- 8 -->🔧 Other" },
+]
+filter_commits = false
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"
+
+[remote.github]
+owner = "leizzo"
+repo = "resamper"
