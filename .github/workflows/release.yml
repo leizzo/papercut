@@ -41,7 +41,10 @@ jobs:
             echo "::error::Tag $TAG does not match CMakeLists.txt version $project_version"
             exit 1
           fi
-          echo "VERSION=$project_version" >> "$GITHUB_ENV"
+          {
+            echo "VERSION=$project_version"
+            echo "DMG=Resamper-$project_version-macOS.dmg"
+          } >> "$GITHUB_ENV"
 
       - name: Extract the CHANGELOG section
         run: |
@@ -72,7 +75,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
           cmake --build build --target Resamper ResamperTests
 
       - name: Test
@@ -108,16 +111,15 @@ jobs:
           mkdir dmg
           ditto "$app" dmg/Resamper.app
           ln -s /Applications dmg/Applications
-          hdiutil create -volname Resamper -srcfolder dmg -fs HFS+ -format UDZO "Resamper-$VERSION-macOS.dmg"
-          codesign --timestamp --sign "$SIGNING_IDENTITY" "Resamper-$VERSION-macOS.dmg"
+          hdiutil create -volname Resamper -srcfolder dmg -fs HFS+ -format UDZO "$DMG"
+          codesign --timestamp --sign "$SIGNING_IDENTITY" "$DMG"
 
       - name: Notarize
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
-          dmg="Resamper-$VERSION-macOS.dmg"
-          xcrun notarytool submit "$dmg" --wait --output-format json \
+          xcrun notarytool submit "$DMG" --wait --output-format json \
             --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" > notarization.json
           cat notarization.json
           if [ "$(jq -r .status notarization.json)" != "Accepted" ]; then
@@ -125,8 +127,8 @@ jobs:
               --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
             exit 1
           fi
-          xcrun stapler staple "$dmg"
-          spctl --assess --type open --context context:primary-signature --verbose "$dmg"
+          xcrun stapler staple "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose "$DMG"
 
       - name: Publish the release
         env:
@@ -137,7 +139,7 @@ jobs:
             echo
             echo "### Download"
             echo
-            echo "Open \`Resamper-$VERSION-macOS.dmg\` (Apple Silicon) and drag Resamper to Applications."
+            echo "Open \`$DMG\` (Apple Silicon) and drag Resamper to Applications."
             echo
             echo "<details><summary>All changes</summary>"
             echo
@@ -152,7 +154,7 @@ jobs:
             0.*) title="$title (alpha)"; flags+=(--prerelease) ;;
           esac
 
-          gh release create "$TAG" "Resamper-$VERSION-macOS.dmg" \
+          gh release create "$TAG" "$DMG" \
             --verify-tag --title "${title:-$TAG}" --notes-file notes.md "${flags[@]}"
 
       - name: Remove the signing keychain

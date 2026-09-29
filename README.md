@@ -282,9 +282,9 @@ commit a pull request adds. Release notes group commits by `<type>`.
 2. Tag it with a title and push: `git tag -a vx.y.z -m "vx.y.z — <title>" && git push origin main vx.y.z`.
 
 The [Release workflow](.github/workflows/release.yml) checks the tag against the CMake version, builds
-and tests the app, and publishes the release: the CHANGELOG section, the app signed and notarized in a DMG, and the commit
-list from [git-cliff](https://git-cliff.org) (`cliff.toml`; preview it with `git cliff --latest`).
-0.x releases are published as alpha pre-releases.
+and tests the app, and publishes the release: the CHANGELOG section, the app signed and notarized in a
+DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; preview it with
+`git cliff --latest`). Tags are plain `vX.Y.Z`; 0.x releases are published as alpha pre-releases.
 
 ## License
 
