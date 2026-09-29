@@ -1,11 +1,12 @@
 #pragma once
 
+#include "Commands/CommandRegistry.h"
+
 #include <juce_data_structures/juce_data_structures.h>
 
 namespace resamper
 {
 
-class CommandRegistry;
 
 /** The window's shell (PRD §5–6): which view shows, the Browser and the
     detail view, and Follow. Lives in a UI State subtree, so it is saved with
@@ -51,11 +52,20 @@ private:
     juce::ValueTree state;
 };
 
-/** Registers the view Commands (UI State only, never undoable):
+namespace cmd
+{
+    inline constexpr CommandRef<> viewSession { "view.session" };
+    inline constexpr CommandRef<> viewArrange { "view.arrange" };
+    inline constexpr CommandRef<> viewMixer { "view.mixer" };
+    inline constexpr CommandRef<> viewPianoRoll { "view.pianoRoll" };
+    inline constexpr CommandRef<> viewEditor { "view.editor" };
+    inline constexpr CommandRef<> viewToggleSessionArrange { "view.toggleSessionArrange" };
+    inline constexpr CommandRef<> viewToggleBrowser { "view.toggleBrowser" };
+    inline constexpr CommandRef<> viewToggleDetail { "view.toggleDetail" };
+    inline constexpr CommandRef<> viewToggleFollow { "view.toggleFollow" };
+}
 
-    view.session  view.arrange  view.mixer  view.pianoRoll  view.editor
-    view.toggleSessionArrange  view.toggleBrowser  view.toggleDetail  view.toggleFollow
-*/
+/** Registers the view Commands above. */
 void registerShellCommands (CommandRegistry&, ShellState&);
 
 } // namespace resamper

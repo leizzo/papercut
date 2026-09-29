@@ -8,42 +8,76 @@ namespace resamper
 
 struct AppCommandHost;
 
-/** Registers the plug-in Commands:
+/** A new plug-in at the end of a track's chain. plugin is a type name or a catalogue path. */
+struct PluginInsertArgs
+{
+    juce::String trackId;
+    juce::String plugin;
+    PluginChain chain = PluginChain::device;
+};
 
-    plugin.scan
-    plugin.insert             args: trackId, plugin (a type name or catalogue path), chain ("device" | "mixer")
-    plugin.remove             args: trackId, pluginId
-    plugin.move               args: trackId, pluginId, index (within the plug-in's chain)
-    plugin.setBypassed        args: trackId, pluginId, bypassed
-    plugin.moveToDeviceChain  args: trackId, pluginId (a mixer insert)
-    plugin.copyInsert         args: trackId, pluginId, toTrackId, index (on toTrackId's mixer chain)
-    plugin.setParameter       args: pluginId, parameterId, value, continuesGesture
-    plugin.replace            args: trackId, pluginId, plugin (a type name or catalogue path)
-*/
+/** Names one plug-in on a track. */
+struct PluginArgs
+{
+    juce::String trackId;
+    juce::String pluginId;
+};
+
+/** A plug-in's new index within its own chain. */
+struct PluginMoveArgs
+{
+    juce::String trackId;
+    juce::String pluginId;
+    int index = 0;
+};
+
+struct PluginBypassArgs
+{
+    juce::String trackId;
+    juce::String pluginId;
+    bool bypassed = false;
+};
+
+/** A copy of a plug-in onto toTrackId's mixer chain, at index. */
+struct PluginCopyArgs
+{
+    juce::String fromTrackId;
+    juce::String pluginId;
+    juce::String toTrackId;
+    int index = 0;
+};
+
+/** continuesGesture joins a knob drag into one undo step. */
+struct PluginParameterArgs
+{
+    juce::String pluginId;
+    juce::String parameterId;
+    float value = 0;
+    bool continuesGesture = false;
+};
+
+/** A new plug-in in pluginId's place. plugin is a type name or a catalogue path. */
+struct PluginReplaceArgs
+{
+    juce::String trackId;
+    juce::String pluginId;
+    juce::String plugin;
+};
+
+namespace cmd
+{
+    inline constexpr CommandRef<> pluginScan { "plugin.scan" };
+    inline constexpr CommandRef<PluginInsertArgs> pluginInsert { "plugin.insert" };
+    inline constexpr CommandRef<PluginArgs> pluginRemove { "plugin.remove" };
+    inline constexpr CommandRef<PluginMoveArgs> pluginMove { "plugin.move" };
+    inline constexpr CommandRef<PluginBypassArgs> pluginSetBypassed { "plugin.setBypassed" };
+    inline constexpr CommandRef<PluginArgs> pluginMoveToDeviceChain { "plugin.moveToDeviceChain" };   ///< a mixer insert
+    inline constexpr CommandRef<PluginCopyArgs> pluginCopyInsert { "plugin.copyInsert" };
+    inline constexpr CommandRef<PluginParameterArgs> pluginSetParameter { "plugin.setParameter" };
+    inline constexpr CommandRef<PluginReplaceArgs> pluginReplace { "plugin.replace" };
+}
+
+/** Registers the plug-in Commands above. */
 void registerPluginCommands (CommandRegistry&, PluginRack&, AppCommandHost&);
-
-/** Arguments for plugin.insert: at the end of that chain of the track. */
-juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin,
-                            PluginChain = PluginChain::device);
-
-/** Arguments naming one plug-in on a track: plugin.remove, plugin.moveToDeviceChain. */
-juce::var pluginArgs (const juce::String& trackId, const juce::String& pluginId);
-
-/** Arguments for plugin.move. index is within the plug-in's own chain. */
-juce::var pluginMoveArgs (const juce::String& trackId, const juce::String& pluginId, int index);
-
-/** Arguments for plugin.setBypassed. */
-juce::var pluginBypassArgs (const juce::String& trackId, const juce::String& pluginId, bool bypassed);
-
-/** Arguments for plugin.setParameter; continuesGesture joins a knob drag into one undo step. */
-juce::var pluginParameterArgs (const juce::String& pluginId, const juce::String& parameterId, float value,
-                               bool continuesGesture = false);
-
-/** Arguments for plugin.replace: a new plug-in in pluginId's place. */
-juce::var pluginReplaceArgs (const juce::String& trackId, const juce::String& pluginId, const juce::String& plugin);
-
-/** Arguments for plugin.copyInsert. */
-juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& pluginId,
-                          const juce::String& toTrackId, int index);
 
 } // namespace resamper

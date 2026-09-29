@@ -54,20 +54,45 @@ struct AppTests : juce::UnitTest
             expect (addTrack->isEnabled() && ! addTrack->isTicked());
 
             expect (! undo->isEnabled());
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             expect (undo->isEnabled());
 
             const auto wasOn = metronome->isTicked();
-            f.invoke ("transport.toggleMetronome");
+            f.invoke (cmd::transportToggleMetronome);
             expect (metronome->isTicked() != wasOn);
+        }
+
+        beginTest ("A key binding's argument is its Command's args: an int, or none");
+        {
+            Fixture f;
+            expect (f.theme.load().wasOk());
+            juce::ApplicationCommandManager commandManager;
+            MainComponent main (f.app, commandManager);
+
+            for (auto& binding : getKeyBindings())
+                if (auto* command = f.commands.find (binding.commandId))
+                    if (binding.argument != KeyBinding::noArgument)
+                        expect (command->getArgsType() == typeid (int), binding.commandId);
+        }
+
+        beginTest ("Invoked by ID with args of another type, a Command does nothing and says so");
+        {
+            Fixture f;
+            expect (! f.commands.invokeById ("track.add", 3));
+            expect (! f.commands.invokeById ("track.setVolume", juce::String ("t1")));
+            expectEquals (f.numTracks(), 0);
+            expect (! f.model.canUndo());
+
+            expect (f.commands.invokeById ("track.add"));
+            expectEquals (f.numTracks(), 1);
         }
 
         beginTest ("A view Command drives the app: Esc clears the selection");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            f.invoke ("clip.add");
+            f.invoke (cmd::clipAdd);
             f.model.selectClip (f.model.getTracks()[0].clips[0].id);
             expect (f.model.getSelectedClipId().isNotEmpty());
 
@@ -75,7 +100,7 @@ struct AppTests : juce::UnitTest
             juce::ApplicationCommandManager commandManager;
             MainComponent main (f.app, commandManager);
 
-            expect (f.invoke ("ui.escape"));
+            expect (f.invoke (cmd::uiEscape));
             expect (f.model.getSelectedClipId().isEmpty());
         }
     }

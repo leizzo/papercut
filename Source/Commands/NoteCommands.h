@@ -1,33 +1,72 @@
 #pragma once
 
+#include "ClipCommands.h"
 #include "CommandRegistry.h"
 #include "Engine/ApplicationModel.h"
 
 namespace resamper
 {
 
-/** Registers the note Commands:
+/** A new note. Times are seconds from the clip's start. */
+struct NoteAddArgs
+{
+    juce::String clipId;
+    double startSeconds = 0, lengthSeconds = 0;
+    int pitch = 0;
+    int velocity = ApplicationModel::defaultNoteVelocity;
+};
 
-    note.add     note.delete   note.move     note.resize   note.setVelocity   note.quantize
-    note.transposeSelected (args: clipId, argument = semitones)   note.selectAll (args: clipId)
-*/
+/** Every named note shifts by the same amount. */
+struct NoteMoveArgs
+{
+    juce::String clipId;
+    juce::StringArray noteIds;
+    double deltaSeconds = 0;
+    int deltaPitch = 0;
+};
+
+/** One note's new edges, seconds from the clip's start. */
+struct NoteResizeArgs
+{
+    juce::String clipId;
+    juce::String noteId;
+    double startSeconds = 0, endSeconds = 0;
+};
+
+/** The selected notes' velocity. continuesGesture joins a drag into one undo step. */
+struct NoteVelocityArgs
+{
+    juce::String clipId;
+    int velocity = 0;
+    bool continuesGesture = false;
+};
+
+/** grid is "1/4", "1/8" or "1/16". */
+struct NoteQuantizeArgs
+{
+    juce::String clipId;
+    juce::String grid;
+};
+
+struct NoteTransposeArgs
+{
+    juce::String clipId;
+    int semitones = 0;
+};
+
+namespace cmd
+{
+    inline constexpr CommandRef<NoteAddArgs> noteAdd { "note.add" };
+    inline constexpr CommandRef<> noteDelete { "note.delete" };                        ///< the selected notes
+    inline constexpr CommandRef<NoteMoveArgs> noteMove { "note.move" };
+    inline constexpr CommandRef<NoteResizeArgs> noteResize { "note.resize" };
+    inline constexpr CommandRef<NoteVelocityArgs> noteSetVelocity { "note.setVelocity" };
+    inline constexpr CommandRef<NoteQuantizeArgs> noteQuantize { "note.quantize" };
+    inline constexpr CommandRef<NoteTransposeArgs> noteTransposeSelected { "note.transposeSelected" };
+    inline constexpr CommandRef<ClipArgs> noteSelectAll { "note.selectAll" };          ///< never undoable
+}
+
+/** Registers the note Commands above. */
 void registerNoteCommands (CommandRegistry&, ApplicationModel&);
-
-/** Arguments for note.add. Times are seconds from the clip's start. Velocity
-    defaults to ApplicationModel::defaultNoteVelocity. */
-juce::var noteAddArgs (const juce::String& clipId, double startSeconds, double lengthSeconds, int pitch,
-                       int velocity = ApplicationModel::defaultNoteVelocity);
-
-/** Arguments for note.move: every named note shifts by the same amount. */
-juce::var noteMoveArgs (const juce::String& clipId, const juce::StringArray& noteIds, double deltaSeconds, int deltaPitch);
-
-/** Arguments for note.resize: one note's new edges, seconds from the clip's start. */
-juce::var noteResizeArgs (const juce::String& clipId, const juce::String& noteId, double startSeconds, double endSeconds);
-
-/** Arguments for note.setVelocity. continuesGesture joins a drag into one undo step. */
-juce::var noteVelocityArgs (const juce::String& clipId, int velocity, bool continuesGesture = false);
-
-/** Arguments for note.quantize. grid is "1/4", "1/8" or "1/16". */
-juce::var noteQuantizeArgs (const juce::String& clipId, const juce::String& grid);
 
 } // namespace resamper

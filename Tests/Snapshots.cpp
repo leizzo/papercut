@@ -22,22 +22,22 @@ struct Snapshots : juce::UnitTest
         juce::LookAndFeel::setDefaultLookAndFeel (&f.theme.getLookAndFeel());
 
         // Some content to look at.
-        f.invoke ("track.add");
-        f.invoke ("track.addMidi");
+        f.invoke (cmd::trackAdd);
+        f.invoke (cmd::trackAddMidi);
         f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 4.0);
         f.model.selectTrack (f.model.getTracks()[0].id);
-        f.invoke ("clip.add");
+        f.invoke (cmd::clipAdd);
         f.model.selectTrack (f.model.getTracks()[1].id);
-        f.invoke ("clip.addMidi");
-        f.invoke ("mixer.addReturn");
+        f.invoke (cmd::clipAddMidi);
+        f.invoke (cmd::mixerAddReturn);
         f.plugins.insert (f.model.getTracks()[0].id, tracktion::ReverbPlugin::xmlTypeName);
         f.plugins.insert (f.model.getTracks()[0].id, tracktion::CompressorPlugin::xmlTypeName, PluginChain::mixer);
         f.plugins.insert (f.model.getTracks()[0].id, tracktion::DelayPlugin::xmlTypeName);
-        f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 0.0, 0.25, 60));
-        f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 0.5, 0.25, 64));
-        f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 1.0, 0.5, 67));
-        f.invoke ("track.toggleSolo", trackArgs (f.model.getTracks()[1].id));
-        f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, 8.0));
+        f.invoke (cmd::noteAdd, { f.model.getTracks()[1].clips[0].id, 0.0, 0.25, 60 });
+        f.invoke (cmd::noteAdd, { f.model.getTracks()[1].clips[0].id, 0.5, 0.25, 64 });
+        f.invoke (cmd::noteAdd, { f.model.getTracks()[1].clips[0].id, 1.0, 0.5, 67 });
+        f.invoke (cmd::trackToggleSolo, { f.model.getTracks()[1].id });
+        f.invoke (cmd::transportSetLoopRange, { 0.0, 8.0 });
         f.model.selectClip (f.model.getTracks()[0].clips[0].id);
 
         juce::ApplicationCommandManager commandManager;
@@ -50,9 +50,11 @@ struct Snapshots : juce::UnitTest
             auto dir = juce::File ("/tmp/resamper-snapshots");
             dir.createDirectory();
 
-            for (auto* view : { "session", "arrange", "mixer", "pianoRoll", "editor" })
+            for (auto [view, command] : { std::pair { "session", cmd::viewSession }, std::pair { "arrange", cmd::viewArrange },
+                                          std::pair { "mixer", cmd::viewMixer }, std::pair { "pianoRoll", cmd::viewPianoRoll },
+                                          std::pair { "editor", cmd::viewEditor } })
             {
-                f.invoke ((juce::String ("view.") + view).toRawUTF8());
+                f.invoke (command);
                 juce::MessageManager::getInstance()->runDispatchLoopUntil (200);
                 main.resized();
                 auto image = main.createComponentSnapshot (main.getLocalBounds(), true, 2.0f);

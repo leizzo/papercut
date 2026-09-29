@@ -4,13 +4,13 @@
 namespace resamper
 {
 
-juce::PopupMenu::Item commandItem (CommandRegistry& commands, const juce::String& commandId, const juce::var& args,
+juce::PopupMenu::Item commandItem (CommandRegistry& commands, const juce::String& commandId, std::any args,
                                    const juce::String& label)
 {
     auto* command = commands.find (commandId);
     juce::PopupMenu::Item item (label.isNotEmpty() ? label : command != nullptr ? command->getName() : commandId);
     item.setEnabled (command != nullptr && command->isEnabled());
-    item.setAction ([&commands, commandId, args] { commands.invoke (commandId, args); });
+    item.setAction ([&commands, commandId, args] { commands.invokeById (commandId, args); });
 
     if (auto key = findShortcut (commandId); key.isValid())
         item.shortcutKeyDescription = key.getTextDescriptionWithIcons();

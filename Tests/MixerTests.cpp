@@ -28,10 +28,10 @@ struct MixerTests : juce::UnitTest
 
         SendFixture()
         {
-            invoke ("track.add");
-            invoke ("mixer.addReturn");
+            invoke (cmd::trackAdd);
+            invoke (cmd::mixerAddReturn);
             sourceId = model.getTracks()[0].id;
-            invoke ("mixer.addSend", sendArgs (sourceId, mixer.getReturns()[0].bus));
+            invoke (cmd::mixerAddSend, { sourceId, mixer.getReturns()[0].bus });
             sendId = mixer.getSends (sourceId)[0].id;
         }
     };
@@ -41,7 +41,7 @@ struct MixerTests : juce::UnitTest
         beginTest ("addReturn creates a track that getReturns lists on bus 0 and TrackInfo marks as a return; undo removes it");
         {
             MixerFixture f;
-            f.invoke ("mixer.addReturn");
+            f.invoke (cmd::mixerAddReturn);
 
             auto returns = f.mixer.getReturns();
             expectEquals ((int) returns.size(), 1);
@@ -51,7 +51,7 @@ struct MixerTests : juce::UnitTest
             expectEquals (f.model.getTracks()[0].id, returns[0].trackId);
             expect (f.model.getTracks()[0].isReturn);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.mixer.getReturns().size(), 0);
             expectEquals (f.numTracks(), 0);
         }
@@ -62,19 +62,19 @@ struct MixerTests : juce::UnitTest
             expectEquals ((int) f.mixer.getSends (f.sourceId).size(), 1);
             expectEquals (f.mixer.getSends (f.sourceId)[0].bus, 0);
 
-            f.invoke ("mixer.setSendGain", sendGainArgs (f.sourceId, f.sendId, -12.0));
+            f.invoke (cmd::mixerSetSendGain, { f.sourceId, f.sendId, -12.0 });
             expectWithinAbsoluteError (f.mixer.getSends (f.sourceId)[0].gainDb, -12.0, 1.0e-2);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.mixer.getSends (f.sourceId)[0].gainDb, 0.0, 1.0e-2);
             expectEquals ((int) f.mixer.getSends (f.sourceId).size(), 1);
 
-            f.invoke ("mixer.setSendGain", sendGainArgs (f.sourceId, f.sendId, -1.0));
-            f.invoke ("mixer.setSendGain", sendGainArgs (f.sourceId, f.sendId, -3.0, true));
-            f.invoke ("mixer.setSendGain", sendGainArgs (f.sourceId, f.sendId, -9.0, true));
+            f.invoke (cmd::mixerSetSendGain, { f.sourceId, f.sendId, -1.0 });
+            f.invoke (cmd::mixerSetSendGain, { f.sourceId, f.sendId, -3.0, true });
+            f.invoke (cmd::mixerSetSendGain, { f.sourceId, f.sendId, -9.0, true });
             expectWithinAbsoluteError (f.mixer.getSends (f.sourceId)[0].gainDb, -9.0, 1.0e-2);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.mixer.getSends (f.sourceId)[0].gainDb, 0.0, 1.0e-2);
             expectEquals ((int) f.mixer.getSends (f.sourceId).size(), 1);
         }
@@ -82,17 +82,17 @@ struct MixerTests : juce::UnitTest
         beginTest ("addSend to a bus with no return fails and adds no undo step");
         {
             MixerFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto trackId = f.model.getTracks()[0].id;
             expect (! f.model.getTracks()[0].isReturn);
 
-            f.invoke ("mixer.addSend", sendArgs (trackId, 0));
+            f.invoke (cmd::mixerAddSend, { trackId, 0 });
 
             expect (! f.errors.isEmpty());
             expect (f.mixer.getSends (trackId).empty());
             expectEquals (f.numTracks(), 1);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.numTracks(), 0);
             expect (! f.model.canUndo());
         }
@@ -100,21 +100,21 @@ struct MixerTests : juce::UnitTest
         beginTest ("addBus and moveTrackToBus nest the track; undo restores it");
         {
             MixerFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto trackId = f.model.getTracks()[0].id;
 
-            f.invoke ("mixer.addBus", busArgs ("Drums"));
+            f.invoke (cmd::mixerAddBus, { "Drums" });
             auto buses = f.mixer.getBuses();
             expectEquals ((int) buses.size(), 1);
             expectEquals (buses[0].name, juce::String ("Drums"));
             expect (buses[0].childTrackIds.empty());
 
-            f.invoke ("mixer.moveToBus", moveToBusArgs (trackId, buses[0].trackId));
+            f.invoke (cmd::mixerMoveToBus, { trackId, buses[0].trackId });
             expect (f.trackIsInABus (trackId));
             expectEquals (f.mixer.getBuses()[0].childTrackIds[0], trackId);
 
             for (int i = 0; i < 4 && f.trackIsInABus (trackId); ++i)
-                f.invoke ("edit.undo");
+                f.invoke (cmd::editUndo);
 
             expect (! f.trackIsInABus (trackId));
 
@@ -129,21 +129,21 @@ struct MixerTests : juce::UnitTest
         beginTest ("setMasterVolume changes the master only; undo restores it");
         {
             MixerFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto trackId = f.model.getTracks()[0].id;
             expectWithinAbsoluteError (f.model.getTracks()[0].volumeDb, 0.0, 1.0e-3);
 
             // The engine's Edit starts the master fader at -3 dB, not 0.
             const auto initialMaster = f.mixer.getMaster().volumeDb;
 
-            f.invoke ("mixer.setMasterVolume", masterVolumeArgs (-6.0));
-            f.invoke ("mixer.setMasterVolume", masterVolumeArgs (-9.0, true));
-            f.invoke ("mixer.setMasterVolume", masterVolumeArgs (-12.0, true));
+            f.invoke (cmd::mixerSetMasterVolume, { -6.0 });
+            f.invoke (cmd::mixerSetMasterVolume, { -9.0, true });
+            f.invoke (cmd::mixerSetMasterVolume, { -12.0, true });
 
             expectWithinAbsoluteError (f.mixer.getMaster().volumeDb, -12.0, 1.0e-2);
             expectWithinAbsoluteError (f.model.getTracks()[0].volumeDb, 0.0, 1.0e-3);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.mixer.getMaster().volumeDb, initialMaster, 1.0e-2);
             expectWithinAbsoluteError (f.model.getTracks()[0].volumeDb, 0.0, 1.0e-3);
             expectEquals (f.model.getTracks()[0].id, trackId);
@@ -152,7 +152,7 @@ struct MixerTests : juce::UnitTest
         beginTest ("getTrackLevel is silence when the track has not played");
         {
             MixerFixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto level = f.mixer.getTrackLevel (f.model.getTracks()[0].id);
             expectWithinAbsoluteError ((double) level.left, ApplicationModel::minVolumeDb, 1.0e-3);
             expectWithinAbsoluteError ((double) level.right, ApplicationModel::minVolumeDb, 1.0e-3);
@@ -162,10 +162,10 @@ struct MixerTests : juce::UnitTest
         beginTest ("Send mute is one undo step, because the engine records the gain");
         {
             SendFixture f;
-            f.invoke ("mixer.setSendMuted", sendMutedArgs (f.sourceId, f.sendId, true));
+            f.invoke (cmd::mixerSetSendMuted, { f.sourceId, f.sendId, true });
             expect (f.mixer.getSends (f.sourceId)[0].muted);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! f.mixer.getSends (f.sourceId)[0].muted);
             expectWithinAbsoluteError (f.mixer.getSends (f.sourceId)[0].gainDb, 0.0, 1.0e-2);
             expectEquals ((int) f.mixer.getSends (f.sourceId).size(), 1);

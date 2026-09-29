@@ -13,15 +13,15 @@ struct ClipOperationTests : juce::UnitTest
     {
         Clips()
         {
-            invoke ("track.add");
+            invoke (cmd::trackAdd);
             audioFileToChoose = writeSineWav (scratchDir().getChildFile ("tone.wav"), 1.0);
-            invoke ("clip.add");
-            invoke ("track.addMidi");
+            invoke (cmd::clipAdd);
+            invoke (cmd::trackAddMidi);
             model.selectTrack (track (1).id);
-            invoke ("clip.addMidi");
+            invoke (cmd::clipAddMidi);
 
             for (int i = 0; i < 3; ++i)
-                invoke ("note.add", noteAddArgs (midiClip().id, 0.25 * i, 0.2, 60 + i));
+                invoke (cmd::noteAdd, { midiClip().id, 0.25 * i, 0.2, 60 + i });
 
             model.selectClip ({});
         }
@@ -40,7 +40,7 @@ struct ClipOperationTests : juce::UnitTest
             f.model.selectClip (original.id);
             f.model.selectClip (f.audioClip().id, ApplicationModel::SelectionMode::add);
 
-            expect (f.invoke ("clip.duplicate"));
+            expect (f.invoke (cmd::clipDuplicate));
             expectEquals ((int) f.track (0).clips.size(), 2);
             expectEquals ((int) f.track (1).clips.size(), 2);
 
@@ -53,25 +53,25 @@ struct ClipOperationTests : juce::UnitTest
             // The copies are selected, ready for another Mod+D.
             expect (copy.selected && ! f.midiClip().selected);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.track (0).clips.size() + (int) f.track (1).clips.size(), 2);
         }
 
         beginTest ("Alt-drag copies a clip to a position on a track of its kind; the original stays");
         {
             Clips f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto target = f.track (2).id;
 
-            f.invoke ("clip.copy", clipMoveArgs (f.audioClip().id, 4.0, target));
+            f.invoke (cmd::clipCopy, { f.audioClip().id, 4.0, target });
             expectEquals ((int) f.track (0).clips.size(), 1);
             expectEquals ((int) f.track (2).clips.size(), 1);
             expectWithinAbsoluteError (f.track (2).clips[0].startSeconds, 4.0, 1.0e-6);
 
-            f.invoke ("clip.copy", clipMoveArgs (f.midiClip().id, 4.0, target));   // MIDI onto audio: refused
+            f.invoke (cmd::clipCopy, { f.midiClip().id, 4.0, target });   // MIDI onto audio: refused
             expectEquals ((int) f.track (2).clips.size(), 1);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.track (2).clips.empty());
         }
 
@@ -81,13 +81,13 @@ struct ClipOperationTests : juce::UnitTest
             const auto clip = f.midiClip();
             const auto end = clip.startSeconds + 3.0 * clip.lengthSeconds;
 
-            expect (f.invoke ("clip.loopExtend", clipResizeArgs (clip.id, clip.startSeconds, end)));
+            expect (f.invoke (cmd::clipLoopExtend, { clip.id, clip.startSeconds, end }));
             auto extended = f.midiClip();
             expect (extended.looping);
             expectWithinAbsoluteError (extended.lengthSeconds, 3.0 * clip.lengthSeconds, 1.0e-6);
             expectWithinAbsoluteError (extended.loopLengthSeconds, clip.lengthSeconds, 1.0e-6);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! f.midiClip().looping);
             expectWithinAbsoluteError (f.midiClip().lengthSeconds, clip.lengthSeconds, 1.0e-6);
         }
@@ -95,15 +95,15 @@ struct ClipOperationTests : juce::UnitTest
         beginTest ("Loop-extend repeats an audio clip past the end of its file, and it plays there");
         {
             Clips f;
-            f.invoke ("track.toggleMute", trackArgs (f.track (1).id));
+            f.invoke (cmd::trackToggleMute, { f.track (1).id });
             const auto clip = f.audioClip();
-            expect (f.invoke ("clip.loopExtend", clipResizeArgs (clip.id, 0.0, 3.0)));
+            expect (f.invoke (cmd::clipLoopExtend, { clip.id, 0.0, 3.0 }));
             auto extended = f.audioClip();
             expect (extended.looping);
             expectWithinAbsoluteError (extended.lengthSeconds, 3.0, 1.0e-3);
             expectGreaterThan (renderPeak (f), 0.1f);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.audioClip().lengthSeconds, 1.0, 1.0e-3);
         }
 
@@ -112,11 +112,11 @@ struct ClipOperationTests : juce::UnitTest
             Clips f;
             const auto first = f.midiClip();
             f.model.selectClip (first.id);
-            f.invoke ("clip.duplicate");
+            f.invoke (cmd::clipDuplicate);
             f.model.selectClip (f.midiClip (0).id);
             f.model.selectClip (f.midiClip (1).id, ApplicationModel::SelectionMode::add);
 
-            expect (f.invoke ("clip.consolidate"));
+            expect (f.invoke (cmd::clipConsolidate));
             expectEquals ((int) f.track (1).clips.size(), 1);
             const auto merged = f.midiClip();
             expectWithinAbsoluteError (merged.startSeconds, first.startSeconds, 1.0e-6);
@@ -124,19 +124,19 @@ struct ClipOperationTests : juce::UnitTest
             expectEquals ((int) merged.notes.size(), 6);
             expectWithinAbsoluteError (merged.notes[3].startSeconds, first.lengthSeconds, 1.0e-6);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.track (1).clips.size(), 2);
         }
 
         beginTest ("Consolidating audio clips renders them into one new audio clip");
         {
             Clips f;
-            f.invoke ("track.toggleMute", trackArgs (f.track (1).id));
-            f.invoke ("clip.copy", clipMoveArgs (f.audioClip().id, 1.5, f.track (0).id));
+            f.invoke (cmd::trackToggleMute, { f.track (1).id });
+            f.invoke (cmd::clipCopy, { f.audioClip().id, 1.5, f.track (0).id });
             f.model.selectClip (f.audioClip (0).id);
             f.model.selectClip (f.audioClip (1).id, ApplicationModel::SelectionMode::add);
 
-            expect (f.invoke ("clip.consolidate"));
+            expect (f.invoke (cmd::clipConsolidate));
             expectEquals (f.errors.joinIntoString ("; "), juce::String());
             expectEquals ((int) f.track (0).clips.size(), 1);
             const auto merged = f.audioClip();
@@ -145,7 +145,7 @@ struct ClipOperationTests : juce::UnitTest
             expect (merged.file.existsAsFile());
             expectGreaterThan (renderPeak (f), 0.1f);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) f.track (0).clips.size(), 2);
         }
 
@@ -167,30 +167,28 @@ struct ClipOperationTests : juce::UnitTest
             Clips f;
             const auto id = f.audioClip().id;
 
-            f.invoke ("clip.rename", clipRenameArgs (id, "Hook"));
+            f.invoke (cmd::clipRename, { id, "Hook" });
             expectEquals (f.audioClip().name, juce::String ("Hook"));
 
-            f.invoke ("clip.setColour", clipColourArgs (id, 4));
-            expectEquals (f.audioClip().colourIndex, 4);
-            f.invoke ("clip.setColour", clipArgs (id));   // no value: not the first colour
+            f.invoke (cmd::clipSetColour, { id, 4 });
             expectEquals (f.audioClip().colourIndex, 4);
 
-            f.invoke ("clip.reverse", clipArgs (id));
+            f.invoke (cmd::clipReverse, { id });
             expect (f.audioClip().reversed);
-            f.invoke ("clip.reverse", clipArgs (f.midiClip().id));   // MIDI can't reverse
+            f.invoke (cmd::clipReverse, { f.midiClip().id });   // MIDI can't reverse
             expect (! f.midiClip().reversed);
 
             f.model.selectClip (id);
-            f.invoke ("clip.delete");
+            f.invoke (cmd::clipDelete);
             expect (f.track (0).clips.empty());
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.audioClip().reversed);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! f.audioClip().reversed);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.audioClip().colourIndex, -1);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.audioClip().name, juce::String ("tone"));
         }
 
@@ -213,7 +211,7 @@ struct ClipOperationTests : juce::UnitTest
             f.model.selectNotes ({ f.midiClip().notes[0].id });
             const auto couldUndo = f.model.canUndo();
 
-            f.invoke ("edit.deselectAll");
+            f.invoke (cmd::editDeselectAll);
             expect (f.model.getSelectedClipIds().isEmpty());
             expect (f.model.getSelectedTrackId().isEmpty());
             expect (! f.model.hasSelectedNotes());

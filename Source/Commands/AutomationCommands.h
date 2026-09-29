@@ -11,29 +11,79 @@ namespace resamper
 
 struct AppCommandHost;
 
-/** Registers automation and shaper Commands:
+/** An automation lane: a track's parameter. */
+struct AutomationLaneArgs
+{
+    juce::String trackId;
+    juce::String parameter;
+};
 
-    automation.addPoint        trackId, parameter, time, value
-    automation.movePoint       trackId, parameter, index, time, value
-    automation.removePoint     trackId, parameter, index
-    automation.clear           trackId, parameter
-    shaper.add                 trackId, parameter, mode ("loop" or "audioTrigger")
-    shaper.remove              shaperId
-    shaper.setLoop             shaperId, lengthBeats, depth, shape (array of {time, value})
-    shaper.setAudioTrigger     shaperId, attack, hold, release, thresholdDb, depth
-*/
+/** A new point on a lane. */
+struct AutomationPointArgs
+{
+    juce::String trackId;
+    juce::String parameter;
+    double timeSeconds = 0;
+    float value = 0;
+};
+
+/** A point's new position. */
+struct AutomationMoveArgs
+{
+    juce::String trackId;
+    juce::String parameter;
+    int index = 0;
+    double timeSeconds = 0;
+    float value = 0;
+};
+
+struct AutomationRemoveArgs
+{
+    juce::String trackId;
+    juce::String parameter;
+    int index = 0;
+};
+
+struct ShaperAddArgs
+{
+    juce::String trackId;
+    juce::String parameter;
+    ShaperMode mode = ShaperMode::loop;
+};
+
+struct ShaperArgs
+{
+    juce::String shaperId;
+};
+
+/** A loop Shaper's shape; left out, a rising ramp. */
+struct ShaperLoopArgs
+{
+    juce::String shaperId;
+    double lengthBeats = 0;
+    float depth = 0;
+    std::vector<ShaperShapePoint> shape { { 0.0f, 0.0f }, { 1.0f, 1.0f } };
+};
+
+struct ShaperTriggerArgs
+{
+    juce::String shaperId;
+    float attack = 0, hold = 0, release = 0, thresholdDb = 0, depth = 0;
+};
+
+namespace cmd
+{
+    inline constexpr CommandRef<AutomationPointArgs> automationAddPoint { "automation.addPoint" };
+    inline constexpr CommandRef<AutomationMoveArgs> automationMovePoint { "automation.movePoint" };
+    inline constexpr CommandRef<AutomationRemoveArgs> automationRemovePoint { "automation.removePoint" };
+    inline constexpr CommandRef<AutomationLaneArgs> automationClear { "automation.clear" };
+    inline constexpr CommandRef<ShaperAddArgs> shaperAdd { "shaper.add" };
+    inline constexpr CommandRef<ShaperArgs> shaperRemove { "shaper.remove" };
+    inline constexpr CommandRef<ShaperLoopArgs> shaperSetLoop { "shaper.setLoop" };
+    inline constexpr CommandRef<ShaperTriggerArgs> shaperSetAudioTrigger { "shaper.setAudioTrigger" };
+}
+
+/** Registers the automation and Shaper Commands above. */
 void registerAutomationCommands (CommandRegistry&, Automation&, Shaper&, AppCommandHost&);
-
-juce::var automationPointArgs (const juce::String& trackId, const juce::String& parameter, double timeSeconds, float value);
-juce::var automationMoveArgs (const juce::String& trackId, const juce::String& parameter, int index, double timeSeconds, float value);
-juce::var automationRemoveArgs (const juce::String& trackId, const juce::String& parameter, int index);
-juce::var automationClearArgs (const juce::String& trackId, const juce::String& parameter);
-
-juce::var shaperAddArgs (const juce::String& trackId, const juce::String& parameter, ShaperMode mode);
-juce::var shaperRemoveArgs (const juce::String& shaperId);
-juce::var shaperSetLoopArgs (const juce::String& shaperId, double lengthBeats, float depth,
-                             const std::vector<ShaperShapePoint>& shape);
-juce::var shaperSetAudioTriggerArgs (const juce::String& shaperId, float attack, float hold, float release,
-                                     float thresholdDb, float depth);
 
 } // namespace resamper

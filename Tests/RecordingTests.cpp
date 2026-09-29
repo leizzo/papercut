@@ -80,7 +80,7 @@ struct RecordingTests : juce::UnitTest
         so the Edit sees its inputs). */
     struct RecordingFixture : HostedAudio, Fixture
     {
-        RecordingFixture()   { invoke ("track.add"); }
+        RecordingFixture()   { invoke (cmd::trackAdd); }
 
         TrackInfo track (int index = 0) const        { return model.getTracks()[(size_t) index]; }
         juce::String trackId (int index = 0) const   { return track (index).id; }
@@ -100,9 +100,9 @@ struct RecordingTests : juce::UnitTest
         void recordFor (double seconds, bool playNotes = false)
         {
             settle();
-            invoke ("transport.record");
+            invoke (cmd::transportRecord);
             process (seconds, playNotes);
-            invoke ("transport.stop");
+            invoke (cmd::transportStop);
         }
 
         int undoDepth()
@@ -137,11 +137,11 @@ struct RecordingTests : juce::UnitTest
             RecordingFixture f;
             const auto steps = f.undoDepth();
 
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             expect (f.track().armed);
             expectEquals (f.track().input, f.model.getAudioInputs()[0]);
 
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             expect (! f.track().armed);
             expectEquals (f.track().input, f.model.getAudioInputs()[0]);   // disarming keeps the input
 
@@ -154,16 +154,16 @@ struct RecordingTests : juce::UnitTest
             const auto inputs = f.model.getAudioInputs();
             const auto last = inputs[inputs.size() - 1];
 
-            f.invoke ("track.setInput", trackInputArgs (f.trackId(), last));
+            f.invoke (cmd::trackSetInput, { f.trackId(), last });
             expectEquals (f.track().input, last);
 
-            f.invoke ("track.setInput", trackInputArgs (f.trackId(), "no-such-input"));
+            f.invoke (cmd::trackSetInput, { f.trackId(), "no-such-input" });
             expectEquals (f.track().input, last);
 
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             expect (f.track().armed);
 
-            f.invoke ("track.setInput", trackInputArgs (f.trackId(), {}));
+            f.invoke (cmd::trackSetInput, { f.trackId(), {} });
             expect (f.track().input.isEmpty());
             expect (! f.track().armed);
         }
@@ -171,9 +171,9 @@ struct RecordingTests : juce::UnitTest
         beginTest ("Two tracks may record from one input");
         {
             RecordingFixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.toggleArm", trackArgs (f.trackId (0)));
-            f.invoke ("track.toggleArm", trackArgs (f.trackId (1)));
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackToggleArm, { f.trackId (0) });
+            f.invoke (cmd::trackToggleArm, { f.trackId (1) });
             expect (f.track (0).armed && f.track (1).armed);
 
             f.recordFor (0.5);
@@ -185,7 +185,7 @@ struct RecordingTests : juce::UnitTest
         beginTest ("transport.record records the armed track's input into a clip in the Project's Audio folder");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             f.recordFor (1.0);
 
             expect (! f.model.isRecording());
@@ -208,28 +208,28 @@ struct RecordingTests : juce::UnitTest
         beginTest ("transport.record reports why it can't record: nothing armed, or a loop under 2 seconds");
         {
             RecordingFixture f;
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportRecord);
             expect (! f.model.isRecording());
             expectEquals (f.errors.size(), 1);
 
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
-            f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, ApplicationModel::minLoopRecordingSeconds - 0.5));
-            f.invoke ("transport.record");
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
+            f.invoke (cmd::transportSetLoopRange, { 0.0, ApplicationModel::minLoopRecordingSeconds - 0.5 });
+            f.invoke (cmd::transportRecord);
             expect (! f.model.isRecording());
             expectEquals (f.errors.size(), 2);
 
-            f.invoke ("transport.toggleLoop");   // off: the loop no longer matters
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportToggleLoop);   // off: the loop no longer matters
+            f.invoke (cmd::transportRecord);
             expect (f.model.isRecording());
             expectEquals (f.errors.size(), 2);
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
         }
 
         beginTest ("Unarmed tracks record nothing");
         {
             RecordingFixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.toggleArm", trackArgs (f.trackId (1)));
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackToggleArm, { f.trackId (1) });
             f.recordFor (0.5);
 
             expect (f.track (0).clips.empty());
@@ -239,27 +239,27 @@ struct RecordingTests : juce::UnitTest
         beginTest ("A recording is one undo step");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             const auto steps = f.undoDepth();
             f.recordFor (0.5);
 
             expectEquals (f.undoDepth(), steps + 1);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.track().clips.empty());
             expectEquals (f.numTracks(), 1);
 
-            f.invoke ("edit.redo");
+            f.invoke (cmd::editRedo);
             expectEquals ((int) f.track().clips.size(), 1);
         }
 
         beginTest ("MIDI inputs are listed; arming a MIDI track gives it the first MIDI input");
         {
             RecordingFixture f;
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             const auto midi = f.trackId (1);
             expect (! f.model.getMidiInputs().isEmpty());
 
-            f.invoke ("track.toggleArm", trackArgs (midi));
+            f.invoke (cmd::trackToggleArm, { midi });
             expect (f.track (1).armed);
             expectEquals (f.track (1).input, f.model.getMidiInputs()[0]);
         }
@@ -267,26 +267,26 @@ struct RecordingTests : juce::UnitTest
         beginTest ("A track only takes inputs of its own kind");
         {
             RecordingFixture f;
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
 
-            f.invoke ("track.setInput", trackInputArgs (f.trackId (1), f.model.getAudioInputs()[0]));
+            f.invoke (cmd::trackSetInput, { f.trackId (1), f.model.getAudioInputs()[0] });
             expect (f.track (1).input.isEmpty());
 
-            f.invoke ("track.setInput", trackInputArgs (f.trackId (0), f.model.getMidiInputs()[0]));
+            f.invoke (cmd::trackSetInput, { f.trackId (0), f.model.getMidiInputs()[0] });
             expect (f.track (0).input.isEmpty());
 
             const auto midiInputs = f.model.getMidiInputs();
             const auto last = midiInputs[midiInputs.size() - 1];
-            f.invoke ("track.setInput", trackInputArgs (f.trackId (1), last));
+            f.invoke (cmd::trackSetInput, { f.trackId (1), last });
             expectEquals (f.track (1).input, last);
         }
 
         beginTest ("Recording an armed MIDI track writes its notes into a MIDI clip, as one undo step");
         {
             RecordingFixture f;
-            f.invoke ("track.addMidi");
-            f.invoke ("track.setInput", trackInputArgs (f.trackId (1), "MIDI Input"));   // the hosted device's input
-            f.invoke ("track.toggleArm", trackArgs (f.trackId (1)));
+            f.invoke (cmd::trackAddMidi);
+            f.invoke (cmd::trackSetInput, { f.trackId (1), "MIDI Input" });   // the hosted device's input
+            f.invoke (cmd::trackToggleArm, { f.trackId (1) });
             const auto steps = f.undoDepth();
 
             f.recordFor (1.0, true);
@@ -302,20 +302,20 @@ struct RecordingTests : juce::UnitTest
             }
 
             expectEquals (f.undoDepth(), steps + 1);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.track (1).clips.empty());
         }
 
         beginTest ("An armed MIDI track plays what comes in through its instrument; a disarmed one doesn't");
         {
             RecordingFixture f;
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             const auto midi = f.trackId (1);
-            f.invoke ("track.setInput", trackInputArgs (midi, "MIDI Input"));
+            f.invoke (cmd::trackSetInput, { midi, "MIDI Input" });
             f.rebuildGraph();
             expect (f.process (0.5, true) < 1.0e-4f);
 
-            f.invoke ("track.toggleArm", trackArgs (midi));
+            f.invoke (cmd::trackToggleArm, { midi });
             f.rebuildGraph();
             expect (f.process (0.5, true) > 1.0e-3f);
         }
@@ -326,11 +326,11 @@ struct RecordingTests : juce::UnitTest
             f.deviceManager.engine.getPropertyStorage().removeProperty (te::SettingID::countInMode);
             expect (! f.model.isCountInOn());
 
-            f.invoke ("transport.toggleCountIn");
+            f.invoke (cmd::transportToggleCountIn);
             expect (f.model.isCountInOn());
             expect (f.projects.getEdit().getCountInMode() == te::Edit::CountIn::twoBar);
 
-            f.invoke ("transport.toggleCountIn");
+            f.invoke (cmd::transportToggleCountIn);
             expect (! f.model.isCountInOn());
         }
 
@@ -338,17 +338,17 @@ struct RecordingTests : juce::UnitTest
         {
             RecordingFixture f;
             f.model.setCountInOn (true);
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             f.settle();
 
             // The engine starts half a beat before the 2 bars, so the first click isn't clipped.
             const auto countIn = f.model.beatsToSeconds (2.0 * f.model.getBeatsPerBar (0.0) + 0.5);
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportRecord);
             f.process (0.5);
             expect (f.model.getTransportPositionSeconds() < 0.0, "the playhead counts in before the start");
 
             f.process (countIn - 0.5 + 1.0);
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
             f.model.setCountInOn (false);
 
             const auto clips = f.track().clips;
@@ -365,12 +365,12 @@ struct RecordingTests : juce::UnitTest
         {
             RecordingFixture f;
             f.model.setCountInOn (true);
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             f.settle();
 
-            f.invoke ("transport.record", recordArgs (false));
+            f.invoke (cmd::transportRecord, { false });
             f.process (1.0);
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
             expect (f.model.isCountInOn());
             f.model.setCountInOn (false);
 
@@ -385,13 +385,13 @@ struct RecordingTests : juce::UnitTest
         {
             RecordingFixture f;
             f.model.setCountInOn (true);
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             const auto steps = f.undoDepth();
             f.settle();
 
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportRecord);
             f.process (1.0);
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
             f.model.setCountInOn (false);
 
             expect (f.track().clips.empty());
@@ -407,19 +407,19 @@ struct RecordingTests : juce::UnitTest
             const auto returnTrack = f.trackId (1);
             expect (f.track (1).isReturn);
 
-            f.invoke ("track.toggleArm", trackArgs (returnTrack));
+            f.invoke (cmd::trackToggleArm, { returnTrack });
             expect (! f.track (1).armed);
         }
 
         beginTest ("Returning to the start while recording ends the recording as its own undo step");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             const auto steps = f.undoDepth();
             f.settle();
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportRecord);
             f.process (0.5);
-            f.invoke ("transport.returnToStart");
+            f.invoke (cmd::transportReturnToStart);
 
             expect (! f.model.isRecording());
             expectEquals ((int) f.track().clips.size(), 1);
@@ -429,27 +429,27 @@ struct RecordingTests : juce::UnitTest
         beginTest ("The loop can't change while recording");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
-            f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, 2.0));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
+            f.invoke (cmd::transportSetLoopRange, { 0.0, 2.0 });
             f.settle();
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportRecord);
             f.process (0.5);
 
-            f.invoke ("transport.toggleLoop");
-            f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, 3.0));
+            f.invoke (cmd::transportToggleLoop);
+            f.invoke (cmd::transportSetLoopRange, { 0.0, 3.0 });
             expect (f.model.isLooping());
             expectWithinAbsoluteError (f.model.getLoopRange().end, 2.0, 1e-6);
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
         }
 
         beginTest ("While recording, the model reports each armed track's recording so far");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             f.settle();
             expect (f.model.getRecordings().empty());
 
-            f.invoke ("transport.record");
+            f.invoke (cmd::transportRecord);
             f.process (0.5);
             expect (f.model.isRecording());
 
@@ -465,23 +465,23 @@ struct RecordingTests : juce::UnitTest
                 expect (f.model.createRecordingWaveform (f.trackId()) != nullptr);
             }
 
-            f.invoke ("transport.stop");
+            f.invoke (cmd::transportStop);
             expect (f.model.getRecordings().empty());
         }
 
         beginTest ("A recording in an untitled Project moves with it on Save As");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
             f.recordFor (0.5);
 
             f.projectSaveLocation = f.scratchDir().getChildFile ("Recorded");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
 
-            f.invoke ("project.new");
+            f.invoke (cmd::projectNew);
             f.projectToOpen = f.projectSaveLocation;
-            f.invoke ("project.open");
+            f.invoke (cmd::projectOpen);
 
             const auto clips = f.track().clips;
             expectEquals ((int) clips.size(), 1);
@@ -500,17 +500,17 @@ struct RecordingTests : juce::UnitTest
             const auto steps = f.undoDepth();
             expect (! f.model.isLooping());
 
-            f.invoke ("transport.setLoopRange", loopRangeArgs (1.0, 3.0));
+            f.invoke (cmd::transportSetLoopRange, { 1.0, 3.0 });
             expect (f.model.isLooping());
             expectWithinAbsoluteError (f.model.getLoopRange().start, 1.0, 1e-6);
             expectWithinAbsoluteError (f.model.getLoopRange().end, 3.0, 1e-6);
 
-            f.invoke ("transport.setLoopRange", loopRangeArgs (3.0, 3.0));   // empty: ignored
+            f.invoke (cmd::transportSetLoopRange, { 3.0, 3.0 });   // empty: ignored
             expectWithinAbsoluteError (f.model.getLoopRange().end, 3.0, 1e-6);
 
-            f.invoke ("transport.toggleLoop");
+            f.invoke (cmd::transportToggleLoop);
             expect (! f.model.isLooping());
-            f.invoke ("transport.toggleLoop");
+            f.invoke (cmd::transportToggleLoop);
             expect (f.model.isLooping());
 
             expectEquals (f.undoDepth(), steps);   // transport state is never undoable
@@ -519,8 +519,8 @@ struct RecordingTests : juce::UnitTest
         beginTest ("Loop recording makes one clip holding a take per pass");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
-            f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, 2.0));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
+            f.invoke (cmd::transportSetLoopRange, { 0.0, 2.0 });
             f.recordFor (5.0);
 
             const auto clips = f.track().clips;
@@ -537,8 +537,8 @@ struct RecordingTests : juce::UnitTest
         beginTest ("clip.setTake switches a clip's take as one undo step");
         {
             RecordingFixture f;
-            f.invoke ("track.toggleArm", trackArgs (f.trackId()));
-            f.invoke ("transport.setLoopRange", loopRangeArgs (0.0, 2.0));
+            f.invoke (cmd::trackToggleArm, { f.trackId() });
+            f.invoke (cmd::transportSetLoopRange, { 0.0, 2.0 });
             f.recordFor (5.0);
 
             if (f.track().clips.empty())
@@ -552,16 +552,16 @@ struct RecordingTests : juce::UnitTest
             const auto other = original == 0 ? 1 : 0;
             const auto steps = f.undoDepth();
 
-            f.invoke ("clip.setTake", clipTakeArgs (clip.id, other));
+            f.invoke (cmd::clipSetTake, { clip.id, other });
             expectEquals (f.track().clips[0].currentTake, other);
             expect (f.track().clips[0].file != clip.file);
             expect (f.track().clips[0].file.existsAsFile());
 
-            f.invoke ("clip.setTake", clipTakeArgs (clip.id, other));   // already current
-            f.invoke ("clip.setTake", clipTakeArgs (clip.id, 7));       // no such take
+            f.invoke (cmd::clipSetTake, { clip.id, other });   // already current
+            f.invoke (cmd::clipSetTake, { clip.id, 7 });       // no such take
             expectEquals (f.undoDepth(), steps + 1);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.track().clips[0].currentTake, original);
             expect (f.track().clips[0].file == clip.file);
         }

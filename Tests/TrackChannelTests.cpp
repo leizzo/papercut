@@ -12,15 +12,15 @@ struct TrackChannelTests : juce::UnitTest
     {
         ChannelFixture()
         {
-            invoke ("track.add");
-            invoke ("track.add");
+            invoke (cmd::trackAdd);
+            invoke (cmd::trackAdd);
         }
 
         TrackInfo track (int index = 0) const        { return model.getTracks()[(size_t) index]; }
         juce::String trackId (int index = 0) const   { return track (index).id; }
 
         /** Undoes one step; returns false if there was none. */
-        bool undoOnce()   { const bool could = model.canUndo(); invoke ("edit.undo"); return could; }
+        bool undoOnce()   { const bool could = model.canUndo(); invoke (cmd::editUndo); return could; }
     };
 
     void runTest() override
@@ -38,26 +38,26 @@ struct TrackChannelTests : juce::UnitTest
         beginTest ("track.setVolume sets one track's volume as one undo step");
         {
             ChannelFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (1), -12.0));
+            f.invoke (cmd::trackSetVolume, { f.trackId (1), -12.0 });
 
             expectWithinAbsoluteError (f.track (1).volumeDb, -12.0, 1e-3);
             expectWithinAbsoluteError (f.track (0).volumeDb, 0.0, 1e-3);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track (1).volumeDb, 0.0, 1e-3);
             expectEquals (f.numTracks(), 2);   // only the volume change was undone
 
-            f.invoke ("edit.redo");
+            f.invoke (cmd::editRedo);
             expectWithinAbsoluteError (f.track (1).volumeDb, -12.0, 1e-3);
         }
 
         beginTest ("track.setVolume clamps to the fader range; -inf is silence");
         {
             ChannelFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), 40.0));
+            f.invoke (cmd::trackSetVolume, { f.trackId(), 40.0 });
             expectWithinAbsoluteError (f.track().volumeDb, ApplicationModel::maxVolumeDb, 1e-3);
 
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -500.0));
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -500.0 });
             expectWithinAbsoluteError (f.track().volumeDb, ApplicationModel::minVolumeDb, 1e-3);
         }
 
@@ -65,10 +65,10 @@ struct TrackChannelTests : juce::UnitTest
         {
             ChannelFixture f;
             f.undoOnce();   // back to one track, so the only step left is its track.add
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), 0.0));
-            f.invoke ("track.setPan", trackPanArgs (f.trackId(), 0.003));   // the engine snaps it to centre
-            f.invoke ("track.setVolume", trackVolumeArgs ("no-such-track", -6.0));
-            f.invoke ("track.setVolume");   // no args at all
+            f.invoke (cmd::trackSetVolume, { f.trackId(), 0.0 });
+            f.invoke (cmd::trackSetPan, { f.trackId(), 0.003 });   // the engine snaps it to centre
+            f.invoke (cmd::trackSetVolume, { "no-such-track", -6.0 });
+            f.invoke (cmd::trackSetVolume);   // no args at all
 
             expect (f.undoOnce());
             expectEquals (f.numTracks(), 0);
@@ -77,12 +77,12 @@ struct TrackChannelTests : juce::UnitTest
         beginTest ("A fader gesture is one undo step, however many values it sends");
         {
             ChannelFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -1.0));
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -3.0, true));
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -9.0, true));
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -1.0 });
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -3.0, true });
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -9.0, true });
             expectWithinAbsoluteError (f.track().volumeDb, -9.0, 1e-3);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track().volumeDb, 0.0, 1e-3);
             expectEquals (f.numTracks(), 2);
         }
@@ -90,10 +90,10 @@ struct TrackChannelTests : juce::UnitTest
         beginTest ("Separate gestures are separate undo steps");
         {
             ChannelFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -3.0));
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -6.0));
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -3.0 });
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -6.0 });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track().volumeDb, -3.0, 1e-3);
         }
 
@@ -102,23 +102,23 @@ struct TrackChannelTests : juce::UnitTest
             ChannelFixture f;
 
             // Continuing after another track's gesture: its own step.
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (1), -3.0));
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (0), -6.0, true));
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackSetVolume, { f.trackId (1), -3.0 });
+            f.invoke (cmd::trackSetVolume, { f.trackId (0), -6.0, true });
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track (0).volumeDb, 0.0, 1e-3);
             expectWithinAbsoluteError (f.track (1).volumeDb, -3.0, 1e-3);
 
             // Continuing after a different edit: its own step.
-            f.invoke ("track.add");
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (1), -6.0, true));
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackSetVolume, { f.trackId (1), -6.0, true });
+            f.invoke (cmd::editUndo);
             expectEquals (f.numTracks(), 3);
 
             // Continuing after an undo: its own step.
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (1), -6.0));
-            f.invoke ("edit.undo");
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (1), -9.0, true));
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackSetVolume, { f.trackId (1), -6.0 });
+            f.invoke (cmd::editUndo);
+            f.invoke (cmd::trackSetVolume, { f.trackId (1), -9.0, true });
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track (1).volumeDb, -3.0, 1e-3);
         }
 
@@ -126,25 +126,25 @@ struct TrackChannelTests : juce::UnitTest
         beginTest ("track.setPan pans one track as one undo step, clamped to [-1, 1]");
         {
             ChannelFixture f;
-            f.invoke ("track.setPan", trackPanArgs (f.trackId (1), -0.5));
+            f.invoke (cmd::trackSetPan, { f.trackId (1), -0.5 });
             expectWithinAbsoluteError (f.track (1).pan, -0.5, 1e-6);
             expectWithinAbsoluteError (f.track (0).pan, 0.0, 1e-6);
 
-            f.invoke ("track.setPan", trackPanArgs (f.trackId (1), 3.0));
+            f.invoke (cmd::trackSetPan, { f.trackId (1), 3.0 });
             expectWithinAbsoluteError (f.track (1).pan, 1.0, 1e-6);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track (1).pan, -0.5, 1e-6);
         }
 
         beginTest ("A pan gesture is one undo step, separate from a volume gesture");
         {
             ChannelFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId(), -6.0));
-            f.invoke ("track.setPan", trackPanArgs (f.trackId(), 0.2, true));
-            f.invoke ("track.setPan", trackPanArgs (f.trackId(), 0.4, true));
+            f.invoke (cmd::trackSetVolume, { f.trackId(), -6.0 });
+            f.invoke (cmd::trackSetPan, { f.trackId(), 0.2, true });
+            f.invoke (cmd::trackSetPan, { f.trackId(), 0.4, true });
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectWithinAbsoluteError (f.track().pan, 0.0, 1e-6);
             expectWithinAbsoluteError (f.track().volumeDb, -6.0, 1e-3);
         }
@@ -153,31 +153,31 @@ struct TrackChannelTests : juce::UnitTest
         beginTest ("track.toggleMute and track.toggleSolo flip one track and are never undoable");
         {
             ChannelFixture f;
-            f.invoke ("track.toggleMute", trackArgs (f.trackId (1)));
-            f.invoke ("track.toggleSolo", trackArgs (f.trackId (0)));
+            f.invoke (cmd::trackToggleMute, { f.trackId (1) });
+            f.invoke (cmd::trackToggleSolo, { f.trackId (0) });
 
             expect (f.track (1).muted);
             expect (! f.track (0).muted);
             expect (f.track (0).solo);
             expect (! f.track (1).solo);
 
-            f.invoke ("edit.undo");   // undoes the second track.add, not mute or solo
+            f.invoke (cmd::editUndo);   // undoes the second track.add, not mute or solo
             expectEquals (f.numTracks(), 1);
             expect (f.track (0).solo);
 
-            f.invoke ("track.toggleSolo", trackArgs (f.trackId (0)));
+            f.invoke (cmd::trackToggleSolo, { f.trackId (0) });
             expect (! f.track (0).solo);
         }
 
         beginTest ("Removing and restoring a track keeps its channel settings");
         {
             ChannelFixture f;
-            f.invoke ("track.setVolume", trackVolumeArgs (f.trackId (1), -6.0));
-            f.invoke ("track.setPan", trackPanArgs (f.trackId (1), 0.5));
-            f.invoke ("track.toggleMute", trackArgs (f.trackId (1)));
+            f.invoke (cmd::trackSetVolume, { f.trackId (1), -6.0 });
+            f.invoke (cmd::trackSetPan, { f.trackId (1), 0.5 });
+            f.invoke (cmd::trackToggleMute, { f.trackId (1) });
 
-            f.invoke ("track.remove");
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackRemove);
+            f.invoke (cmd::editUndo);
 
             expectWithinAbsoluteError (f.track (1).volumeDb, -6.0, 1e-3);
             expectWithinAbsoluteError (f.track (1).pan, 0.5, 1e-6);
@@ -187,14 +187,14 @@ struct TrackChannelTests : juce::UnitTest
         beginTest ("Undo never clears the redo history, whatever the channel settings");
         {
             ChannelFixture f;
-            f.invoke ("track.remove");   // a track with default settings
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackRemove);   // a track with default settings
+            f.invoke (cmd::editUndo);
             expect (f.model.canRedo());
 
-            f.invoke ("track.setPan", trackPanArgs (f.trackId(), 0.5));   // the first change from a default
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackSetPan, { f.trackId(), 0.5 });   // the first change from a default
+            f.invoke (cmd::editUndo);
             expect (f.model.canRedo());
-            f.invoke ("edit.redo");
+            f.invoke (cmd::editRedo);
             expectWithinAbsoluteError (f.track().pan, 0.5, 1e-6);
         }
     }

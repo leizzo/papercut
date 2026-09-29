@@ -25,7 +25,7 @@ PianoRollView::PianoRollView (ApplicationModel& m, CommandRegistry& c, ThemeMana
     quarterButton.onClick = [this] { quantize ("1/4"); };
     eighthButton.onClick = [this] { quantize ("1/8"); };
     sixteenthButton.onClick = [this] { quantize ("1/16"); };
-    deleteButton.onClick = [this] { commands.invoke ("note.delete"); };
+    deleteButton.onClick = [this] { commands.invoke (cmd::noteDelete); };
 
     arrangementButton.setTooltip ("Back to the Arrangement");
     quarterButton.setTooltip ("Quantize to 1/4");
@@ -119,7 +119,7 @@ void PianoRollView::close()
 void PianoRollView::quantize (const char* gridName)
 {
     if (auto* clip = currentClip())
-        commands.invoke ("note.quantize", noteQuantizeArgs (clip->id, gridName));
+        commands.invoke (cmd::noteQuantize, { clip->id, gridName });
 }
 
 void PianoRollView::layoutToolbar (juce::Rectangle<int> toolbar)

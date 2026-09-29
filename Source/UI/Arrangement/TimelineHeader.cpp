@@ -73,9 +73,9 @@ void TimelineHeader::mouseDrag (const juce::MouseEvent& e)
 void TimelineHeader::mouseUp (const juce::MouseEvent&)
 {
     if (auto loop = std::exchange (draggedLoop, std::nullopt))
-        commands.invoke ("transport.setLoopRange", loopRangeArgs (loop->start, loop->end));
+        commands.invoke (cmd::transportSetLoopRange, { loop->start, loop->end });
     else
-        commands.invoke ("transport.setPosition", transportPositionArgs (dragStartSeconds));
+        commands.invoke (cmd::transportSetPosition, dragStartSeconds);
 
     repaint();
 }

@@ -19,24 +19,24 @@ struct TrackCommandTests : juce::UnitTest
         beginTest ("track.add and track.remove mutate the Edit's track list");
         {
             Fixture f;
-            expect (f.invoke ("track.add"));
-            expect (f.invoke ("track.add"));
+            expect (f.invoke (cmd::trackAdd));
+            expect (f.invoke (cmd::trackAdd));
             expectEquals (f.numTracks(), 2);
 
-            expect (f.invoke ("track.remove"));
+            expect (f.invoke (cmd::trackRemove));
             expectEquals (f.numTracks(), 1);
         }
 
         beginTest ("track.remove removes the selected track");
         {
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
             auto first = f.model.getTracks()[0].id;
             auto second = f.model.getTracks()[1].id;
 
             f.model.selectTrack (first);
-            f.invoke ("track.remove");
+            f.invoke (cmd::trackRemove);
 
             expectEquals (f.numTracks(), 1);
             expectEquals (f.model.getTracks()[0].id, second);
@@ -45,7 +45,7 @@ struct TrackCommandTests : juce::UnitTest
         beginTest ("track.remove on an empty Edit changes nothing");
         {
             Fixture f;
-            f.invoke ("track.remove");
+            f.invoke (cmd::trackRemove);
             expectEquals (f.numTracks(), 0);
             expect (! f.model.canUndo());
         }
@@ -53,18 +53,18 @@ struct TrackCommandTests : juce::UnitTest
         beginTest ("edit.undo / edit.redo reverse and replay track.add, one step per Command");
         {
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.numTracks(), 1);
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.numTracks(), 0);
             expect (! f.model.canUndo());
 
-            f.invoke ("edit.redo");
+            f.invoke (cmd::editRedo);
             expectEquals (f.numTracks(), 1);
-            f.invoke ("edit.redo");
+            f.invoke (cmd::editRedo);
             expectEquals (f.numTracks(), 2);
             expect (! f.model.canRedo());
         }
@@ -72,11 +72,11 @@ struct TrackCommandTests : juce::UnitTest
         beginTest ("edit.undo restores a removed track with its identity");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             auto before = f.model.getTracks()[0];
 
-            f.invoke ("track.remove");
-            f.invoke ("edit.undo");
+            f.invoke (cmd::trackRemove);
+            f.invoke (cmd::editUndo);
 
             expectEquals (f.numTracks(), 1);
             expectEquals (f.model.getTracks()[0].id, before.id);
@@ -86,14 +86,14 @@ struct TrackCommandTests : juce::UnitTest
         beginTest ("Selection never creates undo steps");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             auto id = f.model.getTracks()[0].id;
 
             f.model.selectTrack (id);
             expect (f.model.getTracks()[0].selected);
 
             // The only undo step is the track.add itself.
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.numTracks(), 0);
             expect (! f.model.canUndo());
         }
@@ -101,21 +101,21 @@ struct TrackCommandTests : juce::UnitTest
         beginTest ("New tracks take the next colour of the track palette; track.setColour changes it, one undo step");
         {
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.addMidi");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAddMidi);
+            f.invoke (cmd::trackAdd);
             auto tracks = f.model.getTracks();
             expectEquals (tracks[0].colourIndex, 0);
             expectEquals (tracks[1].colourIndex, 1);
             expectEquals (tracks[2].colourIndex, 2);
 
-            f.invoke ("track.setColour", trackColourArgs (tracks[1].id, 5));
+            f.invoke (cmd::trackSetColour, { tracks[1].id, 5 });
             expectEquals (f.model.getTracks()[1].colourIndex, 5);
 
-            f.invoke ("track.setColour", trackColourArgs (tracks[1].id, 99));   // out of the palette: refused
+            f.invoke (cmd::trackSetColour, { tracks[1].id, 99 });   // out of the palette: refused
             expectEquals (f.model.getTracks()[1].colourIndex, 5);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.model.getTracks()[1].colourIndex, 1);
         }
     }

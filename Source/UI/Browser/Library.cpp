@@ -157,9 +157,9 @@ bool canDropOnTrack (const LibraryItem& item, TrackKind kind)
 void dropOnTrack (CommandRegistry& commands, const LibraryItem& item, const juce::String& trackId, double startSeconds)
 {
     if (item.kind == LibraryItem::Kind::plugin)
-        commands.invoke ("plugin.insert", pluginInsertArgs (trackId, item.pluginPath, PluginChain::device));
+        commands.invoke (cmd::pluginInsert, { trackId, item.pluginPath, PluginChain::device });
     else if (item.kind == LibraryItem::Kind::audioFile)
-        commands.invoke ("clip.insertAt", clipInsertAtArgs (item.file, trackId, startSeconds));
+        commands.invoke (cmd::clipInsertAt, { item.file, trackId, startSeconds });
 }
 
 } // namespace resamper

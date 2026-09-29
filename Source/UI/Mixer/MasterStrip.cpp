@@ -19,7 +19,7 @@ MasterStrip::MasterStrip (CommandRegistry& c, ThemeManager& tm)
     setTitle ("Master");
     faderSection.onVolumeChange = [this] (double db, bool continues)
     {
-        commands.invoke ("mixer.setMasterVolume", masterVolumeArgs (db, continues));
+        commands.invoke (cmd::mixerSetMasterVolume, { db, continues });
     };
     addAndMakeVisible (faderSection);
 }

@@ -58,17 +58,17 @@ struct SessionTests : juce::UnitTest
 
             // The Project already has an empty SCENES node, created outside undo.
             // The scenes added here are the undoable part.
-            expect (f.invoke ("session.setSceneCount", sessionSceneCountArgs (2)));
+            expect (f.invoke (cmd::sessionSetSceneCount, 2));
             expectEquals ((int) session.getScenes().size(), 2);
 
-            expect (f.invoke ("session.renameScene", sessionRenameSceneArgs (0, "Verse")));
+            expect (f.invoke (cmd::sessionRenameScene, { 0, "Verse" }));
             expectEquals (session.getScenes()[0].name, juce::String ("Verse"));
 
-            expect (f.invoke ("session.setSceneCount", sessionSceneCountArgs (2)));   // already there: no new step
-            f.invoke ("edit.undo");
+            expect (f.invoke (cmd::sessionSetSceneCount, 2));   // already there: no new step
+            f.invoke (cmd::editUndo);
             expect (session.getScenes()[0].name.isEmpty());
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) session.getScenes().size(), 0);
         }
 
@@ -77,7 +77,7 @@ struct SessionTests : juce::UnitTest
             Fixture f;
             auto& session = f.session;
 
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             expect (session.setSceneCount (1).wasOk());
 
             const auto id = f.model.getTracks()[0].id;
@@ -91,7 +91,7 @@ struct SessionTests : juce::UnitTest
             expect (f.model.getTracks()[0].clips.empty());
             expectEquals (session.getScenes()[0].occupiedSlots, 1);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! session.getSlots (id)[0].hasClip);
             expect (f.model.getTracks()[0].clips.empty());
         }
@@ -101,7 +101,7 @@ struct SessionTests : juce::UnitTest
             Fixture f;
             auto& session = f.session;
 
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             const auto id = f.model.getTracks()[0].id;
             const auto wav = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 2.0);
 
@@ -109,7 +109,7 @@ struct SessionTests : juce::UnitTest
             expect (session.addSlotClip (id, 0, wav).failed());
             expect (session.getScenes().empty());
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals (f.numTracks(), 0);
         }
 
@@ -118,8 +118,8 @@ struct SessionTests : juce::UnitTest
             Fixture f;
             auto& session = f.session;
 
-            f.invoke ("track.add");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
             expect (session.setSceneCount (2).wasOk());
 
             const auto wav = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 2.0);
@@ -131,7 +131,7 @@ struct SessionTests : juce::UnitTest
             expect (session.addSlotClip (a, 1, wav).wasOk());
 
             expect (! session.launchScene (9));
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! session.getSlots (a)[1].hasClip);   // the failed launch recorded nothing
 
             expect (session.addSlotClip (a, 1, wav).wasOk());
@@ -159,7 +159,7 @@ struct SessionTests : juce::UnitTest
 
             expect (session.setSceneCount (3).wasOk());
             expect (! session.launchScene (2));
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expectEquals ((int) session.getScenes().size(), 2);
         }
 
@@ -168,7 +168,7 @@ struct SessionTests : juce::UnitTest
             Fixture f;
             auto& session = f.session;
 
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             expect (session.setSceneCount (1).wasOk());
             const auto id = f.model.getTracks()[0].id;
 
@@ -176,10 +176,10 @@ struct SessionTests : juce::UnitTest
             expect (session.getSlots (id)[0].hasClip);
             expect (f.model.getTracks()[0].clips.empty());
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! session.getSlots (id)[0].hasClip);
 
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             const auto audioId = f.model.getTracks()[1].id;
             expect (session.addMidiSlotClip (audioId, 0).failed());
         }
@@ -189,7 +189,7 @@ struct SessionTests : juce::UnitTest
             Fixture f;
             auto& session = f.session;
 
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             expect (session.setSceneCount (1).wasOk());
 
             const auto id = f.model.getTracks()[0].id;
@@ -199,7 +199,7 @@ struct SessionTests : juce::UnitTest
             expect (session.launchSlot (id, 0));
             expect (session.getSlots (id)[0].queued);
             expect (session.recordIntoArrangement().failed());
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (! session.getSlots (id)[0].hasClip);   // the failed record recorded nothing
             expect (session.addSlotClip (id, 0, wav).wasOk());
 
@@ -216,7 +216,7 @@ struct SessionTests : juce::UnitTest
             expect (clips[0].file == wav);
             expect (session.getSlots (id)[0].hasClip);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[0].clips.empty());
             expect (session.getSlots (id)[0].hasClip);
         }
@@ -226,7 +226,7 @@ struct SessionTests : juce::UnitTest
             Fixture f;
             auto& session = f.session;
 
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             expect (session.setSceneCount (1).wasOk());
             const auto id = f.model.getTracks()[0].id;
             expect (session.addMidiSlotClip (id, 0).wasOk());

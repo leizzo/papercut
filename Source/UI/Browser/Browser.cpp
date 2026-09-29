@@ -56,7 +56,7 @@ Browser::Browser (CommandRegistry& c, PluginRack& r, ApplicationModel& m, ThemeM
     search.onEscapeKey = [this] { search.clear(); refresh(); };
 
     scan.setTooltip ("Scan for VST3 / AU plug-ins");
-    scan.onClick = [this] { commands.invoke ("plugin.scan"); };
+    scan.onClick = [this] { commands.invoke (cmd::pluginScan); };
 
     list.setRowHeight (itemRowHeight);
     list.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
@@ -109,7 +109,7 @@ void Browser::open (int row)
     else if (item.kind == LibraryItem::Kind::plugin)
     {
         if (auto trackId = model.getSelectedTrackId(); trackId.isNotEmpty())
-            commands.invoke ("plugin.insert", pluginInsertArgs (trackId, item.pluginPath));
+            commands.invoke (cmd::pluginInsert, { trackId, item.pluginPath });
     }
     else
     {

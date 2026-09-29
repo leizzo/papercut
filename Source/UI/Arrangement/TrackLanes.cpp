@@ -249,26 +249,26 @@ void TrackLanes::showClipMenu (const ClipInfo& clip)
 
     juce::PopupMenu colours;
     colours.addItem (juce::PopupMenu::Item ("Track Colour").setTicked (clip.colourIndex < 0)
-                         .setAction ([this, id = clip.id] { commands.invoke ("clip.setColour", clipColourArgs (id, -1)); }));
+                         .setAction ([this, id = clip.id] { commands.invoke (cmd::clipSetColour, { id, -1 }); }));
 
     for (int i = 0; i < ApplicationModel::trackPaletteSize; ++i)
         colours.addItem (juce::PopupMenu::Item ("Colour " + juce::String (i + 1)).setColour (theme.trackPalette[(size_t) i])
                              .setTicked (clip.colourIndex == i)
-                             .setAction ([this, id = clip.id, i] { commands.invoke ("clip.setColour", clipColourArgs (id, i)); }));
+                             .setAction ([this, id = clip.id, i] { commands.invoke (cmd::clipSetColour, { id, i }); }));
 
     juce::PopupMenu menu;
     menu.addItem (item ("Rename", [this, clip] { startRename (clip); }));
     menu.addSubMenu ("Colour", colours);
     menu.addSeparator();
-    menu.addItem (commandItem (commands, "clip.duplicate"));
-    menu.addItem (commandItem (commands, "clip.split", {}, "Split"));
-    menu.addItem (commandItem (commands, "clip.consolidate").setEnabled (model.getSelectedClipIds().size() > 1));
+    menu.addItem (commandItem (commands, cmd::clipDuplicate));
+    menu.addItem (commandItem (commands, cmd::clipSplit, "Split"));
+    menu.addItem (commandItem (commands, cmd::clipConsolidate).setEnabled (model.getSelectedClipIds().size() > 1));
 
     if (clip.kind == TrackKind::audio)
         menu.addItem (item (clip.reversed ? "Play Forwards" : "Reverse",
-                            [this, id = clip.id] { commands.invoke ("clip.reverse", clipArgs (id)); }));
+                            [this, id = clip.id] { commands.invoke (cmd::clipReverse, { id }); }));
     else
-        menu.addItem (commandItem (commands, "note.quantize", noteQuantizeArgs (clip.id, "1/16"), "Quantize"));
+        menu.addItem (commandItem (commands, cmd::noteQuantize, { clip.id, "1/16" }, "Quantize"));
 
     if (clip.numTakes > 0)
     {
@@ -276,13 +276,13 @@ void TrackLanes::showClipMenu (const ClipInfo& clip)
 
         for (int take = 0; take < clip.numTakes; ++take)
             takes.addItem ("Take " + juce::String (take + 1), true, take == clip.currentTake,
-                           [this, id = clip.id, take] { commands.invoke ("clip.setTake", clipTakeArgs (id, take)); });
+                           [this, id = clip.id, take] { commands.invoke (cmd::clipSetTake, { id, take }); });
 
         menu.addSubMenu ("Takes", takes);
     }
 
     menu.addSeparator();
-    menu.addItem (commandItem (commands, "edit.delete"));
+    menu.addItem (commandItem (commands, cmd::editDelete));
     menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
 }
 
@@ -309,7 +309,7 @@ void TrackLanes::startRename (const ClipInfo& clip)
         renameEditor->setVisible (false);
 
         if (commit)
-            commands.invoke ("clip.rename", clipRenameArgs (id, text));
+            commands.invoke (cmd::clipRename, { id, text });
 
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<TrackLanes> (this)]
         {
@@ -470,12 +470,12 @@ void TrackLanes::mouseUp (const juce::MouseEvent& e)
         const auto& to = released.preview;
 
         if (released.mode == DragMode::move)
-            commands.invoke (released.copy ? "clip.copy" : "clip.move",
-                             clipMoveArgs (to.id, to.startSeconds, tracks[(size_t) released.row].id));
+            commands.invoke (released.copy ? cmd::clipCopy : cmd::clipMove,
+                             { to.id, to.startSeconds, tracks[(size_t) released.row].id });
         else if (released.mode == DragMode::loopExtend)
-            commands.invoke ("clip.loopExtend", clipResizeArgs (to.id, to.startSeconds, to.startSeconds + to.lengthSeconds));
+            commands.invoke (cmd::clipLoopExtend, { to.id, to.startSeconds, to.startSeconds + to.lengthSeconds });
         else
-            commands.invoke ("clip.resize", clipResizeArgs (to.id, to.startSeconds, to.startSeconds + to.lengthSeconds));
+            commands.invoke (cmd::clipResize, { to.id, to.startSeconds, to.startSeconds + to.lengthSeconds });
     }
 
     // Settle on the committed position now (or snap back if the Command changed

@@ -222,13 +222,13 @@ struct DetailView::Chain : juce::Component,
             const auto to = from >= 0 && index > from ? index - 1 : index;
 
             if (from >= 0 && to != from)
-                owner.commands.invoke ("plugin.move", pluginMoveArgs (trackId, moved, juce::jmin (to, (int) cards.size() - 1)));
+                owner.commands.invoke (cmd::pluginMove, { trackId, moved, juce::jmin (to, (int) cards.size() - 1) });
 
             return;
         }
 
         if (auto item = itemFromDrag (d.description))
-            owner.commands.invoke ("plugin.insert", pluginInsertArgs (trackId, item->pluginPath, PluginChain::device));
+            owner.commands.invoke (cmd::pluginInsert, { trackId, item->pluginPath, PluginChain::device });
     }
 
     DetailView& owner;

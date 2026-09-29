@@ -1,7 +1,6 @@
 #include "PluginCommands.h"
 
 #include "AppCommandHost.h"
-#include "ArgKeys.h"
 #include "Engine/PluginRack.h"
 
 namespace resamper
@@ -9,148 +8,70 @@ namespace resamper
 
 namespace
 {
-    /** Reports a message that isn't from a Result: an empty one reports nothing. */
+    /** Reports a message that isn't from a Result. */
     void reportMessage (const AppCommandHost& host, const juce::String& message)
     {
-        if (message.isNotEmpty() && host.reportError)
+        if (host.reportError)
             host.reportError (message);
     }
 }
 
 void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCommandHost& host)
 {
-    registry.add ({ "plugin.scan", "Scan Plug-ins", [&rack] { return ! rack.isScanning(); } }, [&rack] { rack.startScan(); });
+    registry.add (cmd::pluginScan, { "Scan Plug-ins", [&rack] { return ! rack.isScanning(); } }, [&rack] { rack.startScan(); });
 
-    registry.add ({ "plugin.insert", "Insert Plug-in" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginInsert, { "Insert Plug-in" }, [&rack, &host] (const PluginInsertArgs& a)
     {
-        const auto id = args[ArgKeys::trackId].toString();
-        const auto plugin = args[ArgKeys::plugin].toString();
-        const auto chain = args[ArgKeys::chain].toString() == "mixer" ? PluginChain::mixer : PluginChain::device;
-
-        if (id.isEmpty() || plugin.isEmpty())
+        if (a.trackId.isEmpty() || a.plugin.isEmpty())
             reportMessage (host, "Plug-in insert needs a track and a plug-in");
         else
-            host.report (rack.insert (id, plugin, chain));
+            host.report (rack.insert (a.trackId, a.plugin, a.chain));
     });
 
-    registry.add ({ "plugin.remove", "Remove Plug-in" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginRemove, { "Remove Plug-in" }, [&rack, &host] (const PluginArgs& a)
     {
-        const auto id = args[ArgKeys::trackId].toString();
-        const auto pluginId = args[ArgKeys::pluginId].toString();
-
-        if (id.isEmpty() || pluginId.isEmpty())
+        if (a.trackId.isEmpty() || a.pluginId.isEmpty())
             reportMessage (host, "Plug-in remove needs a track and a plug-in");
-        else if (! rack.remove (id, pluginId))
+        else if (! rack.remove (a.trackId, a.pluginId))
             reportMessage (host, "Couldn't remove the plug-in");
     });
 
-    registry.add ({ "plugin.move", "Move Plug-in" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginMove, { "Move Plug-in" }, [&rack, &host] (const PluginMoveArgs& a)
     {
-        const auto id = args[ArgKeys::trackId].toString();
-        const auto pluginId = args[ArgKeys::pluginId].toString();
-        const auto indexVar = args[ArgKeys::index];
-
-        if (id.isEmpty() || pluginId.isEmpty() || ! (indexVar.isInt() || indexVar.isInt64() || indexVar.isDouble()))
-            reportMessage (host, "Plug-in move needs a track, a plug-in and an index");
-        else if (! rack.move (id, pluginId, (int) indexVar))
+        if (a.trackId.isEmpty() || a.pluginId.isEmpty())
+            reportMessage (host, "Plug-in move needs a track and a plug-in");
+        else if (! rack.move (a.trackId, a.pluginId, a.index))
             reportMessage (host, "Couldn't move the plug-in");
     });
 
-    registry.add ({ "plugin.setBypassed", "Bypass Plug-in" }, [&rack] (const juce::var& args)
+    registry.add (cmd::pluginSetBypassed, { "Bypass Plug-in" }, [&rack] (const PluginBypassArgs& a)
     {
-        rack.setBypassed (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
-                          (bool) args[ArgKeys::bypassed]);
+        rack.setBypassed (a.trackId, a.pluginId, a.bypassed);
     });
 
-    registry.add ({ "plugin.moveToDeviceChain", "Move to Track Chain" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginMoveToDeviceChain, { "Move to Track Chain" }, [&rack, &host] (const PluginArgs& a)
     {
-        const auto result = rack.moveToDeviceChain (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString());
+        const auto result = rack.moveToDeviceChain (a.trackId, a.pluginId);
         host.report (result);
 
         if (result.wasOk() && host.notify)
             host.notify ("Moved to the track chain", true);
     });
 
-    registry.add ({ "plugin.copyInsert", "Copy Insert" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginCopyInsert, { "Copy Insert" }, [&rack, &host] (const PluginCopyArgs& a)
     {
-        host.report (rack.copyInsert (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
-                                      args[ArgKeys::toTrackId].toString(), (int) args[ArgKeys::index]));
+        host.report (rack.copyInsert (a.fromTrackId, a.pluginId, a.toTrackId, a.index));
     });
 
-    registry.add ({ "plugin.setParameter", "Change Parameter" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginSetParameter, { "Change Parameter" }, [&rack] (const PluginParameterArgs& a)
     {
-        const auto value = args[ArgKeys::value];
-
-        // A missing value would otherwise read as 0 and zero the parameter.
-        if (! (value.isInt() || value.isInt64() || value.isDouble()))
-            reportMessage (host, "Parameter change needs a value");
-        else
-            rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
-                               (float) value, (bool) args[ArgKeys::continuesGesture]);
+        rack.setParameter (a.pluginId, a.parameterId, a.value, a.continuesGesture);
     });
 
-    registry.add ({ "plugin.replace", "Replace Plug-in" }, [&rack, &host] (const juce::var& args)
+    registry.add (cmd::pluginReplace, { "Replace Plug-in" }, [&rack, &host] (const PluginReplaceArgs& a)
     {
-        host.report (rack.replace (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
-                                   args[ArgKeys::plugin].toString()));
+        host.report (rack.replace (a.trackId, a.pluginId, a.plugin));
     });
-}
-
-juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin, PluginChain chain)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::trackId, trackId);
-    args->setProperty (ArgKeys::plugin, plugin);
-    args->setProperty (ArgKeys::chain, chain == PluginChain::mixer ? "mixer" : "device");
-    return args;
-}
-
-juce::var pluginArgs (const juce::String& trackId, const juce::String& pluginId)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::trackId, trackId);
-    args->setProperty (ArgKeys::pluginId, pluginId);
-    return args;
-}
-
-juce::var pluginMoveArgs (const juce::String& trackId, const juce::String& pluginId, int index)
-{
-    auto args = pluginArgs (trackId, pluginId);
-    args.getDynamicObject()->setProperty (ArgKeys::index, index);
-    return args;
-}
-
-juce::var pluginBypassArgs (const juce::String& trackId, const juce::String& pluginId, bool bypassed)
-{
-    auto args = pluginArgs (trackId, pluginId);
-    args.getDynamicObject()->setProperty (ArgKeys::bypassed, bypassed);
-    return args;
-}
-
-juce::var pluginCopyArgs (const juce::String& fromTrackId, const juce::String& pluginId,
-                          const juce::String& toTrackId, int index)
-{
-    auto args = pluginMoveArgs (fromTrackId, pluginId, index);
-    args.getDynamicObject()->setProperty (ArgKeys::toTrackId, toTrackId);
-    return args;
-}
-
-juce::var pluginParameterArgs (const juce::String& pluginId, const juce::String& parameterId, float value,
-                               bool continuesGesture)
-{
-    auto args = new juce::DynamicObject();
-    args->setProperty (ArgKeys::pluginId, pluginId);
-    args->setProperty (ArgKeys::parameterId, parameterId);
-    args->setProperty (ArgKeys::value, value);
-    args->setProperty (ArgKeys::continuesGesture, continuesGesture);
-    return args;
-}
-
-juce::var pluginReplaceArgs (const juce::String& trackId, const juce::String& pluginId, const juce::String& plugin)
-{
-    auto args = pluginArgs (trackId, pluginId);
-    args.getDynamicObject()->setProperty (ArgKeys::plugin, plugin);
-    return args;
 }
 
 } // namespace resamper

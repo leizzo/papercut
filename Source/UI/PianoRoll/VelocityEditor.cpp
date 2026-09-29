@@ -107,7 +107,7 @@ void VelocityEditor::mouseDrag (const juce::MouseEvent& e)
 void VelocityEditor::mouseUp (const juce::MouseEvent& e)
 {
     if (previewVelocity && e.mouseWasDraggedSinceMouseDown())
-        commands.invoke ("note.setVelocity", noteVelocityArgs (clip.id, *previewVelocity));
+        commands.invoke (cmd::noteSetVelocity, { clip.id, *previewVelocity });
 
     previewVelocity.reset();
     reload();

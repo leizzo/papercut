@@ -21,9 +21,9 @@ TrackHeader::TrackHeader (CommandRegistry& c, ThemeManager& tm, const TrackInfo&
     mute.setTooltip ("Mute");
     automation.setTooltip ("Show automation");
 
-    arm.onClick = [this] { commands.invoke ("track.toggleArm", trackArgs (track.id)); };
-    solo.onClick = [this] { commands.invoke ("track.toggleSolo", trackArgs (track.id)); };
-    mute.onClick = [this] { commands.invoke ("track.toggleMute", trackArgs (track.id)); };
+    arm.onClick = [this] { commands.invoke (cmd::trackToggleArm, { track.id }); };
+    solo.onClick = [this] { commands.invoke (cmd::trackToggleSolo, { track.id }); };
+    mute.onClick = [this] { commands.invoke (cmd::trackToggleMute, { track.id }); };
     automation.onClick = [this] { if (onToggleAutomation) onToggleAutomation(); };
 
     for (auto* b : { &arm, &solo, &mute, &automation })
@@ -121,7 +121,7 @@ void TrackHeader::showMenu()
         colours.addItem (juce::PopupMenu::Item (paletteNames[i])
                              .setColour (theme.trackPalette[(size_t) i])
                              .setTicked (i == track.colourIndex)
-                             .setAction ([this, i] { commands.invoke ("track.setColour", trackColourArgs (track.id, i)); }));
+                             .setAction ([this, i] { commands.invoke (cmd::trackSetColour, { track.id, i }); }));
 
     juce::PopupMenu menu;
     menu.addSubMenu ("Colour", colours);
@@ -130,11 +130,11 @@ void TrackHeader::showMenu()
     {
         juce::PopupMenu inputMenu;
         inputMenu.addItem ("No Input", true, track.input.isEmpty(),
-                           [this] { commands.invoke ("track.setInput", trackInputArgs (track.id, {})); });
+                           [this] { commands.invoke (cmd::trackSetInput, { track.id, {} }); });
 
         for (auto& input : inputs)
             inputMenu.addItem (input, true, input == track.input,
-                               [this, input] { commands.invoke ("track.setInput", trackInputArgs (track.id, input)); });
+                               [this, input] { commands.invoke (cmd::trackSetInput, { track.id, input }); });
 
         menu.addSubMenu ("Input", inputMenu);
     }

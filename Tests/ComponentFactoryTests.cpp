@@ -17,16 +17,9 @@ struct ComponentFactoryTests : juce::UnitTest
     {
         Setup()
         {
-            commands.add (std::make_unique<Probe> (invocations));
+            commands.add (CommandRef<> { "test.probe" }, { "Probe" }, [this] { ++invocations; });
             registerPrimitives (factory, commands, themes);
         }
-
-        struct Probe : Command
-        {
-            explicit Probe (int& n) : Command ("test.probe", "Probe"), count (n) {}
-            void execute (const juce::var&) override   { ++count; }
-            int& count;
-        };
 
         int invocations = 0;
         LayoutSource source;

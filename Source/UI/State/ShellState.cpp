@@ -88,15 +88,15 @@ void ShellState::setDetailHeight (int h)
 //==============================================================================
 void registerShellCommands (CommandRegistry& registry, ShellState& shell)
 {
-    registry.add ({ "view.session", "Session" }, [&shell] { shell.setView (ShellState::View::session); });
-    registry.add ({ "view.arrange", "Arrange" }, [&shell] { shell.setView (ShellState::View::arrange); });
-    registry.add ({ "view.mixer", "Mixer" }, [&shell] { shell.setView (ShellState::View::mixer); });
-    registry.add ({ "view.pianoRoll", "Piano Roll" }, [&shell] { shell.setView (ShellState::View::pianoRoll); });
-    registry.add ({ "view.editor", "Editor" }, [&shell] { shell.setView (ShellState::View::editor); });
-    registry.add ({ "view.toggleSessionArrange", "Session / Arrange" }, [&shell] { shell.toggleSessionArrange(); });
-    registry.add ({ "view.toggleBrowser", "Show Browser" }, [&shell] { shell.setBrowserVisible (! shell.isBrowserVisible()); });
-    registry.add ({ "view.toggleDetail", "Show Detail View" }, [&shell] { shell.setDetailCollapsed (! shell.isDetailCollapsed()); });
-    registry.add ({ "view.toggleFollow", "Follow" }, [&shell] { shell.setFollowing (! shell.isFollowing()); });
+    registry.add (cmd::viewSession, { "Session" }, [&shell] { shell.setView (ShellState::View::session); });
+    registry.add (cmd::viewArrange, { "Arrange" }, [&shell] { shell.setView (ShellState::View::arrange); });
+    registry.add (cmd::viewMixer, { "Mixer" }, [&shell] { shell.setView (ShellState::View::mixer); });
+    registry.add (cmd::viewPianoRoll, { "Piano Roll" }, [&shell] { shell.setView (ShellState::View::pianoRoll); });
+    registry.add (cmd::viewEditor, { "Editor" }, [&shell] { shell.setView (ShellState::View::editor); });
+    registry.add (cmd::viewToggleSessionArrange, { "Session / Arrange" }, [&shell] { shell.toggleSessionArrange(); });
+    registry.add (cmd::viewToggleBrowser, { "Show Browser" }, [&shell] { shell.setBrowserVisible (! shell.isBrowserVisible()); });
+    registry.add (cmd::viewToggleDetail, { "Show Detail View" }, [&shell] { shell.setDetailCollapsed (! shell.isDetailCollapsed()); });
+    registry.add (cmd::viewToggleFollow, { "Follow" }, [&shell] { shell.setFollowing (! shell.isFollowing()); });
 }
 
 } // namespace resamper

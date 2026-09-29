@@ -21,18 +21,18 @@ struct ProjectTests : juce::UnitTest
         beginTest ("Save As then Open round-trips the Edit intact");
         {
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("media/tone.wav"), 1.25);
             f.model.selectTrack (f.model.getTracks()[1].id);
-            f.invoke ("clip.add");
-            f.invoke ("track.setVolume", trackVolumeArgs (f.model.getTracks()[0].id, -6.0));
-            f.invoke ("track.setPan", trackPanArgs (f.model.getTracks()[0].id, -0.25));
-            f.invoke ("track.toggleMute", trackArgs (f.model.getTracks()[0].id));
-            f.invoke ("track.toggleSolo", trackArgs (f.model.getTracks()[1].id));
+            f.invoke (cmd::clipAdd);
+            f.invoke (cmd::trackSetVolume, { f.model.getTracks()[0].id, -6.0 });
+            f.invoke (cmd::trackSetPan, { f.model.getTracks()[0].id, -0.25 });
+            f.invoke (cmd::trackToggleMute, { f.model.getTracks()[0].id });
+            f.invoke (cmd::trackToggleSolo, { f.model.getTracks()[1].id });
 
             f.projectSaveLocation = f.scratchDir().getChildFile ("My Project");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
             expect (! f.model.isProjectUntitled());
             expectEquals (f.model.getProjectName(), juce::String ("My Project"));
@@ -41,7 +41,7 @@ struct ProjectTests : juce::UnitTest
 
             Fixture reopened;
             reopened.projectToOpen = f.projectSaveLocation;
-            reopened.invoke ("project.open");
+            reopened.invoke (cmd::projectOpen);
             expect (reopened.errors.isEmpty(), reopened.errors.joinIntoString ("; "));
 
             auto loaded = reopened.model.getTracks();
@@ -63,7 +63,7 @@ struct ProjectTests : juce::UnitTest
         {
             Fixture f;
             f.projectSaveLocation = f.scratchDir().getChildFile ("Layout");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
 
             auto folder = f.projectSaveLocation;
             expectEquals (folder.findChildFiles (juce::File::findFiles, false, "*.tracktionedit").size(), 1);
@@ -75,10 +75,10 @@ struct ProjectTests : juce::UnitTest
         beginTest ("project.json holds a version and UI State, and no engine-owned keys");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.app.uiState.restore (sampleUIState());
             f.projectSaveLocation = f.scratchDir().getChildFile ("Json");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
 
             auto json = juce::JSON::parse (f.projectSaveLocation.getChildFile ("project.json"));
             auto* obj = json.getDynamicObject();
@@ -99,11 +99,11 @@ struct ProjectTests : juce::UnitTest
             Fixture f;
             f.app.uiState.restore (sampleUIState());
             f.projectSaveLocation = f.scratchDir().getChildFile ("UIStateRoundTrip");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
 
             Fixture reopened;
             reopened.projectToOpen = f.projectSaveLocation;
-            reopened.invoke ("project.open");
+            reopened.invoke (cmd::projectOpen);
             expectEquals ((double) reopened.app.uiState.toVar()["arrangement"]["pixelsPerSecond"], 120.0);
         }
 
@@ -111,7 +111,7 @@ struct ProjectTests : juce::UnitTest
         {
             Fixture f;
             f.projectSaveLocation = f.scratchDir().getChildFile ("FirstSave");
-            f.invoke ("project.save");
+            f.invoke (cmd::projectSave);
             expect (! f.model.isProjectUntitled());
             expect (f.projectSaveLocation.getChildFile ("project.json").existsAsFile());
         }
@@ -120,16 +120,16 @@ struct ProjectTests : juce::UnitTest
         {
             Fixture f;
             f.projectSaveLocation = f.scratchDir().getChildFile ("InPlace");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
 
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.projectSaveLocation = juce::File();   // a second chooser would be a bug
-            f.invoke ("project.save");
+            f.invoke (cmd::projectSave);
             expect (f.errors.isEmpty());
 
             Fixture reopened;
             reopened.projectToOpen = f.scratchDir().getChildFile ("InPlace");
-            reopened.invoke ("project.open");
+            reopened.invoke (cmd::projectOpen);
             expectEquals (reopened.numTracks(), 1);
         }
 
@@ -137,13 +137,13 @@ struct ProjectTests : juce::UnitTest
         {
             Fixture f;
             f.projectSaveLocation = f.scratchDir().getChildFile ("Future");
-            f.invoke ("project.saveAs");
+            f.invoke (cmd::projectSaveAs);
             f.projectSaveLocation.getChildFile ("project.json").replaceWithText (R"({ "version": 999 })");
 
             Fixture other;
-            other.invoke ("track.add");
+            other.invoke (cmd::trackAdd);
             other.projectToOpen = f.projectSaveLocation;
-            other.invoke ("project.open");
+            other.invoke (cmd::projectOpen);
 
             expectEquals (other.errors.size(), 1);
             expectEquals (other.numTracks(), 1);
@@ -153,9 +153,9 @@ struct ProjectTests : juce::UnitTest
         beginTest ("project.new replaces the Project with an empty untitled Edit");
         {
             Fixture f;
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             f.app.uiState.restore (sampleUIState());
-            f.invoke ("project.new");
+            f.invoke (cmd::projectNew);
 
             expectEquals (f.numTracks(), 0);
             expect (f.model.isProjectUntitled());

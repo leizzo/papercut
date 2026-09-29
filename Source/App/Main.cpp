@@ -1,4 +1,5 @@
 #include "App/ResamperApp.h"
+#include "Commands/ProductionCommands.h"
 #include "Engine/EngineManager.h"
 #include "UI/Layout/LayoutSource.h"
 #include "UI/MainWindow/MainWindow.h"
@@ -87,7 +88,7 @@ public:
         if (app == nullptr)
             return;
 
-        if (app->commands.invoke ("project.autosave"))
+        if (app->commands.invoke (cmd::projectAutosave))
             rememberProjectFolder (app->projects.getProjectFolder());
     }
 

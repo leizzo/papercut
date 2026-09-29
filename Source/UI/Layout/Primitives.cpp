@@ -186,7 +186,7 @@ void registerPrimitives (ComponentFactory& factory, CommandRegistry& commands, T
         // Keyboard shortcuts (e.g. space for play) must reach the Command table,
         // not trigger whichever button was clicked last.
         button->setWantsKeyboardFocus (false);
-        button->onClick = [&commands, commandId] { commands.invoke (commandId); };
+        button->onClick = [&commands, commandId] { commands.invokeById (commandId); };
         return button;
     });
 }

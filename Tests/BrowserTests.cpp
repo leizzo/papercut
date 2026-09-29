@@ -83,36 +83,36 @@ struct BrowserTests : juce::UnitTest
         beginTest ("clip.insertAt drops an audio file on a track at a position, as one undo step");
         {
             Fixture f;
-            f.invoke ("track.add");
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
             const auto trackId = f.model.getTracks()[1].id;
             const auto file = writeSineWav (f.scratchDir().getChildFile ("drop.wav"), 1.0);
 
-            expect (f.invoke ("clip.insertAt", clipInsertAtArgs (file, trackId, 3.0)));
+            expect (f.invoke (cmd::clipInsertAt, { file, trackId, 3.0 }));
             const auto tracks = f.model.getTracks();
             expect (tracks[0].clips.empty());
             expectEquals ((int) tracks[1].clips.size(), 1);
             expectWithinAbsoluteError (tracks[1].clips[0].startSeconds, 3.0, 1.0e-6);
 
-            f.invoke ("edit.undo");
+            f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[1].clips.empty());
         }
 
         beginTest ("clip.insertAt refuses a MIDI track and a file that isn't audio");
         {
             Fixture f;
-            f.invoke ("track.addMidi");
+            f.invoke (cmd::trackAddMidi);
             const auto trackId = f.model.getTracks()[0].id;
             const auto file = writeSineWav (f.scratchDir().getChildFile ("drop.wav"), 1.0);
 
-            f.invoke ("clip.insertAt", clipInsertAtArgs (file, trackId, 0.0));
+            f.invoke (cmd::clipInsertAt, { file, trackId, 0.0 });
             expect (f.model.getTracks()[0].clips.empty());
             expectEquals (f.errors.size(), 1);
 
-            f.invoke ("track.add");
+            f.invoke (cmd::trackAdd);
             auto text = f.scratchDir().getChildFile ("notes.txt");
             text.replaceWithText ("x");
-            f.invoke ("clip.insertAt", clipInsertAtArgs (text, f.model.getTracks()[1].id, 0.0));
+            f.invoke (cmd::clipInsertAt, { text, f.model.getTracks()[1].id, 0.0 });
             expect (f.model.getTracks()[1].clips.empty());
             expectEquals (f.errors.size(), 2);
         }
