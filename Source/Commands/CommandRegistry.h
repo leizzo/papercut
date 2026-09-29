@@ -9,7 +9,7 @@ namespace resamper
 
 /** A named, user-triggerable operation keyed by a string ID (e.g. "transport.play").
 
-    The only path by which UI mutates the model (ADR-0003). Commands never
+    The only path by which UI mutates the model. Commands never
     implement undo: model mutations are recorded by Engine Undo.
 */
 class Command
@@ -39,7 +39,7 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Command)
 };
 
-/** The single registry behind JSON buttons, menus and keyboard shortcuts (ADR-0006).
+/** The single registry behind JSON buttons, menus and keyboard shortcuts.
     If an action isn't registered here, no UI surface can reach it. */
 class CommandRegistry
 {

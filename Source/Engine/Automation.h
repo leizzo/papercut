@@ -27,7 +27,7 @@ struct ParameterInfo
     juce::String name;
 };
 
-/** Facade over one parameter's Tracktion AutomationCurve (ADR-0001, ADR-0012).
+/** Facade over one parameter's Tracktion AutomationCurve.
 
     A target parameter is "volume", "pan", "send:<sendId>" for an aux send on
     the track, or "plugin:<pluginItemId>:<parameterID>" for an insert ahead of

@@ -27,7 +27,7 @@ struct SceneInfo
     int occupiedSlots = 0;
 };
 
-/** Facade over the Edit's scenes and clip slots (ADR-0001, ADR-0012).
+/** Facade over the Edit's scenes and clip slots.
 
     State lives on the Edit. Every call re-reads ProjectManager::getEdit().
     Undo is Engine Undo: setSceneCount, renameScene, addSlotClip and clearSlot

@@ -90,7 +90,7 @@ struct TimeSignature
     int numerator = 4, denominator = 4;
 };
 
-/** The facade over the current Edit (ADR-0001).
+/** The facade over the current Edit.
 
     Exposes app-level operations and read-only snapshots; owns no track or clip
     state of its own. Nothing above this layer sees a Tracktion header.
@@ -135,7 +135,7 @@ public:
     // Model mutations (each one is a single Engine Undo step)
     void addAudioTrack();
 
-    /** Adds a MIDI track: an audio track marked MIDI, with the built-in instrument (ADR-0011). */
+    /** Adds a MIDI track: an audio track marked MIDI, with the built-in instrument. */
     void addMidiTrack();
 
     /** Removes the selected track, or the last one if none is selected.

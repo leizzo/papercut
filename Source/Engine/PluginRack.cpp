@@ -10,7 +10,7 @@ namespace resamper
 
 namespace
 {
-    /** Same property ApplicationModel writes (ADR-0011). Absent means an audio track. */
+    /** Same property ApplicationModel writes. Absent means an audio track. */
     const juce::Identifier trackKindProperty { "resamperKind" };
 
     /** On a mixer insert's state: "mixer". Absent: the device chain (so older projects' inserts land there). */

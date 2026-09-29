@@ -47,7 +47,7 @@ struct MasterInfo
 };
 
 /** Facade over the current Edit's returns, sends, submix buses and master fader
-    (ADR-0001, ADR-0012). Owns none of that state. Re-reads ProjectManager::getEdit()
+    Owns none of that state. Re-reads ProjectManager::getEdit()
     on every call. Nothing above this layer sees a Tracktion header.
 
     Undoable (Engine Undo): adding a return, a send or a bus, moving a track into

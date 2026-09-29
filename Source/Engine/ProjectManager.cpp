@@ -146,7 +146,7 @@ juce::Result ProjectManager::writeProject (const juce::File& folder, const juce:
     if (! te::EditFileOperations (*edit).writeToFile (editFile, false))
         return juce::Result::fail ("Could not write " + editFile.getFullPathName());
 
-    // Only what the engine does not serialize (ADR-0002).
+    // Only what the engine does not serialize.
     auto json = std::make_unique<juce::DynamicObject>();
     json->setProperty ("version", projectFormatVersion);
     json->setProperty ("ui", uiState);

@@ -79,7 +79,7 @@ namespace
 
 
     /** Makes a still-default value explicit, without undo, so undoing the first
-        real change restores it instead of removing the property (ADR-0009). */
+        real change restores it instead of removing the property. */
     void pinDefault (juce::CachedValue<float>& value)
     {
         if (value.isUsingDefault())
@@ -462,7 +462,7 @@ MasterInfo Mixer::getMaster() const
         return {};
 
     // Undo re-syncs this fader in ApplicationModel::syncVolumeParametersFromState
-    // (ADR-0009). Read it from state, and catch the live parameter up so a
+    // Read it from state, and catch the live parameter up so a
     // later playback follows even if nothing has undone yet.
     if (plugin->volParam != nullptr)
         syncParameter (*plugin->volParam, plugin->volume);

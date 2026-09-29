@@ -42,7 +42,7 @@ struct PluginParameter
     float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
 };
 
-/** Facade over the current Edit's plug-ins (ADR-0001, ADR-0012).
+/** Facade over the current Edit's plug-ins.
 
     Owns no plug-in state. Every call re-reads ProjectManager::getEdit(), because
     a new or opened Project replaces the Edit. Nothing above this layer includes

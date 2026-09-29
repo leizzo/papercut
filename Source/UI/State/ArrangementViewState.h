@@ -6,7 +6,7 @@ namespace resamper
 {
 
 /** Zoom and scroll for the Arrangement, and the single owner of the
-    time <-> x conversion (ADR-0004). The values live in a UI State subtree,
+    time <-> x conversion. The values live in a UI State subtree,
     not in this object, so every view built over the same subtree agrees and
     rebuilt components pick up where the old ones left off.
 

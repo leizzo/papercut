@@ -5,7 +5,7 @@
 namespace resamper
 {
 
-/** Production operations over the current Edit (ADR-0012).
+/** Production operations over the current Edit.
 
     No Tracktion types in this header. Freeze, bounce, and export render through
     the engine; templates and recovery are Project folders on disk.

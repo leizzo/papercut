@@ -31,7 +31,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     te::Edit& edit() const          { return projectManager.getEdit(); }
     juce::UndoManager& undoManager() { return edit().getUndoManager(); }
 
-    /** App-specific, on the track's ValueTree (ADR-0001). Absent means audio. */
+    /** App-specific, on the track's ValueTree. Absent means audio. */
     static const juce::Identifier trackKindProperty;
 
     /** App-specific, on a MIDI note's ValueTree, so a note can be named across undo. */
@@ -584,7 +584,7 @@ void ApplicationModel::addMidiTrack()
     if (track == nullptr)
         return;
 
-    // Kind is a property, not "whichever synth is loaded": Phase 6 replaces the synth (ADR-0011).
+    // Kind is a property, not "whichever synth is loaded": Phase 6 replaces the synth.
     track->state.setProperty (Impl::trackKindProperty, "midi", &impl->undoManager());
     impl->giveNextColour (*track);
 

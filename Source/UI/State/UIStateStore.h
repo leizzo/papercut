@@ -5,7 +5,7 @@
 namespace resamper
 {
 
-/** App-owned UI State (ADR-0004): zoom, scroll, focus — keyed by component ID.
+/** App-owned UI State: zoom, scroll, focus — keyed by component ID.
 
     Components are disposable, state is not: a component binds to its subtree
     on construction, so rebuilding it (Hot Reload) loses nothing. Selection is

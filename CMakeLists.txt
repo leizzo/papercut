@@ -21,7 +21,7 @@ set(TE_ADD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/tracktion_engine/modules/juce EXCLUDE_FROM_ALL)
 add_subdirectory(external/tracktion_engine EXCLUDE_FROM_ALL)
 
-# Plugin / synth UI uses gin_plugin (ADR-0008). It hard-depends on gin_dsp,
+# Plugin / synth UI uses gin_plugin. It hard-depends on gin_dsp,
 # gin_graphics, and gin_simd, so those modules are registered with it.
 juce_add_module(external/gin/modules/gin)
 juce_add_module(external/gin/modules/gin_simd)
@@ -35,7 +35,7 @@ juce_add_module(external/gin/modules/gin_plugin)
 # resamper_engine: the only target that sees Tracktion headers.
 # It compiles every JUCE/Tracktion/GIN module exactly once; all other targets
 # link it and borrow its include paths with the Tracktion path filtered out,
-# which turns ADR-0001 ("UI never includes Tracktion headers") into a compile error.
+# which turns "UI never includes Tracktion headers" into a compile error.
 # ------------------------------------------------------------------------------
 add_library(resamper_engine STATIC
     Source/Engine/EngineManager.cpp

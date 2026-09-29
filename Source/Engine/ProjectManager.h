@@ -14,7 +14,7 @@ class EngineManager;
 
     A Project is a folder:
         <Name>.tracktionedit   the Edit (engine-owned state)
-        project.json           format version + UI State only (ADR-0002)
+        project.json           format version + UI State only
         Audio/, Cache/         media (recordings among it) and cache subfolders
 
     A New Project lives in a temporary "untitled" folder, written out like any

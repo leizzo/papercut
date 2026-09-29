@@ -34,7 +34,7 @@ struct ShaperInfo
     std::vector<ShaperShapePoint> shape; ///< loop mode, at most 4 points
 };
 
-/** Facade over Tracktion modifiers (ADR-0012). Not a second automation curve.
+/** Facade over Tracktion modifiers. Not a second automation curve.
 
     Loop mode is a transport-synced breakpoint oscillator. Audio-trigger mode
     is an envelope follower on the track. Every call re-reads
