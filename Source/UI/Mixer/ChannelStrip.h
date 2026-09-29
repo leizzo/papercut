@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/ApplicationModel.h"
+#include "Engine/Mixer.h"
 #include "Engine/PluginRack.h"
 #include "InsertSlot.h"
 #include "StripParts.h"
@@ -14,18 +15,14 @@ namespace resamper
 
 class CommandRegistry;
 
-/** What a strip shows for one track (PRD §10.2). */
+/** What a strip shows (PRD §10.2): the Mixer's Strip and the inputs of its
+    Track Kind it can record from. */
 struct StripState
 {
-    int number = 1;                          ///< 1-based position among the tracks
-    TrackInfo track;
-    std::vector<SendInfo> sends;
-    std::vector<PluginInfo> inserts;         ///< the mixer inserts
-    std::vector<PluginInfo> deviceChain;     ///< read-only, for the Track chain row
-    juce::StringArray inputs;                ///< inputs of the track's kind it can record from
-    juce::String output = "Master";          ///< where it goes
-    bool isReturn = false;                   ///< returns have no sends and no arm
-    juce::String returnLetter;               ///< A..D on a return
+    Strip strip;
+    juce::StringArray inputs;
+
+    bool isReturn() const noexcept   { return strip.role == StripRole::returnTrack; }
 };
 
 /** One mixer channel strip, 145 wide (PRD §10.2), top to bottom in signal

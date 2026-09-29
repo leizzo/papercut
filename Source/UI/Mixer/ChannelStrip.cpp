@@ -86,22 +86,22 @@ ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
         const auto index = input.getSelectedItemIndex();
         const auto chosen = index > 0 ? state.inputs[index - 1] : juce::String();
 
-        if (chosen != state.track.input)
-            commands.invoke (cmd::trackSetInput, { state.track.id, chosen });
+        if (chosen != state.strip.input)
+            commands.invoke (cmd::trackSetInput, { state.strip.id, chosen });
     };
 
     pan.setDialSize (panHeight);
     pan.setReadoutBeside (true);
-    pan.onChange = [this] (double v, bool continues) { commands.invoke (cmd::trackSetPan, { state.track.id, v, continues }); };
+    pan.onChange = [this] (double v, bool continues) { commands.invoke (cmd::trackSetPan, { state.strip.id, v, continues }); };
 
     faderSection.onVolumeChange = [this] (double db, bool continues)
     {
-        commands.invoke (cmd::trackSetVolume, { state.track.id, db, continues });
+        commands.invoke (cmd::trackSetVolume, { state.strip.id, db, continues });
     };
 
-    mute.onClick = [this] { commands.invoke (cmd::trackToggleMute, { state.track.id }); };
-    solo.onClick = [this] { commands.invoke (cmd::trackToggleSolo, { state.track.id }); };
-    arm.onClick = [this] { commands.invoke (cmd::trackToggleArm, { state.track.id }); };
+    mute.onClick = [this] { commands.invoke (cmd::trackToggleMute, { state.strip.id }); };
+    solo.onClick = [this] { commands.invoke (cmd::trackToggleSolo, { state.strip.id }); };
+    arm.onClick = [this] { commands.invoke (cmd::trackToggleArm, { state.strip.id }); };
 
     for (auto* child : std::initializer_list<juce::Component*> { &input, &pan, &faderSection, &mute, &solo, &arm })
         addAndMakeVisible (child);
@@ -134,7 +134,7 @@ void ChannelStrip::setUpInsertSlot (InsertSlot& slot)
     slot.onPowerClick = [this, &slot] (const juce::MouseEvent&)
     {
         if (auto& plugin = slot.getPlugin())
-            commands.invoke (cmd::pluginSetBypassed, { state.track.id, plugin->id, plugin->enabled });
+            commands.invoke (cmd::pluginSetBypassed, { state.strip.id, plugin->id, plugin->enabled });
     };
 
     slot.onMenu = [this, &slot] (const juce::MouseEvent&) { showInsertMenu (slot); };
@@ -148,7 +148,7 @@ void ChannelStrip::setUpInsertSlot (InsertSlot& slot)
 
         auto d = new juce::DynamicObject();
         d->setProperty ("mixerInsert", slot.getPlugin()->id);
-        d->setProperty ("fromTrack", state.track.id);
+        d->setProperty ("fromTrack", state.strip.id);
         container->startDragging (juce::var (d), &slot, juce::ScaledImage (slot.createComponentSnapshot (slot.getLocalBounds())));
     };
 }
@@ -165,7 +165,7 @@ void ChannelStrip::showInsertMenu (InsertSlot& slot)
         return;
     }
 
-    const auto trackId = state.track.id;
+    const auto trackId = state.strip.id;
     const auto id = plugin->id;
     const auto name = plugin->name;
 
@@ -204,7 +204,7 @@ juce::String ChannelStrip::dropRefusal (const SourceDetails& details, const Inse
 {
     if (auto moved = details.description["mixerInsert"].toString(); moved.isNotEmpty())
     {
-        const auto sameStrip = details.description["fromTrack"].toString() == state.track.id;
+        const auto sameStrip = details.description["fromTrack"].toString() == state.strip.id;
 
         if (sameStrip)
             return {};
@@ -212,7 +212,7 @@ juce::String ChannelStrip::dropRefusal (const SourceDetails& details, const Inse
         if (! juce::ModifierKeys::currentModifiers.isAltDown())
             return "Alt+drag copies an insert to another strip";
 
-        return (int) state.inserts.size() >= PluginRack::maxMixerInserts ? "This strip's inserts are full" : juce::String();
+        return (int) state.strip.inserts.size() >= PluginRack::maxMixerInserts ? "This strip's inserts are full" : juce::String();
     }
 
     if (auto item = itemFromDrag (details.description))
@@ -275,32 +275,32 @@ void ChannelStrip::itemDropped (const SourceDetails& details)
         return;
     }
 
-    const auto index = juce::jmin (slot->getIndex(), (int) state.inserts.size());
+    const auto index = juce::jmin (slot->getIndex(), (int) state.strip.inserts.size());
 
     if (auto moved = details.description["mixerInsert"].toString(); moved.isNotEmpty())
     {
         const auto from = details.description["fromTrack"].toString();
 
-        if (from == state.track.id)
-            commands.invoke (cmd::pluginMove, { state.track.id, moved, juce::jmin (index, (int) state.inserts.size() - 1) });
+        if (from == state.strip.id)
+            commands.invoke (cmd::pluginMove, { state.strip.id, moved, juce::jmin (index, (int) state.strip.inserts.size() - 1) });
         else
-            commands.invoke (cmd::pluginCopyInsert, { from, moved, state.track.id, index });
+            commands.invoke (cmd::pluginCopyInsert, { from, moved, state.strip.id, index });
 
         return;
     }
 
     if (auto item = itemFromDrag (details.description))
-        commands.invoke (cmd::pluginInsert, { state.track.id, item->pluginPath, PluginChain::mixer });
+        commands.invoke (cmd::pluginInsert, { state.strip.id, item->pluginPath, PluginChain::mixer });
 }
 
 void ChannelStrip::setState (const StripState& next)
 {
     state = next;
-    colour = state.isReturn ? themeManager.getTheme().returnColours[0]
-                            : themeManager.getTheme().trackColour (state.track.colourIndex);
+    colour = state.isReturn() ? themeManager.getTheme().returnColours[0]
+                              : themeManager.getTheme().trackColour (state.strip.colourIndex);
 
-    setTitle (state.track.name);
-    setTooltip (state.track.name);
+    setTitle (state.strip.name);
+    setTooltip (state.strip.name);
 
     // Input choices: "No Input" then each input of the track's kind.
     input.clear (juce::dontSendNotification);
@@ -309,17 +309,17 @@ void ChannelStrip::setState (const StripState& next)
     for (int i = 0; i < state.inputs.size(); ++i)
         input.addItem (state.inputs[i], i + 2);
 
-    input.setSelectedItemIndex (state.track.input.isEmpty() ? 0 : state.inputs.indexOf (state.track.input) + 1,
+    input.setSelectedItemIndex (state.strip.input.isEmpty() ? 0 : state.inputs.indexOf (state.strip.input) + 1,
                                 juce::dontSendNotification);
-    input.setEnabled (! state.isReturn);
+    input.setEnabled (! state.isReturn());
 
-    pan.setValue (state.track.pan);
-    faderSection.setVolume (state.track.volumeDb, colour);
+    pan.setValue (state.strip.pan);
+    faderSection.setVolume (state.strip.volumeDb, colour);
 
-    mute.setToggleState (state.track.muted, juce::dontSendNotification);
-    solo.setToggleState (state.track.solo, juce::dontSendNotification);
-    arm.setToggleState (state.track.armed, juce::dontSendNotification);
-    arm.setVisible (! state.isReturn);
+    mute.setToggleState (state.strip.muted, juce::dontSendNotification);
+    solo.setToggleState (state.strip.solo, juce::dontSendNotification);
+    arm.setToggleState (state.strip.armed, juce::dontSendNotification);
+    arm.setVisible (! state.isReturn());
 
     rebuildSends();
     rebuildInsertSlots();
@@ -329,19 +329,19 @@ void ChannelStrip::setState (const StripState& next)
 
 void ChannelStrip::rebuildSends()
 {
-    const auto showSends = ! state.isReturn;
+    const auto showSends = ! state.isReturn();
 
-    if (sendRows.size() != (showSends ? state.sends.size() : 0))
+    if (sendRows.size() != (showSends ? state.strip.sends.size() : 0))
     {
         sendRows.clear();
 
-        for (size_t i = 0; showSends && i < state.sends.size(); ++i)
+        for (size_t i = 0; showSends && i < state.strip.sends.size(); ++i)
         {
             auto row = std::make_unique<SendRow> (themeManager, commands);
             row->level.onChange = [this, i] (double db, bool continues)
             {
-                if (i < state.sends.size())
-                    commands.invoke (cmd::mixerSetSendGain, { state.track.id, state.sends[i].id, db, continues });
+                if (i < state.strip.sends.size())
+                    commands.invoke (cmd::mixerSetSendGain, { state.strip.id, state.strip.sends[i].id, db, continues });
             };
             addAndMakeVisible (*row);
             sendRows.push_back (std::move (row));
@@ -351,10 +351,10 @@ void ChannelStrip::rebuildSends()
     for (size_t i = 0; i < sendRows.size(); ++i)
     {
         auto& row = *sendRows[i];
-        row.send = state.sends[i];
-        row.trackId = state.track.id;
-        row.letter = juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, state.sends[i].bus)));
-        row.level.setValue (state.sends[i].gainDb);
+        row.send = state.strip.sends[i];
+        row.trackId = state.strip.id;
+        row.letter = returnLetterFor (state.strip.sends[i].bus);
+        row.level.setValue (state.strip.sends[i].gainDb);
         row.repaint();
     }
 }
@@ -362,14 +362,14 @@ void ChannelStrip::rebuildSends()
 void ChannelStrip::rebuildInsertSlots()
 {
     for (size_t i = 0; i < insertSlots.size(); ++i)
-        insertSlots[i]->setPlugin (i < state.inserts.size() ? std::optional<PluginInfo> (state.inserts[i]) : std::nullopt);
+        insertSlots[i]->setPlugin (i < state.strip.inserts.size() ? std::optional<PluginInfo> (state.strip.inserts[i]) : std::nullopt);
 }
 
 juce::String ChannelStrip::chainSummary() const
 {
     juce::StringArray names;
 
-    for (auto& device : state.deviceChain)
+    for (auto& device : state.strip.deviceChain)
         names.add (device.name);
 
     return names.isEmpty() ? juce::String ("Empty") : names.joinIntoString (juce::String (juce::CharPointer_UTF8 (" \xe2\x80\xba ")));
@@ -424,7 +424,7 @@ void ChannelStrip::resized()
     flowArea = shown (Section::inserts) ? r.removeFromTop (flowHeight) : juce::Rectangle<int>();
 
     // Mixer inserts: 4 slots show; a fuller chain grows the section up to 8.
-    const auto slots = juce::jlimit (visibleInsertSlots, PluginRack::maxMixerInserts, (int) state.inserts.size() + 1);
+    const auto slots = juce::jlimit (visibleInsertSlots, PluginRack::maxMixerInserts, (int) state.strip.inserts.size() + 1);
     insertsArea = section (shown (Section::inserts), slots * slotHeight + (slots - 1) * rowGap);
 
     for (int i = 0; i < (int) insertSlots.size(); ++i)
@@ -493,21 +493,21 @@ void ChannelStrip::paint (juce::Graphics& g)
     const auto bounds = getLocalBounds().toFloat();
     const auto radius = theme.radiusLg;
 
-    g.setColour (state.track.selected ? theme.bgElevated : theme.bgTrack);
+    g.setColour (state.strip.selected ? theme.bgElevated : theme.bgTrack);
     g.fillRoundedRectangle (bounds, radius);
 
     // Head: colour bar, number in the track colour, name (ellipsis; the tooltip has it all).
     paintColourBar (g, bounds, radius, colour);
 
     auto head = headArea.withTrimmedTop (colourBarHeight).reduced (padX, sectionPadY);
-    const auto number = state.isReturn ? state.returnLetter : twoDigits (state.number);
+    const auto number = state.isReturn() ? state.strip.returnLetter : twoDigits (state.strip.number);
     const auto numberFont = themeManager.numberFont (TypeStyle { 10.0f, true, 600 });
     g.setFont (numberFont);
     g.setColour (colour);
     g.drawText (number, head.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (numberFont, number)),
                 juce::Justification::centredLeft, false);
     head.removeFromLeft (7);
-    drawStyledText (g, themeManager, state.track.name, TypeStyle { 12.0f, false, 600 }, head,
+    drawStyledText (g, themeManager, state.strip.name, TypeStyle { 12.0f, false, 600 }, head,
                     juce::Justification::centredLeft, theme.textPrimary);
 
     auto divider = [&] (juce::Rectangle<int> area)
@@ -527,7 +527,7 @@ void ChannelStrip::paint (juce::Graphics& g)
         auto out = ioArea.reduced (padX, sectionPadY).withTrimmedTop (labelHeight + rowGap + selectHeight + rowGap).withHeight (selectHeight);
         g.setColour (theme.bgSlot);
         g.fillRoundedRectangle (out.toFloat(), theme.radiusMd);
-        drawStyledText (g, themeManager, juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x92 ")) + state.output, theme.bodySm,
+        drawStyledText (g, themeManager, juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x92 ")) + state.strip.output, theme.bodySm,
                         out.reduced (7, 0), juce::Justification::centredLeft, theme.textPrimary);
     }
 
@@ -550,7 +550,7 @@ void ChannelStrip::paint (juce::Graphics& g)
         drawIcon (g, Icon::arrowUpRight, link.removeFromRight (10).toFloat().withSizeKeepingCentre (10.0f, 10.0f), theme.textDim);
         link.reduce (5, 0);
         drawStyledText (g, themeManager, chainSummary(), TypeStyle { 9.5f, false, 400 }, link, juce::Justification::centredLeft,
-                        state.deviceChain.empty() ? theme.textDim : theme.textPrimary);
+                        state.strip.deviceChain.empty() ? theme.textDim : theme.textPrimary);
     }
 
     if (! flowArea.isEmpty())
@@ -607,7 +607,7 @@ void ChannelStrip::mouseDown (const juce::MouseEvent& e)
     }
 
     // Selecting a strip selects its track in every view (PRD §16.1).
-    commands.invoke (cmd::trackSelect, { state.track.id });
+    commands.invoke (cmd::trackSelect, { state.strip.id });
 
     if (e.mods.isPopupMenu() && onShowMenu)
         onShowMenu();

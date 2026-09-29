@@ -5,6 +5,8 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
+#include <algorithm>
+#include <functional>
 #include <map>
 
 namespace te = tracktion;
@@ -30,6 +32,24 @@ namespace
                 return send;
 
         return nullptr;
+    }
+
+    /** The bus a Return track listens on, or -1 on any other track. */
+    int returnBusOf (te::AudioTrack& track)
+    {
+        const auto returns = track.pluginList.getPluginsOfType<te::AuxReturnPlugin>();
+        return returns.isEmpty() ? -1 : returns.getFirst()->busNumber.get();
+    }
+
+    /** A track's Output: the nearest Bus above it, else the Master. A Folder-only
+        Folder passes its children through. */
+    juce::String outputOf (const te::Track& track)
+    {
+        for (auto* folder = track.getParentFolderTrack(); folder != nullptr; folder = folder->getParentFolderTrack())
+            if (folder->isSubmixFolder())
+                return folder->getName();
+
+        return "Master";
     }
 
     bool hasReturn (te::Edit& edit, int bus)
@@ -170,8 +190,13 @@ void Mixer::MeterState::detach (te::Edit& edit, Slot& slot)
     slot.pluginId.clear();
 }
 
-Mixer::Mixer (ProjectManager& pm)
-    : projects (pm), meters (std::make_unique<MeterState>())
+juce::String returnLetterFor (int bus)
+{
+    return juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, bus)));
+}
+
+Mixer::Mixer (ProjectManager& pm, const ApplicationModel& m, const PluginRack& p)
+    : projects (pm), model (m), plugins (p), meters (std::make_unique<MeterState>())
 {
 }
 
@@ -425,6 +450,102 @@ std::vector<BusInfo> Mixer::getBuses() const
     }
 
     return buses;
+}
+
+std::vector<Strip> Mixer::getStrips() const
+{
+    auto& edit = projects.getEdit();
+    std::map<juce::String, TrackInfo> tracks;
+
+    for (auto& track : model.getTracks())
+        tracks[track.id] = std::move (track);
+
+    std::vector<Strip> strips;
+    std::vector<std::pair<int, Strip>> returns;   // by bus, to sort A..D
+    int trackNumber = 0;
+
+    auto trackStrip = [&] (te::AudioTrack& audio, const TrackInfo& info)
+    {
+        Strip strip;
+        strip.id = info.id;
+        strip.name = info.name;
+        strip.kind = info.kind;
+        strip.colourIndex = info.colourIndex;
+        strip.selected = info.selected;
+        strip.volumeDb = info.volumeDb;
+        strip.pan = info.pan;
+        strip.muted = info.muted;
+        strip.solo = info.solo;
+        strip.input = info.input;
+        strip.armed = info.armed;
+        strip.sends = getSends (info.id);
+        strip.inserts = plugins.getChain (info.id, PluginChain::mixer);
+        strip.deviceChain = plugins.getChain (info.id, PluginChain::device);
+        strip.output = outputOf (audio);
+        return strip;
+    };
+
+    auto busStrip = [&] (te::FolderTrack& folder)
+    {
+        Strip strip;
+        strip.id = folder.itemID.toString();
+        strip.name = folder.getName();
+        strip.role = StripRole::bus;
+        strip.muted = folder.isMuted (false);
+        strip.solo = folder.isSolo (false);
+        strip.output = outputOf (folder);
+
+        if (auto* volume = folder.getVolumePlugin())
+        {
+            strip.volumeDb = juce::jmax (ApplicationModel::minVolumeDb, (double) volume->getVolumeDb());
+            strip.pan = volume->getPan();
+        }
+
+        return strip;
+    };
+
+    std::function<void (te::Track&)> visit = [&] (te::Track& track)
+    {
+        if (auto* folder = dynamic_cast<te::FolderTrack*> (&track))
+        {
+            for (auto* child : folder->getAllSubTracks (false))
+                visit (*child);
+
+            if (folder->isSubmixFolder())
+                strips.push_back (busStrip (*folder));
+        }
+        else if (auto* audio = dynamic_cast<te::AudioTrack*> (&track))
+        {
+            auto info = tracks.find (audio->itemID.toString());
+
+            if (info == tracks.end())
+                return;
+
+            auto strip = trackStrip (*audio, info->second);
+
+            if (const auto bus = returnBusOf (*audio); bus >= 0)
+            {
+                strip.role = StripRole::returnTrack;
+                strip.returnLetter = returnLetterFor (bus);
+                returns.emplace_back (bus, std::move (strip));
+            }
+            else
+            {
+                strip.number = ++trackNumber;
+                strips.push_back (std::move (strip));
+            }
+        }
+    };
+
+    for (auto* track : te::getTopLevelTracks (edit))
+        visit (*track);
+
+    std::stable_sort (returns.begin(), returns.end(), [] (auto& a, auto& b) { return a.first < b.first; });
+
+    for (auto& ret : returns)
+        strips.push_back (std::move (ret.second));
+
+    return strips;
 }
 
 MasterInfo Mixer::getMaster() const

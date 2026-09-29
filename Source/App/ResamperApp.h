@@ -41,7 +41,7 @@ struct ResamperApp
     ApplicationModel model { projects };
     Production production { projects };
     PluginRack plugins { projects };
-    Mixer mixer { projects };
+    Mixer mixer { projects, model, plugins };
     Session session { projects };
     Automation automation { projects };
     Shaper shaper { projects };
