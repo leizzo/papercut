@@ -7,13 +7,13 @@
 namespace resamper
 {
 
-/** One row of the static table that maps JUCE ApplicationCommand IDs (menus)
-    onto Command string IDs. */
+/** One menu item: the JUCE ApplicationCommand ID the menus use, derived from
+    the item's place in the menus, and the Command it invokes. */
 struct ApplicationCommandEntry
 {
     juce::CommandID applicationCommandID;
     const char* commandId;      ///< Command registry string ID
-    const char* category;       ///< the menu the item appears in
+    const char* menu;           ///< the menu the item appears in
 };
 
 /** Where a shortcut applies (PRD §17): everywhere, or only while a view shows,
@@ -50,6 +50,7 @@ struct PendingShortcut
     const char* waitingOn;
 };
 
+/** Every menu item, menu by menu. The IDs follow the menus' order, so never store them. */
 std::span<const ApplicationCommandEntry> getApplicationCommandTable();
 std::span<const KeyBinding> getKeyBindings();
 std::span<const PendingShortcut> getPendingShortcuts();
@@ -59,7 +60,7 @@ const ApplicationCommandEntry* findApplicationCommand (juce::CommandID);
 /** The menus, in order: File Edit Create View Options Help (PRD §6.1). */
 std::span<const char* const> getMenuNames();
 
-/** One menu's items, with their shortcuts, from the table. */
+/** One menu's items, with their shortcuts. */
 juce::PopupMenu createCommandMenu (juce::ApplicationCommandManager&, const juce::String& menuName);
 
 /** The first shortcut bound to a Command, or an invalid KeyPress if none. */

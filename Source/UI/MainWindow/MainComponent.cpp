@@ -333,7 +333,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
     if (command == nullptr)
         return;
 
-    info.setInfo (command->getName(), command->getName(), entry->category, 0);
+    info.setInfo (command->getName(), command->getName(), entry->menu, 0);
 
     // Global shortcuts belong to the menus; a view's own go through the ShortcutListener.
     for (auto& binding : getKeyBindings())
