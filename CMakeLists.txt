@@ -201,6 +201,12 @@ juce_add_gui_app(Resamper
     COMPANY_NAME "Resamper"
     MICROPHONE_PERMISSION_ENABLED TRUE
     MICROPHONE_PERMISSION_TEXT "Resamper records audio from your inputs onto armed tracks."
+    # Release builds are signed with the hardened runtime (.github/workflows/release.yml):
+    # it needs audio input to record, and plug-ins signed by other teams to load.
+    HARDENED_RUNTIME_ENABLED TRUE
+    HARDENED_RUNTIME_OPTIONS
+        com.apple.security.device.audio-input
+        com.apple.security.cs.disable-library-validation
     NEEDS_CURL FALSE
     NEEDS_WEB_BROWSER FALSE)
 

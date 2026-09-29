@@ -66,8 +66,9 @@ Target platforms: macOS 13+ (Apple Silicon) and Windows 11 x64. The alpha curren
 
 ## Getting started
 
-There are no prebuilt downloads yet — build from source (see [For developers](#for-developers)),
-then open `Resamper.app`.
+Download `Resamper-<version>-macOS.dmg` (Apple Silicon) from
+[Releases](https://github.com/leizzo/resamper/releases), open it and drag Resamper to Applications. Or
+build from source (see [For developers](#for-developers)).
 
 ### Keyboard shortcuts
 
@@ -173,8 +174,9 @@ Hedef platformlar: macOS 13+ (Apple Silicon) ve Windows 11 x64. Alfa sürümü �
 
 ## Başlarken
 
-Henüz hazır indirilebilir sürüm yok — kaynaktan derleyin ([Geliştiriciler için](#for-developers)
-bölümüne bakın), ardından `Resamper.app`'i açın.
+[Releases](https://github.com/leizzo/resamper/releases) sayfasından `Resamper-<sürüm>-macOS.dmg`
+dosyasını (Apple Silicon) indirip açın ve Resamper'ı Applications'a sürükleyin. Ya da kaynaktan derleyin
+([Geliştiriciler için](#for-developers) bölümüne bakın).
 
 ### Klavye kısayolları
 
@@ -269,6 +271,20 @@ In Debug builds, layouts and theme are read from `UI/` in the source tree. Edit 
 Issues are tracked on [GitHub](https://github.com/leizzo/resamper/issues). Releases follow
 [Semantic Versioning](https://semver.org); each PRD milestone ships as a minor release until 1.0.0 —
 see [CHANGELOG.md](CHANGELOG.md).
+
+Commit subjects are `<gitmoji> <type>(<scope>): <summary>`, e.g. `🐛 fix(undo): …`; CI checks every
+commit a pull request adds. Release notes group commits by `<type>`.
+
+### Releasing
+
+1. Bump `project(Resamper VERSION …)` in `CMakeLists.txt`, move `[Unreleased]` in `CHANGELOG.md` to a
+   dated `[x.y.z]` section with its compare link, and commit `🔖 chore(release): vx.y.z`.
+2. Tag it with a title and push: `git tag -a vx.y.z -m "vx.y.z — <title>" && git push origin main vx.y.z`.
+
+The [Release workflow](.github/workflows/release.yml) checks the tag against the CMake version, builds
+and tests the app, and publishes the release: the CHANGELOG section, the app signed and notarized in a
+DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; preview it with
+`git cliff --latest`). Tags are plain `vX.Y.Z`; 0.x releases are published as alpha pre-releases.
 
 ## License
 

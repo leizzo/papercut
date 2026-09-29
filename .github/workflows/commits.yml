@@ -1,0 +1,27 @@
+# Checks that every commit a pull request adds follows the repo's format,
+# "<gitmoji> <type>(<scope>): <summary>", which cliff.toml groups releases by.
+name: Commit messages
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commit subjects
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pattern='[^ ]+ (feat|fix|perf|refactor|test|docs|build|ci|chore|style|revert)(\([^)]+\))?!?: .+'
+          bad=$(git log --no-merges --format='%h %s' "$BASE..$HEAD" | grep -vE "^[0-9a-f]+ $pattern" || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Commit subjects must look like '🐛 fix(scope): summary':"
+            echo "$bad"
+            exit 1
+          fi
