@@ -64,8 +64,6 @@ Fixture::Fixture()
     host.restoreUIState = [this] (const juce::var& v) { uiState = v; };
     host.reportError = [this] (const juce::String& e) { errors.add (e); };
     host.notify = [this] (const juce::String& n, bool) { notifications.add (n); };
-
-    registerAppCommands (commands, model, host);
 }
 
 Fixture::~Fixture()

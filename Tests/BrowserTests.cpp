@@ -1,7 +1,5 @@
 #include "TestFixture.h"
 #include "Commands/PluginCommands.h"
-#include "Engine/PluginRack.h"
-#include "Engine/SamplePreview.h"
 #include "UI/Browser/Library.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -28,7 +26,7 @@ struct BrowserTests : juce::UnitTest
         beginTest ("Plug-in categories come from the catalogue: instruments, audio effects, MIDI effects");
         {
             Fixture f;
-            PluginRack rack { f.projects };
+            auto& rack = f.plugins;
             Library library ([&rack] { return rack.getCatalogue(); }, f.scratchDir());
 
             const auto instruments = library.list (Category::instruments, {}, {});
@@ -51,7 +49,7 @@ struct BrowserTests : juce::UnitTest
         beginTest ("Search filters by name, ignoring case");
         {
             Fixture f;
-            PluginRack rack { f.projects };
+            auto& rack = f.plugins;
             Library library ([&rack] { return rack.getCatalogue(); }, f.scratchDir());
 
             const auto found = library.list (Category::audioEffects, {}, "REVERB");
@@ -122,7 +120,7 @@ struct BrowserTests : juce::UnitTest
         beginTest ("A sample preview starts for an audio file and not for anything else");
         {
             Fixture f;
-            SamplePreview preview (getEngineManager());
+            auto& preview = f.preview;
             const auto file = writeSineWav (f.scratchDir().getChildFile ("preview.wav"), 0.5);
             auto text = f.scratchDir().getChildFile ("notes.txt");
             text.replaceWithText ("x");

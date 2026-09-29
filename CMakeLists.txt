@@ -178,7 +178,9 @@ add_library(resamper_ui STATIC
     Source/UI/PianoRoll/PianoRollView.cpp
     Source/UI/MainWindow/TopBar.cpp
     Source/UI/MainWindow/MainComponent.cpp
-    Source/UI/MainWindow/MainWindow.cpp)
+    Source/UI/MainWindow/MainWindow.cpp
+    # The headless app the window is built from; tests build it too.
+    Source/App/ResamperApp.cpp)
 resamper_use_engine_without_tracktion(resamper_ui)
 target_link_libraries(resamper_ui PUBLIC resamper_commands PRIVATE resamper_resources)
 target_compile_definitions(resamper_ui PRIVATE
@@ -236,6 +238,7 @@ target_sources(ResamperTests PRIVATE
     Tests/BrowserTests.cpp
     Tests/ClipOperationTests.cpp
     Tests/ShortcutTests.cpp
+    Tests/AppTests.cpp
     Tests/Snapshots.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the

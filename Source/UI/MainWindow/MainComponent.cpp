@@ -9,38 +9,41 @@
 namespace resamper
 {
 
-MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
-    : services (std::move (s)),
+MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& cm)
+    : app (a),
+      layoutSource (app.theme.getLayoutSource()),
+      audioDeviceDescription (app.engine.describeActiveAudioDevice()),
       commandManager (cm),
-      shell (services.uiState.getState ("shell")),
-      layouts (services.layoutSource, factory, services.uiState),
-      topBar (services.model, services.commands, services.themeManager, shell),
-      arrangement (services.model, services.commands, services.themeManager, services.uiState, shell),
-      pianoRoll (services.model, services.commands, services.themeManager, services.uiState),
-      browser (services.commands, services.plugins, services.model, services.themeManager, services.preview,
+      shell (app.uiState.getState ("shell")),
+      layouts (layoutSource, factory, app.uiState),
+      topBar (app.model, app.commands, app.theme, shell),
+      arrangement (app.model, app.commands, app.theme, app.uiState, shell),
+      pianoRoll (app.model, app.commands, app.theme, app.uiState),
+      browser (app.commands, app.plugins, app.model, app.theme, app.preview,
                Library::defaultRoot()),
-      detailView (services.model, services.plugins, services.commands, services.themeManager, shell,
-                  services.uiState.getState ("detail")),
-      mixerView (services.model, services.mixer, services.plugins, services.commands, services.themeManager,
-                 services.uiState.getState ("mixer")),
-      sessionPlaceholder (services.themeManager, "The Session view arrives with M5."),
-      editorPlaceholder (services.themeManager, "The audio Editor arrives with M4. Double-click an audio clip then."),
-      pianoRollPlaceholder (services.themeManager, "Select a MIDI clip, or double-click one, to edit its notes."),
-      developerOverlay (services.themeManager),
-      toasts (services.themeManager)
+      detailView (app.model, app.plugins, app.commands, app.theme, shell,
+                  app.uiState.getState ("detail")),
+      mixerView (app.model, app.mixer, app.plugins, app.commands, app.theme,
+                 app.uiState.getState ("mixer")),
+      sessionPlaceholder (app.theme, "The Session view arrives with M5."),
+      editorPlaceholder (app.theme, "The audio Editor arrives with M4. Double-click an audio clip then."),
+      pianoRollPlaceholder (app.theme, "Select a MIDI clip, or double-click one, to edit its notes."),
+      developerOverlay (app.theme),
+      toasts (app.theme)
 {
     // Every Command a layout or the menus may name must be registered before they build.
-    registerPrimitives (factory, services.commands, services.themeManager);
-    registerDeveloperCommands (services.commands, layouts, services.themeManager, services.reportError);
-    registerShellCommands (services.commands, shell);
+    registerPrimitives (factory, app.commands, app.theme);
+    auto reportError = [this] (const juce::String& message) { app.host.reportError (message); };
+    registerDeveloperCommands (app.commands, layouts, app.theme, reportError);
+    registerShellCommands (app.commands, shell);
     registerArrangementZoomCommands();
     registerEscapeCommand();
     registerPianoRollCommands();
 
-    if (services.layoutSource.isDevMode())
+    if (layoutSource.isDevMode())
         registerDeveloperOverlayCommand();
 
-    layouts.onError = services.reportError;
+    layouts.onError = reportError;
     statusBarHost.onBuilt = [this] { updateStatusBar(); };
     layouts.addHost (statusBarHost);
 
@@ -55,7 +58,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     // The mixer's Track chain row: back to the timeline, the track selected, its chain in view.
     mixerView.onShowDeviceChain = [this] (const juce::String& trackId)
     {
-        services.model.selectTrack (trackId);
+        app.model.selectTrack (trackId);
         shell.setDetailCollapsed (false);
         shell.setView (shell.getLastTimelineView());
         detailView.revealDeviceChain();
@@ -74,7 +77,7 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
 
     detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id)
     {
-        pluginEditor = std::make_unique<PluginEditorWindow> (services.plugins, services.themeManager, id);
+        pluginEditor = std::make_unique<PluginEditorWindow> (app.plugins, app.theme, id);
     };
 
     for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &detailView,
@@ -88,16 +91,16 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
     topBar.setVisible (true);
     addMouseListener (this, true);
 
-    if (auto dir = services.layoutSource.getDevDirectory(); dir != juce::File())
+    if (auto dir = layoutSource.getDevDirectory(); dir != juce::File())
     {
         layoutWatch = std::make_unique<LayoutWatcher> (dir.getChildFile ("layouts"));
         themeWatch = std::make_unique<LayoutWatcher> (dir.getChildFile ("themes"));
-        layoutWatch->onJsonUpdated = [this] (const juce::File&) { services.commands.invoke ("dev.reloadLayout"); };
-        themeWatch->onJsonUpdated = [this] (const juce::File&) { services.commands.invoke ("dev.reloadTheme"); };
+        layoutWatch->onJsonUpdated = [this] (const juce::File&) { app.commands.invoke ("dev.reloadLayout"); };
+        themeWatch->onJsonUpdated = [this] (const juce::File&) { app.commands.invoke ("dev.reloadTheme"); };
     }
 
-    services.model.addListener (this);
-    services.themeManager.addListener (this);
+    app.model.addListener (this);
+    app.theme.addListener (this);
     shell.getState().addListener (this);
     themeChanged();
 }
@@ -105,8 +108,8 @@ MainComponent::MainComponent (Services s, juce::ApplicationCommandManager& cm)
 MainComponent::~MainComponent()
 {
     shell.getState().removeListener (this);
-    services.themeManager.removeListener (this);
-    services.model.removeListener (this);
+    app.theme.removeListener (this);
+    app.model.removeListener (this);
 }
 
 void MainComponent::registerArrangementZoomCommands()
@@ -123,7 +126,7 @@ void MainComponent::registerArrangementZoomCommands()
     // Zoom is for the Arrangement, so these only act while it shows.
     auto add = [this] (const char* id, const char* name, void (ArrangementView::*fn)())
     {
-        services.commands.add (std::make_unique<ZoomCommand> (id, name, [this, fn]
+        app.commands.add (std::make_unique<ZoomCommand> (id, name, [this, fn]
         {
             if (arrangement.isShowing())
                 (arrangement.*fn)();
@@ -147,13 +150,13 @@ void MainComponent::registerEscapeCommand()
         {
             juce::PopupMenu::dismissAllActiveMenus();
             owner.arrangement.cancelDrag();
-            owner.services.commands.invoke ("edit.deselectAll");
+            owner.app.commands.invoke ("edit.deselectAll");
         }
 
         MainComponent& owner;
     };
 
-    services.commands.add (std::make_unique<EscapeCommand> (*this));
+    app.commands.add (std::make_unique<EscapeCommand> (*this));
 }
 
 void MainComponent::registerDeveloperOverlayCommand()
@@ -167,7 +170,7 @@ void MainComponent::registerDeveloperOverlayCommand()
         MainComponent& owner;
     };
 
-    services.commands.add (std::make_unique<ToggleOverlayCommand> (*this));
+    app.commands.add (std::make_unique<ToggleOverlayCommand> (*this));
 }
 
 void MainComponent::toggleDeveloperOverlay()
@@ -182,7 +185,7 @@ void MainComponent::toggleDeveloperOverlay()
 
 void MainComponent::showToast (const juce::String& message, bool undoable, bool isError)
 {
-    toasts.show (message, undoable ? std::function<void()> ([this] { services.commands.invoke ("edit.undo"); })
+    toasts.show (message, undoable ? std::function<void()> ([this] { app.commands.invoke ("edit.undo"); })
                                    : std::function<void()>(),
                  isError);
 }
@@ -196,13 +199,13 @@ void MainComponent::Placeholder::paint (juce::Graphics& g)
 
 void MainComponent::paint (juce::Graphics& g)
 {
-    g.fillAll (services.themeManager.getTheme().bgDeep);
+    g.fillAll (app.theme.getTheme().bgDeep);
 }
 
 void MainComponent::resized()
 {
     using View = ShellState::View;
-    auto& metrics = services.themeManager.getMetrics();
+    auto& metrics = app.theme.getMetrics();
     auto r = getLocalBounds();
     toasts.setBounds (r);
     topBar.setBounds (r.removeFromTop (metrics.topBarHeight));
@@ -254,9 +257,9 @@ void MainComponent::valueTreePropertyChanged (juce::ValueTree&, const juce::Iden
 
 void MainComponent::openPianoRollForSelection()
 {
-    const auto clipId = services.model.getSelectedClipId();
+    const auto clipId = app.model.getSelectedClipId();
 
-    for (auto& track : services.model.getTracks())
+    for (auto& track : app.model.getTracks())
         for (auto& clip : track.clips)
             if (clip.id == clipId && clip.kind == TrackKind::midi)
                 pianoRoll.openClip (clipId);
@@ -283,14 +286,14 @@ void MainComponent::updateStatusBar()
             label->setText (text);
     };
 
-    setText ("status.project", "Project: " + services.model.getProjectName());
-    setText ("status.device", services.audioDeviceDescription);
-    setText ("status.mode", services.layoutSource.isDevMode() ? "Dev UI: source tree" : juce::String());
+    setText ("status.project", "Project: " + app.model.getProjectName());
+    setText ("status.device", audioDeviceDescription);
+    setText ("status.mode", layoutSource.isDevMode() ? "Dev UI: source tree" : juce::String());
 
     if (developerOverlay.isVisible())
-        developerOverlay.setStatusText (services.model.getProjectName()
-                                        + "   " + juce::String (services.model.getTracks().size()) + " tracks"
-                                        + "   " + juce::String (services.model.getTransportPositionSeconds(), 2) + " s");
+        developerOverlay.setStatusText (app.model.getProjectName()
+                                        + "   " + juce::String (app.model.getTracks().size()) + " tracks"
+                                        + "   " + juce::String (app.model.getTransportPositionSeconds(), 2) + " s");
 }
 
 void MainComponent::mouseDown (const juce::MouseEvent& e)
@@ -317,14 +320,14 @@ void MainComponent::themeChanged()
 void MainComponent::getAllCommands (juce::Array<juce::CommandID>& ids)
 {
     for (auto& entry : getApplicationCommandTable())
-        if (services.commands.contains (entry.commandId))
+        if (app.commands.contains (entry.commandId))
             ids.add (entry.applicationCommandID);
 }
 
 void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommandInfo& info)
 {
     auto* entry = findApplicationCommand (id);
-    auto* command = entry != nullptr ? services.commands.find (entry->commandId) : nullptr;
+    auto* command = entry != nullptr ? app.commands.find (entry->commandId) : nullptr;
 
     if (command == nullptr)
         return;
@@ -344,7 +347,7 @@ void MainComponent::getCommandInfo (juce::CommandID id, juce::ApplicationCommand
 bool MainComponent::perform (const InvocationInfo& invocation)
 {
     if (auto* entry = findApplicationCommand (invocation.commandID))
-        return services.commands.invoke (entry->commandId);
+        return app.commands.invoke (entry->commandId);
 
     return false;
 }
@@ -377,10 +380,10 @@ bool MainComponent::ShortcutListener::keyPressed (const juce::KeyPress& key, juc
     if (binding->contexts == ShortcutContext::anyView && binding->argument == KeyBinding::noArgument && inMenus)
         return false;
 
-    if (! owner.services.commands.contains (binding->commandId))
+    if (! owner.app.commands.contains (binding->commandId))
         return false;
 
-    owner.services.commands.invoke (binding->commandId, bindingArgs (*binding));
+    owner.app.commands.invoke (binding->commandId, bindingArgs (*binding));
     return true;
 }
 
@@ -401,14 +404,14 @@ void MainComponent::registerPianoRollCommands()
         return [this, commandId, makeArgs] (const juce::var& args)
         {
             if (auto clipId = pianoRoll.openClipId(); clipId.isNotEmpty() && pianoRoll.isShowing())
-                services.commands.invoke (commandId, makeArgs (clipId, args));
+                app.commands.invoke (commandId, makeArgs (clipId, args));
         };
     };
 
-    services.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.quantize", "Quantize",
+    app.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.quantize", "Quantize",
         withClip ("note.quantize", [] (const juce::String& id, const juce::var&) { return noteQuantizeArgs (id, "1/16"); })));
 
-    services.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.transpose", "Transpose",
+    app.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.transpose", "Transpose",
         withClip ("note.transposeSelected", [] (const juce::String& id, const juce::var& args)
         {
             auto a = clipArgs (id);
@@ -416,7 +419,7 @@ void MainComponent::registerPianoRollCommands()
             return a;
         })));
 
-    services.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.selectAll", "Select All Notes",
+    app.commands.add (std::make_unique<PianoRollCommand> ("pianoRoll.selectAll", "Select All Notes",
         withClip ("note.selectAll", [] (const juce::String& id, const juce::var&) { return clipArgs (id); })));
 }
 

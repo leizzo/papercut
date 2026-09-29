@@ -159,6 +159,9 @@ public:
     const LayoutMetrics& getMetrics() const noexcept        { return metrics; }
     juce::LookAndFeel& getLookAndFeel() noexcept            { return *lookAndFeel; }
 
+    /** Where the Theme, and the layouts beside it, are read from. */
+    const LayoutSource& getLayoutSource() const noexcept    { return source; }
+
     /** The legacy body font, scaled. Prefer font (TypeStyle). */
     juce::Font getFont (float scale = 1.0f) const;
 

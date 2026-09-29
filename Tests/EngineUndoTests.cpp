@@ -1,8 +1,6 @@
 #include "TestFixture.h"
 #include "Commands/MixerCommands.h"
 #include "Commands/PluginCommands.h"
-#include "Engine/Mixer.h"
-#include "Engine/PluginRack.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -17,33 +15,27 @@ struct EngineUndoTests : juce::UnitTest
 {
     EngineUndoTests() : juce::UnitTest ("Engine Undo", "Resamper") {}
 
-    /** One track with a reverb on its device chain; the Mixer and Plug-in
-        Commands registered next to the app's. */
+    /** One track with a reverb on its device chain. */
     struct UndoFixture : Fixture
     {
-        PluginRack rack { projects };
-        Mixer mixer { projects };
         juce::String trackId, pluginId;
 
         UndoFixture()
         {
-            registerPluginCommands (commands, rack, host);
-            registerMixerCommands (commands, mixer, host);
-
             invoke ("track.add");
             trackId = model.getTracks()[0].id;
             invoke ("plugin.insert", pluginInsertArgs (trackId, te::ReverbPlugin::xmlTypeName));
-            pluginId = rack.getChain (trackId, PluginChain::device)[0].id;
+            pluginId = plugins.getChain (trackId, PluginChain::device)[0].id;
         }
 
         /** The reverb's first parameter, a fraction of the way through its range. */
         float parameterAt (float fraction) const
         {
-            const auto param = rack.getParameters (pluginId)[0];
+            const auto param = plugins.getParameters (pluginId)[0];
             return param.minimum + (param.maximum - param.minimum) * fraction;
         }
 
-        bool bypassed() const   { return ! rack.getChain (trackId, PluginChain::device)[0].enabled; }
+        bool bypassed() const   { return ! plugins.getChain (trackId, PluginChain::device)[0].enabled; }
     };
 
     void runTest() override
@@ -63,7 +55,7 @@ struct EngineUndoTests : juce::UnitTest
         beginTest ("A plug-in parameter drag never joins a track step made during it");
         {
             UndoFixture f;
-            const auto param = f.rack.getParameters (f.pluginId)[0];
+            const auto param = f.plugins.getParameters (f.pluginId)[0];
             const auto low = f.parameterAt (0.6f), high = f.parameterAt (0.9f);
 
             f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, low));
@@ -71,7 +63,7 @@ struct EngineUndoTests : juce::UnitTest
             f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, high, true));
 
             f.invoke ("edit.undo");
-            expectWithinAbsoluteError (f.rack.getParameters (f.pluginId)[0].value, low, 1.0e-4f);
+            expectWithinAbsoluteError (f.plugins.getParameters (f.pluginId)[0].value, low, 1.0e-4f);
             expectEquals (f.numTracks(), 2, "the track step survives");
         }
 
@@ -90,7 +82,7 @@ struct EngineUndoTests : juce::UnitTest
         beginTest ("A drag that continues after an undo is its own step");
         {
             UndoFixture f;
-            const auto param = f.rack.getParameters (f.pluginId)[0];
+            const auto param = f.plugins.getParameters (f.pluginId)[0];
             const auto low = f.parameterAt (0.6f), high = f.parameterAt (0.9f);
 
             f.invoke ("plugin.setBypassed", pluginBypassArgs (f.trackId, f.pluginId, true));
@@ -99,7 +91,7 @@ struct EngineUndoTests : juce::UnitTest
             f.invoke ("plugin.setParameter", pluginParameterArgs (f.pluginId, param.id, high, true));
 
             f.invoke ("edit.undo");
-            expectWithinAbsoluteError (f.rack.getParameters (f.pluginId)[0].value, param.value, 1.0e-4f);
+            expectWithinAbsoluteError (f.plugins.getParameters (f.pluginId)[0].value, param.value, 1.0e-4f);
             expect (f.bypassed(), "the bypass step survives");
         }
     }

@@ -1,10 +1,7 @@
 #include "TestFixture.h"
 
 #include "Commands/ProductionCommands.h"
-#include "Engine/Production.h"
 #include "UI/Developer/Inspector.h"
-#include "UI/Layout/LayoutSource.h"
-#include "UI/Theme/ThemeManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -40,125 +37,108 @@ struct ProductionTests : juce::UnitTest
 {
     ProductionTests() : juce::UnitTest ("Production", "Resamper") {}
 
-    struct Harness
-    {
-        Fixture f;
-        LayoutSource source;
-        ThemeManager themes;
-        Production production;
-        juce::Result themeLoad;
-
-        Harness()
-            : themes (source, "themes/dark.json"),
-              production (f.projects),
-              themeLoad (themes.load())
-        {
-            registerProductionCommands (f.commands, production, f.model, themes, f.host);
-        }
-    };
-
     void runTest() override
     {
         beginTest ("exportMix of an Edit with a sine clip writes a WAV peaking above 0.1");
         {
-            Harness h;
-            h.f.invoke ("track.add");
-            h.f.audioFileToChoose = writeSineWav (h.f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            h.f.invoke ("clip.add");
+            Fixture f;
+            f.invoke ("track.add");
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke ("clip.add");
 
-            auto dest = h.f.scratchDir().getChildFile ("mix.wav");
-            expect (h.f.invoke ("file.exportMix", exportMixArgs (dest.getFullPathName())));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+            auto dest = f.scratchDir().getChildFile ("mix.wav");
+            expect (f.invoke ("file.exportMix", exportMixArgs (dest.getFullPathName())));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
             expect (dest.existsAsFile());
             expectGreaterThan (wavPeak (dest), 0.1f);
         }
 
         beginTest ("bounceTrack of the sine track peaks above 0.1 and an empty track peaks near 0");
         {
-            Harness h;
-            h.f.invoke ("track.add");
-            h.f.invoke ("track.add");
-            h.f.audioFileToChoose = writeSineWav (h.f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            h.f.invoke ("clip.add");
+            Fixture f;
+            f.invoke ("track.add");
+            f.invoke ("track.add");
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke ("clip.add");
 
-            const auto tone = h.f.model.getTracks()[0].id;
-            const auto empty = h.f.model.getTracks()[1].id;
-            expectEquals ((int) h.f.model.getTracks()[0].clips.size(), 1);
-            expect (h.f.model.getTracks()[1].clips.empty());
+            const auto tone = f.model.getTracks()[0].id;
+            const auto empty = f.model.getTracks()[1].id;
+            expectEquals ((int) f.model.getTracks()[0].clips.size(), 1);
+            expect (f.model.getTracks()[1].clips.empty());
 
-            auto toneFile = h.f.scratchDir().getChildFile ("bounce-tone.wav");
-            expect (h.f.invoke ("track.bounce", bounceArgs (tone, toneFile.getFullPathName())));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+            auto toneFile = f.scratchDir().getChildFile ("bounce-tone.wav");
+            expect (f.invoke ("track.bounce", bounceArgs (tone, toneFile.getFullPathName())));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
             expectGreaterThan (wavPeak (toneFile), 0.1f);
 
-            auto emptyFile = h.f.scratchDir().getChildFile ("bounce-empty.wav");
-            expect (h.f.invoke ("track.bounce", bounceArgs (empty, emptyFile.getFullPathName())));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+            auto emptyFile = f.scratchDir().getChildFile ("bounce-empty.wav");
+            expect (f.invoke ("track.bounce", bounceArgs (empty, emptyFile.getFullPathName())));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
             expectLessThan (wavPeak (emptyFile), 1.0e-3f);
         }
 
         beginTest ("saveTemplate + newFromTemplate round-trips the track and its clip");
         {
-            Harness h;
-            h.f.invoke ("track.add");
-            auto tone = writeSineWav (h.f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            h.f.audioFileToChoose = tone;
-            h.f.invoke ("clip.add");
-            h.f.uiState = sampleUIState();
-            h.f.projectSaveLocation = h.f.scratchDir().getChildFile ("Saved");
-            h.f.invoke ("project.saveAs");
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+            Fixture f;
+            f.invoke ("track.add");
+            auto tone = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.audioFileToChoose = tone;
+            f.invoke ("clip.add");
+            f.uiState = sampleUIState();
+            f.projectSaveLocation = f.scratchDir().getChildFile ("Saved");
+            f.invoke ("project.saveAs");
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
 
-            auto templ = h.f.scratchDir().getChildFile ("Template");
-            expect (h.f.invoke ("project.saveTemplate", saveTemplateArgs (templ.getFullPathName())));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
-            expectEquals (h.f.model.getProjectName(), juce::String ("Saved"));
+            auto templ = f.scratchDir().getChildFile ("Template");
+            expect (f.invoke ("project.saveTemplate", saveTemplateArgs (templ.getFullPathName())));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+            expectEquals (f.model.getProjectName(), juce::String ("Saved"));
             expect (templ.getChildFile ("project.json").existsAsFile());
 
-            h.f.invoke ("track.add");
-            expectEquals (h.f.numTracks(), 2);
+            f.invoke ("track.add");
+            expectEquals (f.numTracks(), 2);
 
-            auto dest = h.f.scratchDir().getChildFile ("FromTemplate");
-            expect (h.f.invoke ("project.newFromTemplate", newFromTemplateArgs (templ.getFullPathName(), dest.getFullPathName())));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+            auto dest = f.scratchDir().getChildFile ("FromTemplate");
+            expect (f.invoke ("project.newFromTemplate", newFromTemplateArgs (templ.getFullPathName(), dest.getFullPathName())));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
 
-            auto tracks = h.f.model.getTracks();
+            auto tracks = f.model.getTracks();
             expectEquals ((int) tracks.size(), 1);
             expectEquals ((int) tracks[0].clips.size(), 1);
             expect (tracks[0].clips[0].file == tone);
-            expectEquals ((double) h.f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
+            expectEquals ((double) f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
         }
 
         beginTest ("autosave then track.add then recover restores the autosaved track count");
         {
-            Harness h;
-            h.f.invoke ("track.add");
-            h.f.uiState = sampleUIState();
-            const auto saved = h.f.numTracks();
+            Fixture f;
+            f.invoke ("track.add");
+            f.uiState = sampleUIState();
+            const auto saved = f.numTracks();
 
-            expect (h.f.invoke ("project.autosave"));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
-            expect (h.production.hasRecovery());
+            expect (f.invoke ("project.autosave"));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+            expect (f.production.hasRecovery());
 
-            h.f.invoke ("track.add");
-            h.f.uiState = juce::var();
-            expectEquals (h.f.numTracks(), saved + 1);
+            f.invoke ("track.add");
+            f.uiState = juce::var();
+            expectEquals (f.numTracks(), saved + 1);
 
-            expect (h.f.invoke ("project.recover"));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
-            expectEquals (h.f.numTracks(), saved);
-            expectEquals ((double) h.f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
+            expect (f.invoke ("project.recover"));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+            expectEquals (f.numTracks(), saved);
+            expectEquals ((double) f.uiState["arrangement"]["pixelsPerSecond"], 80.0);
         }
 
         beginTest ("hasNewerRecovery follows which Edit was written last");
         {
-            Harness h;
-            h.f.uiState = sampleUIState();
-            const auto project = h.f.projects.getProjectFolder();
+            Fixture f;
+            f.uiState = sampleUIState();
+            const auto project = f.projects.getProjectFolder();
             expect (! Production::hasNewerRecovery (project));
 
-            expect (h.f.invoke ("project.autosave"));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
+            expect (f.invoke ("project.autosave"));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
 
             auto recoveryEdits = project.getChildFile ("Recovery").findChildFiles (juce::File::findFiles, false, "*.tracktionedit");
             auto projectEdits = project.findChildFiles (juce::File::findFiles, false, "*.tracktionedit");
@@ -174,25 +154,26 @@ struct ProductionTests : juce::UnitTest
 
         beginTest ("theme.use light then dark changes colour and keeps trackHeight");
         {
-            Harness h;
-            expect (h.themeLoad.wasOk(), h.themeLoad.getErrorMessage());
+            Fixture f;
+            const auto themeLoad = f.theme.load();
+            expect (themeLoad.wasOk(), themeLoad.getErrorMessage());
 
-            const auto background = h.themes.getTheme().background;
-            const auto accent = h.themes.getTheme().accent;
-            const auto trackHeight = h.themes.getMetrics().trackHeight;
+            const auto background = f.theme.getTheme().background;
+            const auto accent = f.theme.getTheme().accent;
+            const auto trackHeight = f.theme.getMetrics().trackHeight;
             expectGreaterThan (trackHeight, 0);
 
-            expect (h.f.invoke ("theme.use", themeFileArgs ("themes/light.json")));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
-            expect (h.themes.getTheme().background != background);
-            expect (h.themes.getTheme().accent != accent);
-            expectEquals (h.themes.getMetrics().trackHeight, trackHeight);
+            expect (f.invoke ("theme.use", themeFileArgs ("themes/light.json")));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+            expect (f.theme.getTheme().background != background);
+            expect (f.theme.getTheme().accent != accent);
+            expectEquals (f.theme.getMetrics().trackHeight, trackHeight);
 
-            expect (h.f.invoke ("theme.use", themeFileArgs ("themes/dark.json")));
-            expect (h.f.errors.isEmpty(), h.f.errors.joinIntoString ("; "));
-            expect (h.themes.getTheme().background == background);
-            expect (h.themes.getTheme().accent == accent);
-            expectEquals (h.themes.getMetrics().trackHeight, trackHeight);
+            expect (f.invoke ("theme.use", themeFileArgs ("themes/dark.json")));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+            expect (f.theme.getTheme().background == background);
+            expect (f.theme.getTheme().accent == accent);
+            expectEquals (f.theme.getMetrics().trackHeight, trackHeight);
         }
 
         beginTest ("freeze either freezes the track or fails without a new undo step");
@@ -201,39 +182,40 @@ struct ProductionTests : juce::UnitTest
             // flag is not its own undo step. A successful freeze may still join the open
             // UndoManager transaction via the freeze-point plug-in insert. A failed freeze
             // must not append a transaction.
-            Harness h;
-            h.f.invoke ("track.add");
-            h.f.audioFileToChoose = writeSineWav (h.f.scratchDir().getChildFile ("tone.wav"), 1.0);
-            h.f.invoke ("clip.add");
+            Fixture f;
+            f.invoke ("track.add");
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke ("clip.add");
 
-            const auto id = h.f.model.getTracks()[0].id;
-            auto& undo = h.f.projects.getEdit().getUndoManager();
+            const auto id = f.model.getTracks()[0].id;
+            auto& undo = f.projects.getEdit().getUndoManager();
             const auto undoCount = undo.getUndoDescriptions().size();
-            auto result = h.production.freezeTrack (id);
+            auto result = f.production.freezeTrack (id);
 
             if (result.wasOk())
             {
-                expect (h.production.isFrozen (id));
-                expect (h.production.unfreezeTrack (id).wasOk(), "unfreeze failed");
-                expect (! h.production.isFrozen (id));
+                expect (f.production.isFrozen (id));
+                expect (f.production.unfreezeTrack (id).wasOk(), "unfreeze failed");
+                expect (! f.production.isFrozen (id));
             }
             else
             {
-                expect (! h.production.isFrozen (id));
+                expect (! f.production.isFrozen (id));
                 expectEquals (undo.getUndoDescriptions().size(), undoCount);
             }
         }
 
         beginTest ("Inspector shows the inspected component id");
         {
-            Harness h;
+            Fixture f;
             juce::Component parent, component;
             parent.setComponentID ("arrangement");
             component.setName ("Lane");
             component.setComponentID ("lane.track1");
             parent.addAndMakeVisible (component);
 
-            Inspector inspector (h.themes);
+            expect (f.theme.load().wasOk());
+            Inspector inspector (f.theme);
             inspector.setInspected (&component);
 
             auto sawId = false, sawParent = false;

@@ -1,9 +1,8 @@
 #pragma once
 
-#include "Engine/EngineManager.h"
-#include "Engine/ProjectManager.h"
-#include "Engine/ApplicationModel.h"
-#include "Commands/AppCommands.h"
+#include "App/ResamperApp.h"
+#include "UI/Layout/LayoutSource.h"
+#include "UI/Theme/ThemeManager.h"
 
 namespace resamper::test
 {
@@ -15,17 +14,30 @@ EngineManager& getEngineManager();
     ACID loop chunk, as tempo-tagged sample-library loops carry. */
 juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2, double acidTempo = 0);
 
-/** A fresh untitled Project with the Command registry wired exactly as the app
-    wires it, except that file choosers and UI State are plain fields. */
+/** A fresh untitled Project in the app exactly as the app builds it, every
+    Command registered, except that file choosers and UI State are plain
+    fields. The Theme is not loaded: call theme.load() before building views. */
 struct Fixture
 {
     Fixture();
     ~Fixture();
 
-    ProjectManager projects { getEngineManager() };
-    ApplicationModel model { projects };
-    CommandRegistry commands;
-    AppCommandHost host;
+    LayoutSource layoutSource;
+    ThemeManager theme { layoutSource, "themes/dark.json" };
+    ResamperApp app { getEngineManager(), theme };
+
+    // The app's parts, by their short names.
+    ProjectManager& projects = app.projects;
+    ApplicationModel& model = app.model;
+    Production& production = app.production;
+    PluginRack& plugins = app.plugins;
+    Mixer& mixer = app.mixer;
+    Session& session = app.session;
+    Automation& automation = app.automation;
+    Shaper& shaper = app.shaper;
+    SamplePreview& preview = app.preview;
+    CommandRegistry& commands = app.commands;
+    AppCommandHost& host = app.host;
 
     // What the choosers "pick". An invalid File means the user cancelled.
     juce::File audioFileToChoose, projectToOpen, projectSaveLocation;

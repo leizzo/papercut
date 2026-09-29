@@ -10,13 +10,6 @@ struct MixerTests : juce::UnitTest
 
     struct MixerFixture : Fixture
     {
-        Mixer mixer { projects };
-
-        MixerFixture()
-        {
-            registerMixerCommands (commands, mixer, host);
-        }
-
         bool trackIsInABus (const juce::String& trackId) const
         {
             for (auto& bus : mixer.getBuses())

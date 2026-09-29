@@ -402,7 +402,7 @@ struct RecordingTests : juce::UnitTest
         beginTest ("A return track never arms");
         {
             RecordingFixture f;
-            Mixer mixer { f.projects };
+            auto& mixer = f.mixer;
             expect (mixer.addReturn ("Return").wasOk());
             const auto returnTrack = f.trackId (1);
             expect (f.track (1).isReturn);

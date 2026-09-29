@@ -11,7 +11,7 @@ class MainWindow : public juce::DocumentWindow,
                    private juce::MenuBarModel
 {
 public:
-    MainWindow (const juce::String& title, MainComponent::Services services);
+    MainWindow (const juce::String& title, ResamperApp&);
     ~MainWindow() override;
 
     void closeButtonPressed() override;

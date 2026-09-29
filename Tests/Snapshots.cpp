@@ -1,17 +1,5 @@
 #include "TestFixture.h"
-#include "Commands/AutomationCommands.h"
-#include "Commands/MixerCommands.h"
-#include "Commands/PluginCommands.h"
-#include "Commands/SessionCommands.h"
-#include "Engine/Automation.h"
-#include "Engine/Mixer.h"
-#include "Engine/PluginRack.h"
-#include "Engine/SamplePreview.h"
-#include "Engine/Session.h"
-#include "Engine/Shaper.h"
-#include "UI/Layout/LayoutSource.h"
 #include "UI/MainWindow/MainComponent.h"
-#include "UI/State/UIStateStore.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -30,22 +18,8 @@ struct Snapshots : juce::UnitTest
         beginTest ("Render every view");
 
         Fixture f;
-        LayoutSource source;
-        ThemeManager theme { source, "themes/dark.json" };
-        expect (theme.load().wasOk());
-        juce::LookAndFeel::setDefaultLookAndFeel (&theme.getLookAndFeel());
-
-        UIStateStore uiState;
-        PluginRack plugins { f.projects };
-        Mixer mixer { f.projects };
-        Session session { f.projects };
-        Automation automation { f.projects };
-        Shaper shaper { f.projects };
-        SamplePreview preview { getEngineManager() };
-        registerPluginCommands (f.commands, plugins, f.host);
-        registerMixerCommands (f.commands, mixer, f.host);
-        registerSessionCommands (f.commands, session, f.host);
-        registerAutomationCommands (f.commands, automation, shaper, f.host);
+        expect (f.theme.load().wasOk());
+        juce::LookAndFeel::setDefaultLookAndFeel (&f.theme.getLookAndFeel());
 
         // Some content to look at.
         f.invoke ("track.add");
@@ -56,9 +30,9 @@ struct Snapshots : juce::UnitTest
         f.model.selectTrack (f.model.getTracks()[1].id);
         f.invoke ("clip.addMidi");
         f.invoke ("mixer.addReturn");
-        plugins.insert (f.model.getTracks()[0].id, tracktion::ReverbPlugin::xmlTypeName);
-        plugins.insert (f.model.getTracks()[0].id, tracktion::CompressorPlugin::xmlTypeName, PluginChain::mixer);
-        plugins.insert (f.model.getTracks()[0].id, tracktion::DelayPlugin::xmlTypeName);
+        f.plugins.insert (f.model.getTracks()[0].id, tracktion::ReverbPlugin::xmlTypeName);
+        f.plugins.insert (f.model.getTracks()[0].id, tracktion::CompressorPlugin::xmlTypeName, PluginChain::mixer);
+        f.plugins.insert (f.model.getTracks()[0].id, tracktion::DelayPlugin::xmlTypeName);
         f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 0.0, 0.25, 60));
         f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 0.5, 0.25, 64));
         f.invoke ("note.add", noteAddArgs (f.model.getTracks()[1].clips[0].id, 1.0, 0.5, 67));
@@ -70,9 +44,7 @@ struct Snapshots : juce::UnitTest
         const auto size = juce::Point<int> (juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_W", "1600").getIntValue(),
                                             juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_H", "1000").getIntValue());
         {
-            MainComponent main ({ f.model, f.commands, theme, uiState, source, "No audio device", {},
-                                  plugins, mixer, preview },
-                                commandManager);
+            MainComponent main (f.app, commandManager);
             main.setSize (size.x, size.y);
 
             auto dir = juce::File ("/tmp/resamper-snapshots");

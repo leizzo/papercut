@@ -1,13 +1,12 @@
 #pragma once
 
-#include "Commands/CommandRegistry.h"
+#include "App/ResamperApp.h"
 #include "UI/Arrangement/ArrangementView.h"
 #include "UI/Layout/LayoutManager.h"
 #include "UI/Mixer/MixerView.h"
 #include "UI/PianoRoll/PianoRollView.h"
 #include "UI/Detail/DetailView.h"
 #include "UI/Browser/Browser.h"
-#include "Engine/SamplePreview.h"
 #include "UI/Plugins/PluginEditorWindow.h"
 #include "UI/Developer/DeveloperOverlay.h"
 #include "UI/Developer/LayoutWatcher.h"
@@ -36,21 +35,8 @@ class MainComponent : public juce::Component,
                       private juce::ValueTree::Listener
 {
 public:
-    struct Services
-    {
-        ApplicationModel& model;
-        CommandRegistry& commands;
-        ThemeManager& themeManager;
-        UIStateStore& uiState;
-        const LayoutSource& layoutSource;
-        juce::String audioDeviceDescription;
-        std::function<void (const juce::String&)> reportError;
-        PluginRack& plugins;
-        Mixer& mixer;
-        SamplePreview& preview;
-    };
-
-    MainComponent (Services, juce::ApplicationCommandManager&);
+    /** Builds the views over the app and registers their Commands in its registry. */
+    MainComponent (ResamperApp&, juce::ApplicationCommandManager&);
 
     /** Dispatches the shortcuts JUCE's key mappings can't: those of one view
         (fired only while it shows) and those that pass an argument. Add it to
@@ -71,7 +57,9 @@ public:
     bool perform (const InvocationInfo&) override;
 
 private:
-    Services services;
+    ResamperApp& app;
+    const LayoutSource& layoutSource;
+    const juce::String audioDeviceDescription;
     juce::ApplicationCommandManager& commandManager;
 
     ShellState shell;

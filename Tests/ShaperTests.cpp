@@ -1,8 +1,5 @@
 #include "TestFixture.h"
 #include "Commands/AutomationCommands.h"
-#include "Engine/Automation.h"
-#include "Engine/Mixer.h"
-#include "Engine/Shaper.h"
 
 namespace resamper::test
 {
@@ -13,14 +10,9 @@ struct ShaperTests : juce::UnitTest
 
     struct ShapeFixture : Fixture
     {
-        Automation automation;
-        Shaper shaper;
-
         ShapeFixture()
-            : automation (projects), shaper (projects)
         {
             invoke ("track.add");
-            registerAutomationCommands (commands, automation, shaper, host);
         }
 
         juce::String trackId() const { return model.getTracks()[0].id; }
@@ -67,7 +59,7 @@ struct ShaperTests : juce::UnitTest
         beginTest ("shaper.add loop assigns a send");
         {
             ShapeFixture f;
-            Mixer mixer (f.projects);
+            auto& mixer = f.mixer;
             expect (mixer.addReturn ("Return").wasOk());
             expect (mixer.addSend (f.trackId(), mixer.getReturns()[0].bus).wasOk());
             const auto key = "send:" + mixer.getSends (f.trackId())[0].id;

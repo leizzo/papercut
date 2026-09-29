@@ -1,5 +1,4 @@
 #include "TestFixture.h"
-#include "Engine/Session.h"
 #include "Commands/SessionCommands.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -50,8 +49,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("setSceneCount adds scenes and undo removes them");
         {
             Fixture f;
-            Session session (f.projects);
-            registerSessionCommands (f.commands, session, f.host);
+            auto& session = f.session;
 
             for (const char* id : { "session.setSceneCount", "session.renameScene", "session.addSlotClip",
                                     "session.addMidiSlotClip", "session.clearSlot", "session.launchSlot",
@@ -77,8 +75,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("addSlotClip stays out of the Arrangement and undo clears the slot");
         {
             Fixture f;
-            Session session (f.projects);
-            registerSessionCommands (f.commands, session, f.host);
+            auto& session = f.session;
 
             f.invoke ("track.add");
             expect (session.setSceneCount (1).wasOk());
@@ -102,8 +99,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("addSlotClip on a MIDI track fails and adds no undo step");
         {
             Fixture f;
-            Session session (f.projects);
-            registerSessionCommands (f.commands, session, f.host);
+            auto& session = f.session;
 
             f.invoke ("track.addMidi");
             const auto id = f.model.getTracks()[0].id;
@@ -120,8 +116,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("launchSlot queues one slot; launchScene queues only that row");
         {
             Fixture f;
-            Session session (f.projects);
-            registerSessionCommands (f.commands, session, f.host);
+            auto& session = f.session;
 
             f.invoke ("track.add");
             f.invoke ("track.add");
@@ -171,7 +166,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("addMidiSlotClip stays off the Arrangement; a WAV on a MIDI track still fails");
         {
             Fixture f;
-            Session session (f.projects);
+            auto& session = f.session;
 
             f.invoke ("track.addMidi");
             expect (session.setSceneCount (1).wasOk());
@@ -192,8 +187,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("recordIntoArrangement places a playing slot at the playhead and skips a queued one");
         {
             Fixture f;
-            Session session (f.projects);
-            registerSessionCommands (f.commands, session, f.host);
+            auto& session = f.session;
 
             f.invoke ("track.add");
             expect (session.setSceneCount (1).wasOk());
@@ -230,7 +224,7 @@ struct SessionTests : juce::UnitTest
         beginTest ("recordIntoArrangement places a playing MIDI slot on the Arrangement");
         {
             Fixture f;
-            Session session (f.projects);
+            auto& session = f.session;
 
             f.invoke ("track.addMidi");
             expect (session.setSceneCount (1).wasOk());

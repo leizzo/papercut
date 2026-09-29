@@ -4,12 +4,12 @@
 namespace resamper
 {
 
-MainWindow::MainWindow (const juce::String& title, MainComponent::Services services)
+MainWindow::MainWindow (const juce::String& title, ResamperApp& app)
     : juce::DocumentWindow (title,
                             juce::LookAndFeel::getDefaultLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId),
                             juce::DocumentWindow::allButtons)
 {
-    auto content = std::make_unique<MainComponent> (std::move (services), commandManager);
+    auto content = std::make_unique<MainComponent> (app, commandManager);
 
     commandManager.registerAllCommandsForTarget (content.get());
     commandManager.setFirstCommandTarget (content.get());

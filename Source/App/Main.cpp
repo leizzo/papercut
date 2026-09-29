@@ -1,22 +1,7 @@
-#include "Commands/AppCommands.h"
-#include "Commands/AutomationCommands.h"
-#include "Commands/MixerCommands.h"
-#include "Commands/PluginCommands.h"
-#include "Commands/ProductionCommands.h"
-#include "Commands/SessionCommands.h"
-#include "Engine/ApplicationModel.h"
-#include "Engine/Automation.h"
+#include "App/ResamperApp.h"
 #include "Engine/EngineManager.h"
-#include "Engine/Mixer.h"
-#include "Engine/PluginRack.h"
-#include "Engine/Production.h"
-#include "Engine/ProjectManager.h"
-#include "Engine/SamplePreview.h"
-#include "Engine/Session.h"
-#include "Engine/Shaper.h"
 #include "UI/Layout/LayoutSource.h"
 #include "UI/MainWindow/MainWindow.h"
-#include "UI/State/UIStateStore.h"
 #include "UI/Theme/ThemeManager.h"
 
 namespace resamper
@@ -73,28 +58,9 @@ public:
         juce::LookAndFeel::setDefaultLookAndFeel (&theme.getLookAndFeel());
 
         engine = std::make_unique<EngineManager> (getApplicationName(), EngineManager::AudioDevice::initialise);
-        projects = std::make_unique<ProjectManager> (*engine);
-        model = std::make_unique<ApplicationModel> (*projects);
-        production = std::make_unique<Production> (*projects);
-        plugins = std::make_unique<PluginRack> (*projects);
-        mixer = std::make_unique<Mixer> (*projects);
-        session = std::make_unique<Session> (*projects);
-        automation = std::make_unique<Automation> (*projects);
-        shaper = std::make_unique<Shaper> (*projects);
-        preview = std::make_unique<SamplePreview> (*engine);
-
+        app = std::make_unique<ResamperApp> (*engine, theme);
         wireCommandHost();
-        registerAppCommands (commands, *model, commandHost);
-        registerProductionCommands (commands, *production, *model, theme, commandHost);
-        registerPluginCommands (commands, *plugins, commandHost);
-        registerMixerCommands (commands, *mixer, commandHost);
-        registerSessionCommands (commands, *session, commandHost);
-        registerAutomationCommands (commands, *automation, *shaper, commandHost);
-
-        mainWindow = std::make_unique<MainWindow> (getApplicationName(),
-            MainComponent::Services { *model, commands, theme, uiState, layoutSource,
-                                      engine->describeActiveAudioDevice(),
-                                      commandHost.reportError, *plugins, *mixer, *preview });
+        mainWindow = std::make_unique<MainWindow> (getApplicationName(), *app);
 
         offerRecovery();
         startTimer (Production::autosaveIntervalMs);
@@ -106,18 +72,10 @@ public:
         mainWindow.reset();
         chooser.reset();
 
-        if (model != nullptr)
-            model->stop();
+        if (app != nullptr)
+            app->model.stop();
 
-        model.reset();
-        preview.reset();
-        shaper.reset();
-        automation.reset();
-        session.reset();
-        mixer.reset();
-        plugins.reset();
-        production.reset();
-        projects.reset();
+        app.reset();
         engine.reset();
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
@@ -126,18 +84,18 @@ public:
 
     void timerCallback() override
     {
-        if (projects == nullptr)
+        if (app == nullptr)
             return;
 
-        if (commands.invoke ("project.autosave"))
-            rememberProjectFolder (projects->getProjectFolder());
+        if (app->commands.invoke ("project.autosave"))
+            rememberProjectFolder (app->projects.getProjectFolder());
     }
 
     void offerRecovery()
     {
         const auto folder = rememberedProjectFolder();
 
-        if (! Production::hasNewerRecovery (folder) || model == nullptr)
+        if (! Production::hasNewerRecovery (folder) || app == nullptr)
             return;
 
         const auto recovery = folder.getChildFile ("Recovery");
@@ -149,14 +107,14 @@ public:
                                             mainWindow.get(),
                                             juce::ModalCallbackFunction::create ([this, recovery] (int result)
                                             {
-                                                if (result != 1 || model == nullptr)
+                                                if (result != 1 || app == nullptr)
                                                     return;
 
                                                 juce::var recovered;
 
-                                                if (auto r = model->openProject (recovery, recovered); r.wasOk())
+                                                if (auto r = app->model.openProject (recovery, recovered); r.wasOk())
                                                 {
-                                                    uiState.restore (recovered);
+                                                    app->uiState.restore (recovered);
                                                     rememberProjectFolder (recovery);
                                                 }
                                                 else
@@ -169,21 +127,9 @@ public:
 private:
     LayoutSource layoutSource;
     ThemeManager theme { layoutSource, "themes/dark.json" };
-    UIStateStore uiState;
 
     std::unique_ptr<EngineManager> engine;
-    std::unique_ptr<ProjectManager> projects;
-    std::unique_ptr<ApplicationModel> model;
-    std::unique_ptr<Production> production;
-    std::unique_ptr<PluginRack> plugins;
-    std::unique_ptr<Mixer> mixer;
-    std::unique_ptr<Session> session;
-    std::unique_ptr<Automation> automation;
-    std::unique_ptr<Shaper> shaper;
-    std::unique_ptr<SamplePreview> preview;
-
-    CommandRegistry commands;
-    AppCommandHost commandHost;
+    std::unique_ptr<ResamperApp> app;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<MainWindow> mainWindow;
 
@@ -200,6 +146,7 @@ private:
     void wireCommandHost()
     {
         using FB = juce::FileBrowserComponent;
+        auto& commandHost = app->host;
 
         commandHost.chooseAudioFile = [this] (auto cb)
         {
@@ -216,8 +163,6 @@ private:
             choose ("Save Project As (creates a folder)", {}, FB::saveMode | FB::canSelectFiles, std::move (cb));
         };
 
-        commandHost.captureUIState = [this] { return uiState.toVar(); };
-        commandHost.restoreUIState = [this] (const juce::var& v) { uiState.restore (v); };
         // Errors are toasts, not modal dialogs (PRD §16.7); before the window exists, a dialog.
         commandHost.reportError = [this] (const juce::String& message)
         {

@@ -1,8 +1,6 @@
 #include "TestFixture.h"
 #include "Commands/MixerCommands.h"
 #include "Commands/PluginCommands.h"
-#include "Engine/Mixer.h"
-#include "Engine/PluginRack.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -19,15 +17,6 @@ struct DeviceChainTests : juce::UnitTest
 
     struct Chains : Fixture
     {
-        PluginRack rack { projects };
-        Mixer mixer { projects };
-
-        Chains()
-        {
-            registerPluginCommands (commands, rack, host);
-            registerMixerCommands (commands, mixer, host);
-        }
-
         juce::String trackId (int index = 0) const   { return model.getTracks()[(size_t) index].id; }
 
         /** The chain's plug-in types, joined with " > ". */
@@ -35,7 +24,7 @@ struct DeviceChainTests : juce::UnitTest
         {
             juce::StringArray result;
 
-            for (auto& p : rack.getChain (id, chain))
+            for (auto& p : plugins.getChain (id, chain))
                 result.add (p.path);
 
             return result.joinIntoString (" > ");
@@ -76,7 +65,7 @@ struct DeviceChainTests : juce::UnitTest
             expect (f.insert (f.trackId(), reverb.toRawUTF8()));
 
             expectEquals (f.paths (f.trackId(), PluginChain::device), Chains::joined ({ reverb }));
-            expect (f.rack.getChain (f.trackId(), PluginChain::mixer).empty());
+            expect (f.plugins.getChain (f.trackId(), PluginChain::mixer).empty());
         }
 
         beginTest ("A mixer insert shows only on the mixer chain");
@@ -86,8 +75,8 @@ struct DeviceChainTests : juce::UnitTest
             expect (f.insert (f.trackId(), compressor.toRawUTF8(), PluginChain::mixer));
 
             expectEquals (f.paths (f.trackId(), PluginChain::mixer), Chains::joined ({ compressor }));
-            expect (f.rack.getChain (f.trackId(), PluginChain::device).empty());
-            expect (f.rack.getChain (f.trackId(), PluginChain::mixer).front().chain == PluginChain::mixer);
+            expect (f.plugins.getChain (f.trackId(), PluginChain::device).empty());
+            expect (f.plugins.getChain (f.trackId(), PluginChain::mixer).front().chain == PluginChain::mixer);
         }
 
         beginTest ("Signal order: device chain, then mixer inserts, then sends, then the fader");
@@ -122,7 +111,7 @@ struct DeviceChainTests : juce::UnitTest
             expect (f.errors[f.errors.size() - 1].containsIgnoreCase ("effects only"), f.errors[f.errors.size() - 1]);
             expect (! f.insert (id, midiFx.toRawUTF8(), PluginChain::mixer));
             expectEquals (Chains::joined (f.signalOrder (id)), Chains::joined (before));
-            expect (! f.model.canUndo() || f.rack.getChain (id, PluginChain::mixer).empty());
+            expect (! f.model.canUndo() || f.plugins.getChain (id, PluginChain::mixer).empty());
         }
 
         beginTest ("A track holds at most 8 mixer inserts");
@@ -135,7 +124,7 @@ struct DeviceChainTests : juce::UnitTest
                 expect (f.insert (id, eq.toRawUTF8(), PluginChain::mixer));
 
             expect (! f.insert (id, eq.toRawUTF8(), PluginChain::mixer));
-            expectEquals ((int) f.rack.getChain (id, PluginChain::mixer).size(), PluginRack::maxMixerInserts);
+            expectEquals ((int) f.plugins.getChain (id, PluginChain::mixer).size(), PluginRack::maxMixerInserts);
 
             // The device chain has no such limit.
             expect (f.insert (id, reverb.toRawUTF8()));
@@ -162,7 +151,7 @@ struct DeviceChainTests : juce::UnitTest
             f.insert (id, compressor.toRawUTF8(), PluginChain::mixer);
             f.insert (id, eq.toRawUTF8(), PluginChain::mixer);
 
-            const auto eqId = f.rack.getChain (id, PluginChain::mixer)[1].id;
+            const auto eqId = f.plugins.getChain (id, PluginChain::mixer)[1].id;
             f.invoke ("plugin.move", pluginMoveArgs (id, eqId, 0));
             expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ eq, compressor }));
             expectEquals (f.paths (id, PluginChain::device), Chains::joined ({ reverb }));
@@ -178,14 +167,14 @@ struct DeviceChainTests : juce::UnitTest
             f.invoke ("track.add");
             const auto id = f.trackId();
             f.insert (id, compressor.toRawUTF8(), PluginChain::mixer);
-            const auto pluginId = f.rack.getChain (id, PluginChain::mixer)[0].id;
-            expect (f.rack.getChain (id, PluginChain::mixer)[0].enabled);
+            const auto pluginId = f.plugins.getChain (id, PluginChain::mixer)[0].id;
+            expect (f.plugins.getChain (id, PluginChain::mixer)[0].enabled);
 
             f.invoke ("plugin.setBypassed", pluginBypassArgs (id, pluginId, true));
-            expect (! f.rack.getChain (id, PluginChain::mixer)[0].enabled);
+            expect (! f.plugins.getChain (id, PluginChain::mixer)[0].enabled);
 
             f.invoke ("edit.undo");
-            expect (f.rack.getChain (id, PluginChain::mixer)[0].enabled);
+            expect (f.plugins.getChain (id, PluginChain::mixer)[0].enabled);
         }
 
         beginTest ("Move to track chain puts a mixer insert at the end of the device chain, one undo step");
@@ -196,12 +185,12 @@ struct DeviceChainTests : juce::UnitTest
             f.insert (id, reverb.toRawUTF8());
             f.insert (id, compressor.toRawUTF8(), PluginChain::mixer);
             f.insert (id, eq.toRawUTF8(), PluginChain::mixer);
-            const auto compressorId = f.rack.getChain (id, PluginChain::mixer)[0].id;
+            const auto compressorId = f.plugins.getChain (id, PluginChain::mixer)[0].id;
 
             f.invoke ("plugin.moveToDeviceChain", pluginArgs (id, compressorId));
             expectEquals (f.paths (id, PluginChain::device), Chains::joined ({ reverb, compressor }));
             expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ eq }));
-            expectEquals (f.rack.getChain (id, PluginChain::device)[1].id, compressorId);
+            expectEquals (f.plugins.getChain (id, PluginChain::device)[1].id, compressorId);
 
             f.invoke ("edit.undo");
             expectEquals (f.paths (id, PluginChain::device), Chains::joined ({ reverb }));
@@ -239,7 +228,7 @@ struct DeviceChainTests : juce::UnitTest
             expectEquals (Chains::joined (reopened.signalOrder (reopenedId)), Chains::joined (order));
             expectEquals (reopened.paths (reopenedId, PluginChain::device),
                           Chains::joined ({ te::CompressorPlugin::xmlTypeName, te::LowPassPlugin::xmlTypeName }));
-            expect (reopened.rack.getChain (reopenedId, PluginChain::mixer).empty());
+            expect (reopened.plugins.getChain (reopenedId, PluginChain::mixer).empty());
             expectWithinAbsoluteError (renderPeak (reopened), peak, 1.0e-4f);
         }
 
@@ -251,11 +240,11 @@ struct DeviceChainTests : juce::UnitTest
             const auto from = f.trackId (0), to = f.trackId (1);
             f.insert (from, compressor.toRawUTF8(), PluginChain::mixer);
             f.insert (to, eq.toRawUTF8(), PluginChain::mixer);
-            const auto sourceId = f.rack.getChain (from, PluginChain::mixer)[0].id;
+            const auto sourceId = f.plugins.getChain (from, PluginChain::mixer)[0].id;
 
             f.invoke ("plugin.copyInsert", pluginCopyArgs (from, sourceId, to, 0));
             expectEquals (f.paths (to, PluginChain::mixer), Chains::joined ({ compressor, eq }));
-            expect (f.rack.getChain (to, PluginChain::mixer)[0].id != sourceId);
+            expect (f.plugins.getChain (to, PluginChain::mixer)[0].id != sourceId);
             expectEquals (f.paths (from, PluginChain::mixer), Chains::joined ({ compressor }));
 
             f.invoke ("edit.undo");
@@ -268,9 +257,9 @@ struct DeviceChainTests : juce::UnitTest
             f.invoke ("track.add");
             const auto id = f.trackId();
             f.insert (id, reverb.toRawUTF8());
-            const auto pluginId = f.rack.getChain (id, PluginChain::device)[0].id;
+            const auto pluginId = f.plugins.getChain (id, PluginChain::device)[0].id;
 
-            const auto params = f.rack.getParameters (pluginId);
+            const auto params = f.plugins.getParameters (pluginId);
             expectGreaterThan ((int) params.size(), 2);
 
             for (auto& p : params)
@@ -278,10 +267,10 @@ struct DeviceChainTests : juce::UnitTest
                 expect (p.id.isNotEmpty() && p.name.isNotEmpty());
                 expect (p.maximum > p.minimum);
                 expect (p.value >= p.minimum && p.value <= p.maximum);
-                expect (f.rack.getParameterText (pluginId, p.id, p.value).isNotEmpty());
+                expect (f.plugins.getParameterText (pluginId, p.id, p.value).isNotEmpty());
             }
 
-            expect (f.rack.getParameters ("no-such-plugin").empty());
+            expect (f.plugins.getParameters ("no-such-plugin").empty());
         }
 
         beginTest ("plugin.setParameter changes a device knob; a drag is one undo step");
@@ -290,24 +279,24 @@ struct DeviceChainTests : juce::UnitTest
             f.invoke ("track.add");
             const auto id = f.trackId();
             f.insert (id, reverb.toRawUTF8());
-            const auto pluginId = f.rack.getChain (id, PluginChain::device)[0].id;
-            const auto param = f.rack.getParameters (pluginId)[0];
+            const auto pluginId = f.plugins.getChain (id, PluginChain::device)[0].id;
+            const auto param = f.plugins.getParameters (pluginId)[0];
             const auto mid = param.minimum + (param.maximum - param.minimum) * 0.5f;
             const auto high = param.minimum + (param.maximum - param.minimum) * 0.8f;
 
             f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, param.minimum + (param.maximum - param.minimum) * 0.3f));
             f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, mid, true));
             f.invoke ("plugin.setParameter", pluginParameterArgs (pluginId, param.id, high, true));
-            expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, high, 1.0e-4f);
+            expectWithinAbsoluteError (f.plugins.getParameters (pluginId)[0].value, high, 1.0e-4f);
 
             auto noValue = pluginParameterArgs (pluginId, param.id, high);
             noValue.getDynamicObject()->removeProperty ("value");
             f.invoke ("plugin.setParameter", noValue);
-            expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, high, 1.0e-4f);
+            expectWithinAbsoluteError (f.plugins.getParameters (pluginId)[0].value, high, 1.0e-4f);
 
             f.invoke ("edit.undo");
-            expectWithinAbsoluteError (f.rack.getParameters (pluginId)[0].value, param.value, 1.0e-4f);
-            expectEquals ((int) f.rack.getChain (id, PluginChain::device).size(), 1);
+            expectWithinAbsoluteError (f.plugins.getParameters (pluginId)[0].value, param.value, 1.0e-4f);
+            expectEquals ((int) f.plugins.getChain (id, PluginChain::device).size(), 1);
         }
 
         beginTest ("plugin.replace swaps a mixer insert in place, one undo step; an instrument is refused");
@@ -317,12 +306,12 @@ struct DeviceChainTests : juce::UnitTest
             const auto id = f.trackId();
             f.insert (id, eq.toRawUTF8(), PluginChain::mixer);
             f.insert (id, compressor.toRawUTF8(), PluginChain::mixer);
-            const auto eqId = f.rack.getChain (id, PluginChain::mixer)[0].id;
+            const auto eqId = f.plugins.getChain (id, PluginChain::mixer)[0].id;
 
             f.invoke ("plugin.replace", pluginReplaceArgs (id, eqId, delay));
             expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ delay, compressor }));
 
-            f.invoke ("plugin.replace", pluginReplaceArgs (id, f.rack.getChain (id, PluginChain::mixer)[0].id, synth));
+            f.invoke ("plugin.replace", pluginReplaceArgs (id, f.plugins.getChain (id, PluginChain::mixer)[0].id, synth));
             expectEquals (f.paths (id, PluginChain::mixer), Chains::joined ({ delay, compressor }));
 
             f.invoke ("edit.undo");
@@ -340,8 +329,8 @@ struct DeviceChainTests : juce::UnitTest
             for (int i = 0; i < PluginRack::maxMixerInserts; ++i)
                 f.insert (to, eq.toRawUTF8(), PluginChain::mixer);
 
-            f.invoke ("plugin.copyInsert", pluginCopyArgs (from, f.rack.getChain (from, PluginChain::mixer)[0].id, to, 0));
-            expectEquals ((int) f.rack.getChain (to, PluginChain::mixer).size(), PluginRack::maxMixerInserts);
+            f.invoke ("plugin.copyInsert", pluginCopyArgs (from, f.plugins.getChain (from, PluginChain::mixer)[0].id, to, 0));
+            expectEquals ((int) f.plugins.getChain (to, PluginChain::mixer).size(), PluginRack::maxMixerInserts);
             expect (! f.errors.isEmpty());
         }
     }
