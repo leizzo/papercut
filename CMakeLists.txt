@@ -123,6 +123,12 @@ set_target_properties(resamper_resources PROPERTIES POSITION_INDEPENDENT_CODE ON
 add_library(resamper_commands STATIC
     Source/Commands/CommandRegistry.cpp
     Source/Commands/AppCommands.cpp
+    Source/Commands/ClipCommands.cpp
+    Source/Commands/EditCommands.cpp
+    Source/Commands/NoteCommands.cpp
+    Source/Commands/ProjectCommands.cpp
+    Source/Commands/TrackCommands.cpp
+    Source/Commands/TransportCommands.cpp
     Source/Commands/ApplicationCommandTable.cpp
     Source/Commands/PluginCommands.cpp
     Source/Commands/MixerCommands.cpp

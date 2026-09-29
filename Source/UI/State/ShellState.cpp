@@ -86,35 +86,17 @@ void ShellState::setDetailHeight (int h)
 }
 
 //==============================================================================
-namespace
-{
-    struct ShellCommand : Command
-    {
-        ShellCommand (juce::String id, juce::String name, std::function<void()> fn)
-            : Command (std::move (id), std::move (name)), action (std::move (fn)) {}
-
-        void execute (const juce::var&) override   { action(); }
-
-        std::function<void()> action;
-    };
-}
-
 void registerShellCommands (CommandRegistry& registry, ShellState& shell)
 {
-    auto add = [&] (const char* id, const char* name, std::function<void()> fn)
-    {
-        registry.add (std::make_unique<ShellCommand> (id, name, std::move (fn)));
-    };
-
-    add ("view.session", "Session", [&shell] { shell.setView (ShellState::View::session); });
-    add ("view.arrange", "Arrange", [&shell] { shell.setView (ShellState::View::arrange); });
-    add ("view.mixer", "Mixer", [&shell] { shell.setView (ShellState::View::mixer); });
-    add ("view.pianoRoll", "Piano Roll", [&shell] { shell.setView (ShellState::View::pianoRoll); });
-    add ("view.editor", "Editor", [&shell] { shell.setView (ShellState::View::editor); });
-    add ("view.toggleSessionArrange", "Session / Arrange", [&shell] { shell.toggleSessionArrange(); });
-    add ("view.toggleBrowser", "Show Browser", [&shell] { shell.setBrowserVisible (! shell.isBrowserVisible()); });
-    add ("view.toggleDetail", "Show Detail View", [&shell] { shell.setDetailCollapsed (! shell.isDetailCollapsed()); });
-    add ("view.toggleFollow", "Follow", [&shell] { shell.setFollowing (! shell.isFollowing()); });
+    registry.add ({ "view.session", "Session" }, [&shell] { shell.setView (ShellState::View::session); });
+    registry.add ({ "view.arrange", "Arrange" }, [&shell] { shell.setView (ShellState::View::arrange); });
+    registry.add ({ "view.mixer", "Mixer" }, [&shell] { shell.setView (ShellState::View::mixer); });
+    registry.add ({ "view.pianoRoll", "Piano Roll" }, [&shell] { shell.setView (ShellState::View::pianoRoll); });
+    registry.add ({ "view.editor", "Editor" }, [&shell] { shell.setView (ShellState::View::editor); });
+    registry.add ({ "view.toggleSessionArrange", "Session / Arrange" }, [&shell] { shell.toggleSessionArrange(); });
+    registry.add ({ "view.toggleBrowser", "Show Browser" }, [&shell] { shell.setBrowserVisible (! shell.isBrowserVisible()); });
+    registry.add ({ "view.toggleDetail", "Show Detail View" }, [&shell] { shell.setDetailCollapsed (! shell.isDetailCollapsed()); });
+    registry.add ({ "view.toggleFollow", "Follow" }, [&shell] { shell.setFollowing (! shell.isFollowing()); });
 }
 
 } // namespace resamper

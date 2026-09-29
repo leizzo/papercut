@@ -1,178 +1,99 @@
 #include "PluginCommands.h"
 
-#include "AppCommands.h"
+#include "AppCommandHost.h"
+#include "ArgKeys.h"
 #include "Engine/PluginRack.h"
 
 namespace resamper
 {
 
-namespace ArgKeys
-{
-    const juce::Identifier trackId ("trackId"), plugin ("plugin"), pluginId ("pluginId"), index ("index"),
-                           chain ("chain"), bypassed ("bypassed"), toTrackId ("toTrackId"),
-                           parameterId ("parameterId"), value ("value"), continuesGesture ("continuesGesture");
-}
-
 namespace
 {
-    class PluginCommand : public Command
+    /** Reports a message that isn't from a Result: an empty one reports nothing. */
+    void reportMessage (const AppCommandHost& host, const juce::String& message)
     {
-    public:
-        PluginCommand (juce::String commandId, juce::String name, PluginRack& r, AppCommandHost& h)
-            : Command (std::move (commandId), std::move (name)), rack (r), host (h) {}
-
-    protected:
-        PluginRack& rack;
-        AppCommandHost& host;
-
-        void report (const juce::String& message) const
-        {
-            if (message.isNotEmpty() && host.reportError)
-                host.reportError (message);
-        }
-
-        void report (const juce::Result& result) const
-        {
-            if (result.failed())
-                report (result.getErrorMessage());
-        }
-    };
-
-    struct ScanPluginsCommand : PluginCommand
-    {
-        ScanPluginsCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.scan", "Scan Plug-ins", r, h) {}
-
-        void execute (const juce::var&) override { rack.startScan(); }
-        bool isEnabled() const override          { return ! rack.isScanning(); }
-    };
-
-    struct InsertPluginCommand : PluginCommand
-    {
-        InsertPluginCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.insert", "Insert Plug-in", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            const auto id = args[ArgKeys::trackId].toString();
-            const auto plugin = args[ArgKeys::plugin].toString();
-            const auto chain = args[ArgKeys::chain].toString() == "mixer" ? PluginChain::mixer : PluginChain::device;
-
-            if (id.isEmpty() || plugin.isEmpty())
-                report ("Plug-in insert needs a track and a plug-in");
-            else
-                report (rack.insert (id, plugin, chain));
-        }
-    };
-
-    struct RemovePluginCommand : PluginCommand
-    {
-        RemovePluginCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.remove", "Remove Plug-in", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            const auto id = args[ArgKeys::trackId].toString();
-            const auto pluginId = args[ArgKeys::pluginId].toString();
-
-            if (id.isEmpty() || pluginId.isEmpty())
-                report ("Plug-in remove needs a track and a plug-in");
-            else if (! rack.remove (id, pluginId))
-                report ("Couldn't remove the plug-in");
-        }
-    };
-
-    struct MovePluginCommand : PluginCommand
-    {
-        MovePluginCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.move", "Move Plug-in", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            const auto id = args[ArgKeys::trackId].toString();
-            const auto pluginId = args[ArgKeys::pluginId].toString();
-            const auto indexVar = args[ArgKeys::index];
-
-            if (id.isEmpty() || pluginId.isEmpty() || ! (indexVar.isInt() || indexVar.isInt64() || indexVar.isDouble()))
-                report ("Plug-in move needs a track, a plug-in and an index");
-            else if (! rack.move (id, pluginId, (int) indexVar))
-                report ("Couldn't move the plug-in");
-        }
-    };
-
-    struct SetBypassedCommand : PluginCommand
-    {
-        SetBypassedCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.setBypassed", "Bypass Plug-in", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            rack.setBypassed (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
-                              (bool) args[ArgKeys::bypassed]);
-        }
-    };
-
-    struct MoveToDeviceChainCommand : PluginCommand
-    {
-        MoveToDeviceChainCommand (PluginRack& r, AppCommandHost& h)
-            : PluginCommand ("plugin.moveToDeviceChain", "Move to Track Chain", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            const auto result = rack.moveToDeviceChain (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString());
-            report (result);
-
-            if (result.wasOk() && host.notify)
-                host.notify ("Moved to the track chain", true);
-        }
-    };
-
-    struct ReplacePluginCommand : PluginCommand
-    {
-        ReplacePluginCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.replace", "Replace Plug-in", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            report (rack.replace (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
-                                  args[ArgKeys::plugin].toString()));
-        }
-    };
-
-    struct SetParameterCommand : PluginCommand
-    {
-        SetParameterCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.setParameter", "Change Parameter", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            const auto value = args[ArgKeys::value];
-
-            // A missing value would otherwise read as 0 and zero the parameter.
-            if (! (value.isInt() || value.isInt64() || value.isDouble()))
-                report ("Parameter change needs a value");
-            else
-                rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
-                                   (float) value, (bool) args[ArgKeys::continuesGesture]);
-        }
-    };
-
-    struct CopyInsertCommand : PluginCommand
-    {
-        CopyInsertCommand (PluginRack& r, AppCommandHost& h) : PluginCommand ("plugin.copyInsert", "Copy Insert", r, h) {}
-
-        void execute (const juce::var& args) override
-        {
-            report (rack.copyInsert (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
-                                     args[ArgKeys::toTrackId].toString(), (int) args[ArgKeys::index]));
-        }
-    };
+        if (message.isNotEmpty() && host.reportError)
+            host.reportError (message);
+    }
 }
 
 void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCommandHost& host)
 {
-    registry.add (std::make_unique<ScanPluginsCommand> (rack, host));
-    registry.add (std::make_unique<InsertPluginCommand> (rack, host));
-    registry.add (std::make_unique<RemovePluginCommand> (rack, host));
-    registry.add (std::make_unique<MovePluginCommand> (rack, host));
-    registry.add (std::make_unique<SetBypassedCommand> (rack, host));
-    registry.add (std::make_unique<MoveToDeviceChainCommand> (rack, host));
-    registry.add (std::make_unique<CopyInsertCommand> (rack, host));
-    registry.add (std::make_unique<SetParameterCommand> (rack, host));
-    registry.add (std::make_unique<ReplacePluginCommand> (rack, host));
+    registry.add ({ "plugin.scan", "Scan Plug-ins", [&rack] { return ! rack.isScanning(); } }, [&rack] { rack.startScan(); });
+
+    registry.add ({ "plugin.insert", "Insert Plug-in" }, [&rack, &host] (const juce::var& args)
+    {
+        const auto id = args[ArgKeys::trackId].toString();
+        const auto plugin = args[ArgKeys::plugin].toString();
+        const auto chain = args[ArgKeys::chain].toString() == "mixer" ? PluginChain::mixer : PluginChain::device;
+
+        if (id.isEmpty() || plugin.isEmpty())
+            reportMessage (host, "Plug-in insert needs a track and a plug-in");
+        else
+            host.report (rack.insert (id, plugin, chain));
+    });
+
+    registry.add ({ "plugin.remove", "Remove Plug-in" }, [&rack, &host] (const juce::var& args)
+    {
+        const auto id = args[ArgKeys::trackId].toString();
+        const auto pluginId = args[ArgKeys::pluginId].toString();
+
+        if (id.isEmpty() || pluginId.isEmpty())
+            reportMessage (host, "Plug-in remove needs a track and a plug-in");
+        else if (! rack.remove (id, pluginId))
+            reportMessage (host, "Couldn't remove the plug-in");
+    });
+
+    registry.add ({ "plugin.move", "Move Plug-in" }, [&rack, &host] (const juce::var& args)
+    {
+        const auto id = args[ArgKeys::trackId].toString();
+        const auto pluginId = args[ArgKeys::pluginId].toString();
+        const auto indexVar = args[ArgKeys::index];
+
+        if (id.isEmpty() || pluginId.isEmpty() || ! (indexVar.isInt() || indexVar.isInt64() || indexVar.isDouble()))
+            reportMessage (host, "Plug-in move needs a track, a plug-in and an index");
+        else if (! rack.move (id, pluginId, (int) indexVar))
+            reportMessage (host, "Couldn't move the plug-in");
+    });
+
+    registry.add ({ "plugin.setBypassed", "Bypass Plug-in" }, [&rack] (const juce::var& args)
+    {
+        rack.setBypassed (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
+                          (bool) args[ArgKeys::bypassed]);
+    });
+
+    registry.add ({ "plugin.moveToDeviceChain", "Move to Track Chain" }, [&rack, &host] (const juce::var& args)
+    {
+        const auto result = rack.moveToDeviceChain (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString());
+        host.report (result);
+
+        if (result.wasOk() && host.notify)
+            host.notify ("Moved to the track chain", true);
+    });
+
+    registry.add ({ "plugin.copyInsert", "Copy Insert" }, [&rack, &host] (const juce::var& args)
+    {
+        host.report (rack.copyInsert (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
+                                      args[ArgKeys::toTrackId].toString(), (int) args[ArgKeys::index]));
+    });
+
+    registry.add ({ "plugin.setParameter", "Change Parameter" }, [&rack, &host] (const juce::var& args)
+    {
+        const auto value = args[ArgKeys::value];
+
+        // A missing value would otherwise read as 0 and zero the parameter.
+        if (! (value.isInt() || value.isInt64() || value.isDouble()))
+            reportMessage (host, "Parameter change needs a value");
+        else
+            rack.setParameter (args[ArgKeys::pluginId].toString(), args[ArgKeys::parameterId].toString(),
+                               (float) value, (bool) args[ArgKeys::continuesGesture]);
+    });
+
+    registry.add ({ "plugin.replace", "Replace Plug-in" }, [&rack, &host] (const juce::var& args)
+    {
+        host.report (rack.replace (args[ArgKeys::trackId].toString(), args[ArgKeys::pluginId].toString(),
+                                   args[ArgKeys::plugin].toString()));
+    });
 }
 
 juce::var pluginInsertArgs (const juce::String& trackId, const juce::String& plugin, PluginChain chain)
