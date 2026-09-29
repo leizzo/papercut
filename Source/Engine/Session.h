@@ -53,7 +53,7 @@ public:
     bool renameScene (int index, const juce::String& name);
 
     /** Puts a WAV in an audio track's slot for the scene.
-        Fails if the track is MIDI (resamperKind == "midi"), the scene does not exist, or the file is missing.
+        Fails if the track is MIDI, the scene does not exist, or the file is missing.
         The clip is parented to the ClipSlot, so it is not an Arrangement clip. */
     juce::Result addSlotClip (const juce::String& trackId, int sceneIndex, const juce::File& audioFile);
 

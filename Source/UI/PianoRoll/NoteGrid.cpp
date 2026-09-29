@@ -190,15 +190,7 @@ NoteGrid::DragMode NoteGrid::dragModeAt (const NoteComponent& note, juce::Point<
 
 void NoteGrid::reload()
 {
-    for (auto& track : model.getTracks())
-        for (auto& found : track.clips)
-            if (found.id == clip.id)
-            {
-                setClip (found);
-                return;
-            }
-
-    setClip ({});
+    setClip (model.getClip (clip.id).value_or (ClipInfo {}));
 }
 
 void NoteGrid::mouseMove (const juce::MouseEvent& e)

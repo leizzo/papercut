@@ -1,4 +1,5 @@
 #include "Shaper.h"
+#include "EditTracks.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -18,15 +19,6 @@ namespace
     const juce::Identifier releaseProperty ("resamperReleaseSeconds");
     const juce::Identifier thresholdProperty ("resamperThresholdDb");
     const juce::Identifier shapeType ("resamperShape");
-
-    te::AudioTrack* findTrack (te::Edit& edit, const juce::String& trackId)
-    {
-        for (auto* track : te::getAudioTracks (edit))
-            if (track->itemID.toString() == trackId)
-                return track;
-
-        return nullptr;
-    }
 
     int indexBeforeVolume (te::AudioTrack& track)
     {
@@ -398,7 +390,7 @@ Shaper::Shaper (ProjectManager& pm) : projects (pm) {}
 juce::Result Shaper::add (const juce::String& trackId, const juce::String& parameterKey, ShaperMode mode)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
 
     if (track == nullptr)
         return juce::Result::fail ("Unknown track");
@@ -526,7 +518,7 @@ std::vector<ShaperInfo> Shaper::getShapers (const juce::String& trackId) const
 {
     std::vector<ShaperInfo> shapers;
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
     auto* list = track != nullptr ? track->getModifierList() : nullptr;
 
     if (list == nullptr)

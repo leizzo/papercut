@@ -89,6 +89,7 @@ struct SessionTests : juce::UnitTest
             expect (slots[0].hasClip);
             expect (slots[0].clipId.isNotEmpty());
             expect (f.model.getTracks()[0].clips.empty());
+            expect (! f.model.getClip (slots[0].clipId).has_value());
             expectEquals (session.getScenes()[0].occupiedSlots, 1);
 
             f.invoke (cmd::editUndo);

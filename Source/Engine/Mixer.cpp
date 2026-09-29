@@ -1,5 +1,6 @@
 #include "Mixer.h"
 #include "ApplicationModel.h"
+#include "EditTracks.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -15,11 +16,6 @@ namespace
 {
     // AuxSendPlugin::isMute() treats a send at or below this as muted.
     constexpr float sendMuteThresholdDb = -90.0f;
-
-    te::AudioTrack* findAudioTrack (te::Edit& edit, const juce::String& id)
-    {
-        return te::findAudioTrackForID (edit, te::EditItemID::fromString (id));
-    }
 
     te::FolderTrack* findBus (te::Edit& edit, const juce::String& id)
     {

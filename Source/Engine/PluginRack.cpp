@@ -1,4 +1,5 @@
 #include "PluginRack.h"
+#include "EditTracks.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -10,9 +11,6 @@ namespace resamper
 
 namespace
 {
-    /** Same property ApplicationModel writes. Absent means an audio track. */
-    const juce::Identifier trackKindProperty { "resamperKind" };
-
     /** On a mixer insert's state: "mixer". Absent: the device chain (so older projects' inserts land there). */
     const juce::Identifier chainProperty { "resamperChain" };
     const juce::String mixerChainValue { "mixer" };
@@ -137,20 +135,6 @@ namespace
         return info;
     }
 
-    te::AudioTrack* findTrack (te::Edit& edit, const juce::String& trackId)
-    {
-        for (auto* track : te::getAudioTracks (edit))
-            if (track->itemID.toString() == trackId)
-                return track;
-
-        return nullptr;
-    }
-
-    bool isMidiTrack (const te::AudioTrack& track)
-    {
-        return track.state[trackKindProperty].toString() == "midi";
-    }
-
     /** Routing, not a chain member: aux sends and returns, and meters. */
     bool isRouting (te::Plugin& plugin)
     {
@@ -232,7 +216,7 @@ namespace
     Chains chainsFor (te::Edit& edit, const juce::String& trackId)
     {
         Chains chains;
-        chains.track = findTrack (edit, trackId);
+        chains.track = findAudioTrack (edit, trackId);
 
         if (chains.track == nullptr)
             return chains;
@@ -436,7 +420,7 @@ juce::StringArray PluginRack::getHostedFormats() const
 juce::Result PluginRack::insert (const juce::String& trackId, const juce::String& typeOrIdentifier, PluginChain chain)
 {
     auto& edit = projectManager.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
 
     if (track == nullptr)
         return juce::Result::fail ("No track with that id");
@@ -490,7 +474,7 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
 
         plugin->state.setProperty (chainProperty, mixerChainValue, &edit.getUndoManager());
     }
-    else if (isMidiTrack (*track) && plugin->isSynth())
+    else if (isMidi (*track) && plugin->isSynth())
     {
         std::vector<te::Plugin::Ptr> replaced;
 

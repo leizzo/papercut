@@ -48,15 +48,7 @@ int VelocityEditor::velocityAt (int y) const
 
 void VelocityEditor::reload()
 {
-    for (auto& track : model.getTracks())
-        for (auto& found : track.clips)
-            if (found.id == clip.id)
-            {
-                setClip (found);
-                return;
-            }
-
-    setClip ({});
+    setClip (model.getClip (clip.id).value_or (ClipInfo {}));
 }
 
 void VelocityEditor::paint (juce::Graphics& g)

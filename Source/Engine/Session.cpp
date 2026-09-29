@@ -1,4 +1,5 @@
 #include "Session.h"
+#include "EditTracks.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -13,22 +14,6 @@ namespace resamper
 
 namespace
 {
-    const juce::Identifier trackKindProperty ("resamperKind");
-
-    te::AudioTrack* findTrack (te::Edit& edit, const juce::String& trackId)
-    {
-        for (auto* track : te::getAudioTracks (edit))
-            if (track->itemID.toString() == trackId)
-                return track;
-
-        return nullptr;
-    }
-
-    bool isMidiTrack (const te::Track& track)
-    {
-        return track.state[trackKindProperty].toString() == "midi";
-    }
-
     /** The slot list the track already has. Does not create the CLIPSLOTS node:
         creating it through the UndoManager while the track caches the list is
         how an undo step corrupts the Edit (see ProjectManager's getSceneList note). */
@@ -186,12 +171,12 @@ bool Session::renameScene (int index, const juce::String& name)
 juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, const juce::File& audioFile)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
 
     if (track == nullptr)
         return juce::Result::fail ("Unknown track");
 
-    if (isMidiTrack (*track))
+    if (isMidi (*track))
         return juce::Result::fail ("Slot clips go on audio tracks");
 
     te::AudioFile audio (edit.engine, audioFile);
@@ -237,12 +222,12 @@ juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, 
 juce::Result Session::addMidiSlotClip (const juce::String& trackId, int sceneIndex)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
 
     if (track == nullptr)
         return juce::Result::fail ("Unknown track");
 
-    if (! isMidiTrack (*track))
+    if (! isMidi (*track))
         return juce::Result::fail ("MIDI slot clips go on MIDI tracks");
 
     if (! juce::isPositiveAndBelow (sceneIndex, edit.getSceneList().getNumScenes()))
@@ -273,7 +258,7 @@ juce::Result Session::addMidiSlotClip (const juce::String& trackId, int sceneInd
 bool Session::clearSlot (const juce::String& trackId, int sceneIndex)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
     auto* slot = track != nullptr ? slotAt (*track, sceneIndex) : nullptr;
     auto* clip = slot != nullptr ? slot->getClip() : nullptr;
 
@@ -289,7 +274,7 @@ std::vector<SlotInfo> Session::getSlots (const juce::String& trackId) const
 {
     auto& edit = projects.getEdit();
     std::vector<SlotInfo> result;
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
 
     if (track == nullptr)
         return result;
@@ -314,7 +299,7 @@ std::vector<SlotInfo> Session::getSlots (const juce::String& trackId) const
 
 bool Session::launchSlot (const juce::String& trackId, int sceneIndex)
 {
-    auto* track = findTrack (projects.getEdit(), trackId);
+    auto* track = findAudioTrack (projects.getEdit(), trackId);
     auto* slot = track != nullptr ? slotAt (*track, sceneIndex) : nullptr;
     auto* clip = slot != nullptr ? slot->getClip() : nullptr;
 
@@ -330,7 +315,7 @@ bool Session::launchSlot (const juce::String& trackId, int sceneIndex)
 
 bool Session::stopSlot (const juce::String& trackId, int sceneIndex)
 {
-    auto* track = findTrack (projects.getEdit(), trackId);
+    auto* track = findAudioTrack (projects.getEdit(), trackId);
     auto* slot = track != nullptr ? slotAt (*track, sceneIndex) : nullptr;
     auto* clip = slot != nullptr ? slot->getClip() : nullptr;
 

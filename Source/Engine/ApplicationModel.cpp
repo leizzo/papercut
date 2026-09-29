@@ -1,5 +1,6 @@
 #include "ApplicationModel.h"
 #include "ClipWaveformImpl.h"
+#include "EditTracks.h"
 #include "ProjectManager.h"
 #include "Render.h"
 
@@ -32,9 +33,6 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     juce::UndoManager& undoManager() { return edit().getUndoManager(); }
     EngineUndo& undo()              { return projectManager.getUndo(); }
 
-    /** App-specific, on the track's ValueTree. Absent means audio. */
-    static const juce::Identifier trackKindProperty;
-
     /** App-specific, on a MIDI note's ValueTree, so a note can be named across undo. */
     static const juce::Identifier noteIdProperty;
 
@@ -60,11 +58,6 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     }
 
     juce::StringArray selectedNoteIds;
-
-    bool isMidiTrack (const te::Track& track) const
-    {
-        return track.state[trackKindProperty].toString() == "midi";
-    }
 
     //==============================================================================
     /** Must wrap every replacement of the current Edit. */
@@ -102,7 +95,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     template <typename Get, typename Set>
     bool changeVolumePlugin (const juce::String& trackId, const juce::String& stepName, bool continues, Get get, Set set)
     {
-        auto* track = findTrack (trackId);
+        auto* track = findAudioTrack (edit(), trackId);
         auto* plugin = track != nullptr ? track->getVolumePlugin() : nullptr;
 
         if (plugin == nullptr)
@@ -154,13 +147,6 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
 
     //==============================================================================
     te::TransportControl& transport() const   { return edit().getTransport(); }
-
-    TrackKind kindOf (const te::Track& track) const   { return isMidiTrack (track) ? TrackKind::midi : TrackKind::audio; }
-
-    static bool isReturnTrack (const te::AudioTrack& track)
-    {
-        return ! track.pluginList.getPluginsOfType<te::AuxReturnPlugin>().isEmpty();
-    }
 
     /** The Edit's inputs a track of this kind records from: audio inputs, or
         physical and virtual MIDI inputs. Allocates the playback context, which owns them. */
@@ -262,15 +248,6 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     }
 
     //==============================================================================
-    te::AudioTrack* findTrack (const juce::String& id) const
-    {
-        for (auto* t : te::getAudioTracks (edit()))
-            if (t->itemID.toString() == id)
-                return t;
-
-        return nullptr;
-    }
-
     te::Clip* findClip (const juce::String& id) const
     {
         for (auto* t : te::getAudioTracks (edit()))
@@ -334,6 +311,33 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
                 found.add (note);
 
         return found;
+    }
+
+    /** An arrangement clip as the UI sees it; nothing for a clip kind the app does not show. */
+    std::optional<ClipInfo> clipInfo (te::Clip& c) const
+    {
+        if (auto* wave = dynamic_cast<te::WaveAudioClip*> (&c))
+        {
+            const auto pos = wave->getPosition();
+            ClipInfo clip { wave->itemID.toString(),
+                            wave->getName(),
+                            pos.getStart().inSeconds(),
+                            pos.getLength().inSeconds(),
+                            pos.getOffset().inSeconds(),
+                            wave->getMaximumLength().inSeconds(),
+                            wave->getOriginalFile(),
+                            selectionManager.isSelected (wave),
+                            takesOf (*wave).getNumChildren(),
+                            currentTakeOf (*wave) };
+            clip.reversed = wave->getIsReversed();
+            describeLoopAndColour (*wave, clip);
+            return clip;
+        }
+
+        if (auto* midi = dynamic_cast<te::MidiClip*> (&c))
+            return midiClipInfo (*midi);
+
+        return {};
     }
 
     ClipInfo midiClipInfo (const te::MidiClip& clip) const
@@ -404,7 +408,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     te::AudioTrack* firstMidiTrack() const
     {
         for (auto* t : te::getAudioTracks (edit()))
-            if (isMidiTrack (*t))
+            if (isMidi (*t))
                 return t;
 
         return nullptr;
@@ -531,13 +535,12 @@ bool ApplicationModel::isProjectUntitled() const        { return impl->projectMa
 juce::String ApplicationModel::getProjectName() const   { return impl->projectManager.getProjectName(); }
 
 //==============================================================================
-const juce::Identifier ApplicationModel::Impl::trackKindProperty { "resamperKind" };
 const juce::Identifier ApplicationModel::Impl::noteIdProperty { "resamperNoteId" };
 const juce::Identifier ApplicationModel::Impl::trackColourProperty { "resamperColour" };
 
 bool ApplicationModel::setTrackColour (const juce::String& trackId, int colourIndex)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
 
     if (track == nullptr || ! juce::isPositiveAndBelow (colourIndex, trackPaletteSize) || impl->colourOf (*track) == colourIndex)
         return false;
@@ -566,7 +569,7 @@ void ApplicationModel::addMidiTrack()
         return;
 
     // Kind is a property, not "whichever synth is loaded": Phase 6 replaces the synth.
-    track->state.setProperty (Impl::trackKindProperty, "midi", &impl->undoManager());
+    markMidi (*track, &impl->undoManager());
     impl->giveNextColour (*track);
 
     // Ahead of the volume plugin, so the track's fader still applies.
@@ -608,7 +611,7 @@ bool ApplicationModel::setTrackPan (const juce::String& trackId, double pan, boo
 
 bool ApplicationModel::setTrackMuted (const juce::String& trackId, bool muted)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
 
     if (track == nullptr || track->isMuted (false) == muted)
         return false;
@@ -619,7 +622,7 @@ bool ApplicationModel::setTrackMuted (const juce::String& trackId, bool muted)
 
 bool ApplicationModel::setTrackSolo (const juce::String& trackId, bool solo)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
 
     if (track == nullptr || track->isSolo (false) == solo)
         return false;
@@ -651,9 +654,9 @@ juce::StringArray ApplicationModel::getMidiInputs() const
 
 bool ApplicationModel::setTrackInput (const juce::String& trackId, const juce::String& inputName)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
     auto* current = track != nullptr ? impl->inputOf (*track) : nullptr;
-    auto* input = inputName.isEmpty() || track == nullptr ? nullptr : impl->findInput (impl->kindOf (*track), inputName);
+    auto* input = inputName.isEmpty() || track == nullptr ? nullptr : impl->findInput (trackKindOf (*track), inputName);
 
     if (track == nullptr || input == current || (input == nullptr && inputName.isNotEmpty()))
         return false;
@@ -673,15 +676,15 @@ bool ApplicationModel::setTrackInput (const juce::String& trackId, const juce::S
 
 bool ApplicationModel::setTrackArmed (const juce::String& trackId, bool armed)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
 
-    if (track == nullptr || (armed && Impl::isReturnTrack (*track)))
+    if (track == nullptr || (armed && isReturnTrack (*track)))
         return false;
 
     auto* input = impl->inputOf (*track);
 
     if (input == nullptr && armed)
-        if (setTrackInput (trackId, getInputs (impl->kindOf (*track))[0]))
+        if (setTrackInput (trackId, getInputs (trackKindOf (*track))[0]))
             input = impl->inputOf (*track);
 
     if (input == nullptr || input->isRecordingEnabled (track->itemID) == armed)
@@ -700,14 +703,14 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
 
     auto* track = impl->insertionTrack();
 
-    if (track != nullptr && impl->isMidiTrack (*track))
+    if (track != nullptr && isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
     impl->undo().beginStep ("Insert Clip");
 
     if (track == nullptr)
         for (auto* t : te::getAudioTracks (edit))
-            if (! impl->isMidiTrack (*t))
+            if (! isMidi (*t))
             {
                 track = t;
                 break;
@@ -730,12 +733,12 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
 
 juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const juce::String& trackId, double startSeconds)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
 
     if (track == nullptr)
         return juce::Result::fail ("No track with that id");
 
-    if (impl->isMidiTrack (*track))
+    if (isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
     if (! te::AudioFile (impl->edit().engine, file).isValid())
@@ -749,7 +752,7 @@ juce::Result ApplicationModel::insertMidiClip()
 {
     auto* track = impl->insertionTrack();
 
-    if (track != nullptr && ! impl->isMidiTrack (*track))
+    if (track != nullptr && ! isMidi (*track))
         return juce::Result::fail ("Select a MIDI track");
 
     // Nothing selected: the first MIDI track, as clip.add uses the first audio track.
@@ -774,11 +777,11 @@ bool ApplicationModel::moveClip (const juce::String& clipId, double startSeconds
 {
     auto* clip = impl->findClip (clipId);
     auto* track = trackId.isEmpty() ? (clip != nullptr ? clip->getClipTrack() : nullptr)
-                                    : impl->findTrack (trackId);
+                                    : findAudioTrack (impl->edit(), trackId);
 
     // A clip stays on tracks of its own kind.
     if (clip == nullptr || track == nullptr
-         || impl->isMidiTrack (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
+         || isMidi (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
         return false;
 
     const auto start = te::TimePosition::fromSeconds (std::max (0.0, startSeconds));
@@ -860,12 +863,12 @@ juce::Result ApplicationModel::copyClip (const juce::String& clipId, double star
 {
     auto* clip = impl->findClip (clipId);
     auto* track = trackId.isEmpty() ? (clip != nullptr ? dynamic_cast<te::AudioTrack*> (clip->getClipTrack()) : nullptr)
-                                    : impl->findTrack (trackId);
+                                    : findAudioTrack (impl->edit(), trackId);
 
     if (clip == nullptr || track == nullptr)
         return juce::Result::fail ("No such clip or track");
 
-    if (impl->isMidiTrack (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
+    if (isMidi (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
         return juce::Result::fail ("A clip only goes on a track of its own kind");
 
     impl->undo().beginStep ("Copy Clip");
@@ -1390,7 +1393,7 @@ bool ApplicationModel::canRedo() const   { return impl->undoManager().canRedo();
 //==============================================================================
 void ApplicationModel::selectTrack (const juce::String& trackId, SelectionMode mode)
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
     auto& selection = impl->selectionManager;
 
     if (track == nullptr)
@@ -1736,6 +1739,14 @@ int ApplicationModel::getBeatsPerBar (double seconds) const
     return std::max (1, (int) impl->edit().tempoSequence.getTimeSigAt (te::TimePosition::fromSeconds (std::max (0.0, seconds))).numerator);
 }
 
+std::optional<ClipInfo> ApplicationModel::getClip (const juce::String& clipId) const
+{
+    if (auto* clip = impl->findClip (clipId))
+        return impl->clipInfo (*clip);
+
+    return {};
+}
+
 std::vector<TrackInfo> ApplicationModel::getTracks() const
 {
     std::vector<TrackInfo> tracks;
@@ -1746,12 +1757,12 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         TrackInfo info;
         info.id = t->itemID.toString();
         info.name = t->getName();
-        info.kind = impl->isMidiTrack (*t) ? TrackKind::midi : TrackKind::audio;
+        info.kind = trackKindOf (*t);
         info.selected = impl->selectionManager.isSelected (t);
         info.colourIndex = impl->colourOf (*t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
-        info.isReturn = Impl::isReturnTrack (*t);
+        info.isReturn = isReturnTrack (*t);
 
         if (auto* input = impl->inputOf (*t, inputs))
         {
@@ -1766,29 +1777,8 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         }
 
         for (auto* c : t->getClips())
-        {
-            if (auto* wave = dynamic_cast<te::WaveAudioClip*> (c))
-            {
-                const auto pos = wave->getPosition();
-                ClipInfo clip { wave->itemID.toString(),
-                                wave->getName(),
-                                pos.getStart().inSeconds(),
-                                pos.getLength().inSeconds(),
-                                pos.getOffset().inSeconds(),
-                                wave->getMaximumLength().inSeconds(),
-                                wave->getOriginalFile(),
-                                impl->selectionManager.isSelected (wave),
-                                Impl::takesOf (*wave).getNumChildren(),
-                                impl->currentTakeOf (*wave) };
-                clip.reversed = wave->getIsReversed();
-                impl->describeLoopAndColour (*wave, clip);
-                info.clips.push_back (std::move (clip));
-            }
-            else if (auto* midi = dynamic_cast<te::MidiClip*> (c))
-            {
-                info.clips.push_back (impl->midiClipInfo (*midi));
-            }
-        }
+            if (auto clip = impl->clipInfo (*c))
+                info.clips.push_back (std::move (*clip));
 
         tracks.push_back (std::move (info));
     }
@@ -1842,7 +1832,7 @@ std::vector<RecordingInfo> ApplicationModel::getRecordings() const
 
 std::unique_ptr<ClipWaveform> ApplicationModel::createRecordingWaveform (const juce::String& trackId) const
 {
-    auto* track = impl->findTrack (trackId);
+    auto* track = findAudioTrack (impl->edit(), trackId);
     auto* input = track != nullptr ? impl->inputOf (*track) : nullptr;
 
     // A MIDI recording has no waveform.

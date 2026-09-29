@@ -233,10 +233,8 @@ void MainComponent::openPianoRollForSelection()
 {
     const auto clipId = app.model.getSelectedClipId();
 
-    for (auto& track : app.model.getTracks())
-        for (auto& clip : track.clips)
-            if (clip.id == clipId && clip.kind == TrackKind::midi)
-                pianoRoll.openClip (clipId);
+    if (auto clip = app.model.getClip (clipId); clip && clip->kind == TrackKind::midi)
+        pianoRoll.openClip (clipId);
 }
 
 void MainComponent::showMenu (const juce::String& name, juce::Rectangle<int> screenArea)

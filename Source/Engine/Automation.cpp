@@ -1,5 +1,6 @@
 #include "Automation.h"
 #include "ApplicationModel.h"
+#include "EditTracks.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -13,15 +14,6 @@ namespace resamper
 
 namespace
 {
-    te::AudioTrack* findTrack (te::Edit& edit, const juce::String& trackId)
-    {
-        for (auto* track : te::getAudioTracks (edit))
-            if (track->itemID.toString() == trackId)
-                return track;
-
-        return nullptr;
-    }
-
     /** Inserts are everything ahead of the track fader, matching PluginRack.
         The level meter lives after the volume plug-in and is not a target. */
     int indexBeforeVolume (te::AudioTrack& track)
@@ -134,7 +126,7 @@ Automation::Automation (ProjectManager& pm) : projects (pm) {}
 std::vector<ParameterInfo> Automation::getTargets (const juce::String& trackId) const
 {
     std::vector<ParameterInfo> targets;
-    auto* track = findTrack (projects.getEdit(), trackId);
+    auto* track = findAudioTrack (projects.getEdit(), trackId);
 
     if (track == nullptr)
         return targets;
@@ -175,7 +167,7 @@ std::vector<AutomationPointInfo> Automation::getPoints (const juce::String& trac
                                                         const juce::String& parameterKey) const
 {
     std::vector<AutomationPointInfo> points;
-    auto* track = findTrack (projects.getEdit(), trackId);
+    auto* track = findAudioTrack (projects.getEdit(), trackId);
     auto* param = track != nullptr ? findParameter (*track, parameterKey) : nullptr;
 
     if (param == nullptr)
@@ -199,7 +191,7 @@ bool Automation::addPoint (const juce::String& trackId, const juce::String& para
                            double timeSeconds, float value)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
     auto* param = track != nullptr ? findParameter (*track, parameterKey) : nullptr;
 
     if (param == nullptr)
@@ -217,7 +209,7 @@ bool Automation::movePoint (const juce::String& trackId, const juce::String& par
                             int index, double timeSeconds, float value)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
     auto* param = track != nullptr ? findParameter (*track, parameterKey) : nullptr;
 
     if (param == nullptr)
@@ -245,7 +237,7 @@ bool Automation::movePoint (const juce::String& trackId, const juce::String& par
 bool Automation::removePoint (const juce::String& trackId, const juce::String& parameterKey, int index)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
     auto* param = track != nullptr ? findParameter (*track, parameterKey) : nullptr;
 
     if (param == nullptr || ! juce::isPositiveAndBelow (index, param->getCurve().getNumPoints()))
@@ -259,7 +251,7 @@ bool Automation::removePoint (const juce::String& trackId, const juce::String& p
 bool Automation::clear (const juce::String& trackId, const juce::String& parameterKey)
 {
     auto& edit = projects.getEdit();
-    auto* track = findTrack (edit, trackId);
+    auto* track = findAudioTrack (edit, trackId);
     auto* param = track != nullptr ? findParameter (*track, parameterKey) : nullptr;
 
     if (param == nullptr || param->getCurve().getNumPoints() == 0)
