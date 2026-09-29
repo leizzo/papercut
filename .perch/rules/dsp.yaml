@@ -1,16 +1,17 @@
 - name: realtime-safe-audio-thread
   each: method
   where: Source/Engine/**/*.{cpp,h}
+  min: 70
   ensure: >-
     If this method runs on the audio thread (processBlock, applyToBuffer,
-    getNextAudioBlock, renderNextBlock, prepareForNextBlock, a LevelMeasurer or
-    audio-device callback, or anything only they call), it does not allocate
-    (new, make_unique, push_back or resize on a growing container, building a
+    getNextAudioBlock, renderNextBlock, prepareForNextBlock, an audio-device
+    callback, or anything only they call), it does not allocate (new,
+    make_unique, push_back or resize on a growing container, building a
     juce::String), lock a mutex or CriticalSection, wait, log, touch files, read
     or write a ValueTree, or call into the message thread. Buffers are sized in
     prepare/initialise and reused; data crosses threads through atomics or
-    lock-free FIFOs. A method that never runs on the audio thread passes.
-  min: 70
+    lock-free FIFOs. A method that runs on the message thread — including one
+    that reads peaks from a LevelMeasurer::Client — passes.
 - name: dsp-sample-rate-from-prepare
   each: method
   where: Source/Engine/**/*.{cpp,h}

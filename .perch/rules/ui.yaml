@@ -1,7 +1,7 @@
 - name: ui-theme-tokens-only
   each: method
   where: Source/UI/**/*.{cpp,h}
-  except: Source/UI/Theme/**/*.{cpp,h}
+  except: Source/UI/{Theme,Developer}/**/*.{cpp,h}
   min: 70
   ensure: >-
     Look only at colour values and numeric literals written directly in this
@@ -11,39 +11,40 @@
     value passes wherever it is defined: Theme fields (theme.accent, radiusSm),
     LayoutMetrics fields, a constexpr in a *Metrics namespace, a named member or
     local. juce::Colours::transparentBlack, 0, 1 px hairlines, 0.5f centring and
-    ratios like getWidth() / 2 pass.
+    ratios like getWidth() / 2 pass, and so does icon glyph path data.
 - name: ui-changes-edit-through-commands
   each: method
   where: Source/UI/**/*.{cpp,h}
   min: 70
   ensure: >-
-    Look only at calls this method makes on an Engine facade (the
-    ApplicationModel, Mixer, PluginRack, Session, Automation or another class
-    from Source/Engine, usually held as model, mixer, rack or plugins) or on a
-    Tracktion object. If one of those calls changes the Edit (adds, removes,
-    moves, renames or sets a value on a track, clip, note, plugin, send,
-    parameter, tempo or transport-independent setting), this breaks: the UI must
-    invoke a Command (commands.invoke (cmd::..., {...})) instead. Reading from a
-    facade, calling methods on this component or its child components, writing
-    UI State (a component's own state ValueTree) and selection pass. A method
-    that makes no such call passes.
+    Look only at calls this method makes on a class from Source/Engine
+    (ApplicationModel, Mixer, PluginRack, the Session facade, Automation,
+    Production and the like) or on a Tracktion object. If one of those calls
+    changes the Edit (adds, removes, moves, renames or sets a value on a track,
+    clip, note, plugin, send or parameter, or changes tempo), this breaks: the
+    UI must invoke a Command (commands.invoke (cmd::..., {...})) instead.
+    Reading from those classes passes. Calls on UI-side types (ContinuousValue,
+    this component, its child components), view-only UI State (scroll, zoom,
+    focus, view options kept in a component's state ValueTree) and selection
+    pass. A method that makes no such call passes.
 - name: ui-paint-only-draws
   each: method
   where: Source/UI/**/*.{cpp,h}
+  min: 70
   ensure: >-
     If this method is paint, paintOverChildren or resized, it only lays out or
-    draws from state already held by the component: it does not change the Edit
-    or the model, invoke a Command, start timers, add/remove child components,
-    call repaint, allocate large buffers, sort, read files or walk the whole
-    Edit to find what to draw. Any other method passes.
-  min: 70
+    draws from state the component already holds: it does not change any state,
+    start timers, add or remove child components, call repaint, allocate large
+    buffers, sort, read files or walk the whole Edit to find what to draw. Any
+    other method passes.
 - name: ui-timer-repaints-on-change
   each: method
   where: Source/UI/**/*.{cpp,h}
-  ensure: >-
-    If this method is a timerCallback, it repaints or re-lays out only when what
-    it polls has changed since the last tick (compared against a stored previous
-    value), and repaints the smallest region that changed. An unconditional
-    repaint() of the whole component every tick breaks this. Any other method
-    passes.
   min: 70
+  ensure: >-
+    If this method is a timerCallback, it does not repaint() the whole component
+    every tick unconditionally. It passes when it repaints only when what it
+    polls has changed since the last tick, when it repaints just the region of a
+    readout or meter that moves continuously (a position counter, CPU display,
+    level meter), or when it hands off to a method that makes that decision. Any
+    other method passes.

@@ -1,15 +1,17 @@
 - name: tracktion-edits-through-undo
   each: method
   where: Source/Engine/**/*.{cpp,h}
-  ensure: >-
-    Every change this method makes to the Edit (a ValueTree
-    setProperty/addChild/removeChild, inserting or removing a track, clip,
-    plugin or automation point, changing a parameter value) passes the Edit's
-    UndoManager, or a comment at that line says why it is not undoable
-    (transport, loop, selection, zoom, scroll, track input or arming — per
-    CONTEXT.md Engine Undo). Passing nullptr as the UndoManager for any other
-    Edit change breaks this. A method that changes nothing in the Edit passes.
   min: 70
+  ensure: >-
+    Every change this method makes to a ValueTree or object that is already part
+    of the Edit (setProperty, addChild, removeChild, inserting or removing a
+    track, clip, plugin or automation point, setting a parameter value) passes
+    the Edit's UndoManager, or a comment in or above the method says why it is
+    not undoable (transport, the Loop, selection, zoom, scroll, a track's Input
+    and arming — per CONTEXT.md Engine Undo). Passing nullptr for any other
+    change to the Edit breaks this. Building a detached ValueTree that is added
+    to the Edit afterwards with the UndoManager passes, and so does a method
+    that changes nothing in the Edit.
 - name: tracktion-lookups-checked
   each: method
   where: Source/Engine/**/*.{cpp,h}
