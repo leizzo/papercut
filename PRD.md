@@ -4,8 +4,8 @@
 |---|---|
 | **Product** | Resamper — Digital Audio Workstation (desktop) |
 | **Document** | Product Requirements Document (PRD) |
-| **Version** | 1.2 (draft) |
-| **Date** | 2026-09-28 (v1.0) · updated 2026-09-28 (v1.1) · 2026-09-29 (v1.2) |
+| **Version** | 1.3 (draft) |
+| **Date** | 2026-09-28 (v1.0) · updated 2026-09-28 (v1.1) · 2026-09-29 (v1.2, v1.3) |
 | **Owner** | Ismail Bahtiyar |
 | **Design source** | `@design/design.pen` — screens + `Resamper DS — Foundations / Components / Patterns & Handoff` |
 | **Status** | Ready for engineering review |
@@ -21,6 +21,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.3** | Glossary alignment: one tap vocabulary per track (**Input · Pre-FX · Pre-Fader · Post-Fader**); sidechain taps renamed from Pre-FX / Post-FX / Post-Mixer to Input / Pre-FX / Post-Fader (§4.1, §20). §20 root is the **Edit** (was `Project`); rack chains are `RackChain`. |
 | **1.2** | Feature sections already covered by tickets (§5–§14, §15.8, §16–§19, §21) moved verbatim into their issues; headings remain with pointers. Still specified here: §1–§4, §9.2.1a (native device v2), §9.8 (Simpler & Sampler), §15.1–§15.7, §20, §22–§24. Ambiguities found while matching tickets listed in §23.3. M5 now names MIDI Effect racks. |
 | **1.1** | Native devices vs plug-ins (§9.2) and floating **plug-in windows that open on insert** (§9.6). **Sidechain inputs** (§9.7) with source picker and indicators. **Iconography** (§15.8). Sidechain key path in the signal flow (§4.1). Detail view grows for expanded device panels (§6.3). New tokens `state-sidechain`, `bg-hover`, `accent-hover`, `focus-ring`. Accessibility, performance, data model, edge states, release plan (new **M1.1 — Devices & Plug-ins** phase after v0.1.0; sidechain in M2) and screen inventory updated for plug-ins and sidechain. Mixer redesigned to #16: FX / PRE / POST send taps, returns A–D (`return-c`, `return-d` tokens) in a horizontally scrolling strips area with pinned Master, send-section paging. Open items listed in §23.2. |
 | **1.0** | Initial PRD: shell, Session, Arrangement, racks, Mixer (inserts, sends, returns, master), folders & buses, automation, piano roll, audio editor, design system. Open questions resolved in #16. |
@@ -154,19 +155,19 @@ Tap-point definitions:
 
 ```
 Source (track | rack chain / pad | folder bus | return | external input)
-  → Sidechain tap  [Pre-FX | Post-FX | Post-Mixer]   (default Pre-FX)
+  → Sidechain tap  [Input | Pre-FX | Post-Fader]   (default Input)
   → Key conditioning: band filter · gain · mono sum · listen
   → Detector of the destination device (native compressor / gate / ducker, or plug-in aux bus)
        → only the destination's gain changes; its own audio path is unchanged
 ```
 
-Sidechain taps are defined relative to the **source** track:
+Sidechain taps are defined relative to the **source** track and use the same names as send taps (a sidechain offers Input, Pre-FX and Post-Fader; a send offers Pre-FX, Pre-Fader and Post-Fader):
 
 | Tap | Key signal taken |
 |---|---|
-| **Pre-FX** (default) | Source before its device chain (raw clip / input). |
-| **Post-FX** | After the source's device chain, before its mixer inserts. |
-| **Post-Mixer** | After the source's fader and pan; follows mute. |
+| **Input** (default) | Source before its device chain (raw clip / input). |
+| **Pre-FX** | After the source's device chain, before its mixer inserts. |
+| **Post-Fader** | After the source's fader and pan; follows mute. |
 
 ### 4.2 Two chains, one track
 
@@ -697,10 +698,10 @@ Tokens ship as CSS custom properties `--resamper-<token>` (e.g. `--resamper-bg-d
 ## 20. Data model
 
 ```ts
-Project {
+Edit {                                    // the one Edit inside a Project folder
   id, name, tempo, timeSignature, sampleRate,
   tracks: Track[], returns: ReturnTrack[], master: MasterTrack,
-  scenes: Scene[], markers: Marker[], viewState: ViewState
+  scenes: Scene[], markers: Marker[], viewState: ViewState   // UI State
 }
 
 Track {
@@ -747,15 +748,15 @@ Plugin {
 }
 Rack {
   type: "instrument" | "drum" | "audioEffect" | "midiEffect",
-  chains: Chain[], macros: Macro[16], selectedChainId
+  chains: RackChain[], macros: Macro[16], selectedChainId
 }
-Chain { id, name, volumeDb, enabled, solo, devices: Device[], padNote?: number }
+RackChain { id, name, volumeDb, enabled, solo, devices: Device[], padNote?: number }
 
 Sidechain {                               // on any device / insert with a detector or aux bus
   enabled: boolean,
   source?: { kind: "track" | "chain" | "bus" | "return" | "external",
              trackId?: string, chainId?: string, inputId?: string },
-  tap: "preFx" | "postFx" | "postMixer",   // default "preFx"
+  tap: "input" | "preFx" | "postFader",    // default "input"
   gainDb: number, mix: number /* 0..1 */, monoSum: boolean,
   filter?: { type: "hpf" | "lpf" | "bandpass", lowHz?: number, highHz?: number },
   listen: boolean                          // UI state, not saved
