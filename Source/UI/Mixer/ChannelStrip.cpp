@@ -20,6 +20,11 @@ namespace
     /** A Bus Strip: narrower fader, wider meter wells. */
     constexpr FaderSection::Geometry busFaderGeometry { 40, 9.0f };
 
+    /** The Bus Strip's tint and outline, and the tint of a chip or badge, as alphas of their colour. */
+    constexpr float busTintAlpha = 0.08f, busOutlineAlpha = 0.6f, chipTintAlpha = 0.15f;
+
+    constexpr int headIconSize = 12, chipPadX = 7, badgePadX = 4, badgeGap = 4;
+
     /** Signal-flow stages, as the mixer toolbar names them. */
     enum Stage { trackChainStage, insertsStage, sendsStage, faderStage };
 
@@ -483,12 +488,12 @@ void ChannelStrip::paintSectionHeader (juce::Graphics& g, juce::Rectangle<int> a
     // The badge first, so a narrow strip's title never runs under it.
     if (tag.isNotEmpty())
     {
-        const auto width = juce::GlyphArrangement::getStringWidthInt (themeManager.font (theme.micro), theme.micro.apply (tag)) + 8;
+        const auto width = juce::GlyphArrangement::getStringWidthInt (themeManager.font (theme.micro), theme.micro.apply (tag)) + 2 * badgePadX;
         auto badge = row.removeFromRight (width);
-        g.setColour (tagColour.withAlpha (0.15f));
+        g.setColour (tagColour.withAlpha (chipTintAlpha));
         g.fillRoundedRectangle (badge.toFloat(), theme.radiusSm);
         drawStyledText (g, themeManager, tag, theme.micro, badge, juce::Justification::centred, tagColour);
-        row.removeFromRight (4);
+        row.removeFromRight (badgeGap);
     }
 
     drawStyledText (g, themeManager, title, labelStyle, row, juce::Justification::centredLeft, theme.textDim);
@@ -505,9 +510,9 @@ void ChannelStrip::paint (juce::Graphics& g)
 
     if (state.isBus())
     {
-        g.setColour (colour.withAlpha (0.08f));
+        g.setColour (colour.withAlpha (busTintAlpha));
         g.fillRoundedRectangle (bounds, radius);
-        g.setColour (colour.withAlpha (0.6f));
+        g.setColour (colour.withAlpha (busOutlineAlpha));
         g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
     }
 
@@ -518,7 +523,7 @@ void ChannelStrip::paint (juce::Graphics& g)
 
     if (state.isBus())
     {
-        drawIcon (g, Icon::gitMerge, head.removeFromLeft (12).toFloat().withSizeKeepingCentre (12.0f, 12.0f), colour);
+        drawIcon (g, Icon::gitMerge, head.removeFromLeft (headIconSize).toFloat().withSizeKeepingCentre ((float) headIconSize, (float) headIconSize), colour);
     }
     else
     {
@@ -553,12 +558,12 @@ void ChannelStrip::paint (juce::Graphics& g)
         if (state.isBus())
         {
             auto chip = rows.withHeight (selectHeight);
-            g.setColour (colour.withAlpha (0.15f));
+            g.setColour (colour.withAlpha (chipTintAlpha));
             g.fillRoundedRectangle (chip.toFloat(), theme.radiusMd);
             const auto count = state.strip.childCount;
             drawStyledText (g, themeManager, juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x90 ")) + juce::String (count)
                                                  + (count == 1 ? " track" : " tracks"),
-                            theme.bodySm, chip.reduced (7, 0), juce::Justification::centredLeft, colour);
+                            theme.bodySm, chip.reduced (chipPadX, 0), juce::Justification::centredLeft, colour);
         }
 
         auto out = rows.withTrimmedTop (selectHeight + rowGap).withHeight (selectHeight);

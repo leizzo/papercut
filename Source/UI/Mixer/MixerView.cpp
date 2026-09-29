@@ -85,11 +85,12 @@ void MixerView::showStripMenu (const Strip& strip)
 
     juce::PopupMenu sends, buses;
 
+    // The items call the registry, which outlives this view, never this.
     for (auto& ret : mixer.getReturns())
-        sends.addItem (ret.name, [this, trackId, bus = ret.bus] { commands.invoke (cmd::mixerAddSend, { trackId, bus }); });
+        sends.addItem (commandItem (commands, cmd::mixerAddSend, { trackId, ret.bus }, ret.name));
 
     for (auto& bus : mixer.getBuses())
-        buses.addItem (bus.name, [this, trackId, id = bus.trackId] { commands.invoke (cmd::mixerMoveToBus, { trackId, id }); });
+        buses.addItem (commandItem (commands, cmd::mixerMoveToBus, { trackId, bus.trackId }, bus.name));
 
     // A return doesn't send to returns or join a bus; a Bus sends, but nesting Buses is #37.
     juce::PopupMenu menu;
