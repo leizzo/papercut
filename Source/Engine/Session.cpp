@@ -141,7 +141,7 @@ juce::Result Session::setSceneCount (int count)
     if (scenes.getNumScenes() >= count && tracksHaveSlotCount (edit, scenes.getNumScenes()))
         return juce::Result::ok();
 
-    edit.getUndoManager().beginNewTransaction ("Set Scenes");
+    projects.getUndo().beginStep ("Set Scenes");
     scenes.ensureNumberOfScenes (std::max (count, scenes.getNumScenes()));
     return juce::Result::ok();
 }
@@ -178,7 +178,7 @@ bool Session::renameScene (int index, const juce::String& name)
     if (! juce::isPositiveAndBelow (index, scenes.size()) || scenes[index]->name.get() == name)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Rename Scene");
+    projects.getUndo().beginStep ("Rename Scene");
     scenes[index]->name = name;
     return true;
 }
@@ -214,7 +214,7 @@ juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, 
     if (slots == nullptr)
         return juce::Result::fail ("No slot for that scene");
 
-    edit.getUndoManager().beginNewTransaction ("Add Slot Clip");
+    projects.getUndo().beginStep ("Add Slot Clip");
     slots->ensureNumberOfSlots (sceneIndex + 1);
 
     auto* slot = slotAt (*track, sceneIndex);
@@ -253,7 +253,7 @@ juce::Result Session::addMidiSlotClip (const juce::String& trackId, int sceneInd
     if (slots == nullptr)
         return juce::Result::fail ("No slot for that scene");
 
-    edit.getUndoManager().beginNewTransaction ("Add Slot Clip");
+    projects.getUndo().beginStep ("Add Slot Clip");
     slots->ensureNumberOfSlots (sceneIndex + 1);
 
     auto* slot = slotAt (*track, sceneIndex);
@@ -280,7 +280,7 @@ bool Session::clearSlot (const juce::String& trackId, int sceneIndex)
     if (clip == nullptr)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Clear Slot");
+    projects.getUndo().beginStep ("Clear Slot");
     clip->removeFromParent();
     return true;
 }
@@ -460,7 +460,7 @@ juce::Result Session::recordIntoArrangement()
     const auto startSeconds = std::max (0.0, edit.getTransport().getPosition().inSeconds());
     const auto maxEnd = te::Edit::getMaximumEditEnd().inSeconds();
 
-    edit.getUndoManager().beginNewTransaction ("Record into Arrangement");
+    projects.getUndo().beginStep ("Record into Arrangement");
     int inserted = 0;
 
     for (auto& cap : captured)

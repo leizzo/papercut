@@ -413,7 +413,7 @@ juce::Result Shaper::add (const juce::String& trackId, const juce::String& param
     if (list == nullptr)
         return juce::Result::fail ("This track cannot hold a shaper");
 
-    edit.getUndoManager().beginNewTransaction ("Add Shaper");
+    projects.getUndo().beginStep ("Add Shaper");
 
     const auto type = mode == ShaperMode::audioTrigger ? te::IDs::ENVELOPEFOLLOWER
                                                        : te::IDs::BREAKPOINTOSCILLATOR;
@@ -444,7 +444,7 @@ bool Shaper::remove (const juce::String& shaperId)
     if (located.modifier == nullptr)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Remove Shaper");
+    projects.getUndo().beginStep ("Remove Shaper");
     located.modifier->remove();
     return true;
 }
@@ -470,7 +470,7 @@ bool Shaper::setLoop (const juce::String& shaperId, double lengthBeats, const st
     if (replacing && located.track->getModifierList() == nullptr)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Set Shaper Loop");
+    projects.getUndo().beginStep ("Set Shaper Loop");
 
     auto* osc = dynamic_cast<te::BreakpointOscillatorModifier*> (located.modifier);
 
@@ -507,7 +507,7 @@ bool Shaper::setAudioTrigger (const juce::String& shaperId, float attackSeconds,
     if (replacing && located.track->getModifierList() == nullptr)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Set Shaper Audio Trigger");
+    projects.getUndo().beginStep ("Set Shaper Audio Trigger");
 
     auto* env = dynamic_cast<te::EnvelopeFollowerModifier*> (located.modifier);
 

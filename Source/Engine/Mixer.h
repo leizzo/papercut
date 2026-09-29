@@ -111,16 +111,12 @@ private:
     struct MeterState;
 
     ProjectManager& projects;
-    juce::String openGestureKey;
     std::unique_ptr<MeterState> meters;
     bool measuringRms = false;
 
     /** meterPlugin is a tracktion::LevelMeterPlugin*. Kept as void* so this
         header stays free of Tracktion types. */
     StereoLevel levelOf (const juce::String& slotId, void* meterPlugin);
-
-    void beginUndoStep (const juce::String& name);
-    void beginGestureStep (const juce::String& name, const juce::String& gestureKey, bool continues);
 
     JUCE_DECLARE_NON_COPYABLE (Mixer)
 };

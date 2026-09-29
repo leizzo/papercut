@@ -461,7 +461,7 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     // Creation writes default parameter state through the Edit undo manager,
     // so it has to land in the same transaction as the insert (and, on a MIDI
     // track, the removal of the built-in synth).
-    edit.getUndoManager().beginNewTransaction ("Insert Plug-in");
+    projectManager.getUndo().beginStep ("Insert Plug-in");
 
     te::Plugin::Ptr plugin = builtIn ? edit.getPluginCache().createNewPlugin (typeOrIdentifier, {})
                                      : edit.getPluginCache().createNewPlugin (te::ExternalPlugin::xmlTypeName, external);
@@ -542,7 +542,7 @@ bool PluginRack::remove (const juce::String& trackId, const juce::String& plugin
     if (pluginId.isEmpty() || plugin == nullptr)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Remove Plug-in");
+    projectManager.getUndo().beginStep ("Remove Plug-in");
     plugin->deleteFromParent();
     return true;
 }
@@ -563,7 +563,7 @@ bool PluginRack::move (const juce::String& trackId, const juce::String& pluginId
     if (newIndex < 0 || newIndex >= (int) members.size() || newIndex == from)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Move Plug-in");
+    projectManager.getUndo().beginStep ("Move Plug-in");
     plugin->removeFromParent();
 
     auto remaining = chainsFor (edit, trackId);
@@ -579,7 +579,7 @@ bool PluginRack::setBypassed (const juce::String& trackId, const juce::String& p
     if (plugin == nullptr || plugin->isEnabled() == ! bypassed || ! plugin->canBeDisabled())
         return false;
 
-    edit.getUndoManager().beginNewTransaction (bypassed ? "Bypass Plug-in" : "Enable Plug-in");
+    projectManager.getUndo().beginStep (bypassed ? "Bypass Plug-in" : "Enable Plug-in");
     plugin->setEnabled (! bypassed);
     return true;
 }
@@ -594,7 +594,7 @@ juce::Result PluginRack::moveToDeviceChain (const juce::String& trackId, const j
         return juce::Result::fail ("That plug-in isn't a mixer insert");
 
     auto& um = edit.getUndoManager();
-    um.beginNewTransaction ("Move to Track Chain");
+    projectManager.getUndo().beginStep ("Move to Track Chain");
     plugin->removeFromParent();
     plugin->state.removeProperty (chainProperty, &um);
     chains.track->pluginList.insertPlugin (plugin, chainsFor (edit, trackId).endIndex (PluginChain::device), nullptr);
@@ -622,7 +622,7 @@ juce::Result PluginRack::copyInsert (const juce::String& fromTrackId, const juce
     te::EditItemID::remapIDs (state, nullptr, edit);
     state.setProperty (chainProperty, mixerChainValue, nullptr);
 
-    edit.getUndoManager().beginNewTransaction ("Copy Plug-in");
+    projectManager.getUndo().beginStep ("Copy Plug-in");
     auto copy = edit.getPluginCache().createNewPlugin (state);
 
     if (copy == nullptr)
@@ -733,12 +733,7 @@ bool PluginRack::setParameter (const juce::String& pluginId, const juce::String&
     if (juce::exactlyEqual (clamped, parameter->getCurrentValue()))
         return false;
 
-    const auto key = pluginId + ":" + parameterId;
-
-    if (! continuesGesture || openGestureKey != key)
-        edit.getUndoManager().beginNewTransaction ("Change " + parameter->getParameterName());
-
-    openGestureKey = key;
+    projectManager.getUndo().beginGestureStep ("Change " + parameter->getParameterName(), pluginId + ":" + parameterId, continuesGesture);
     return edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameterId, parameter->getCurrentValue(), clamped));
 }
 

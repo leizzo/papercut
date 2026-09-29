@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EngineUndo.h"
+
 #include <juce_core/juce_core.h>
 #include <memory>
 
@@ -51,6 +53,9 @@ public:
 
     tracktion::Edit& getEdit() const noexcept;
 
+    /** Where every facade starts its undo steps in the current Edit. */
+    EngineUndo& getUndo() noexcept                  { return undo; }
+
     /** Where a Project keeps its media, recordings included. */
     static juce::File getAudioFolder (const juce::File& projectFolder)   { return projectFolder.getChildFile ("Audio"); }
 
@@ -63,6 +68,7 @@ private:
     std::unique_ptr<tracktion::Edit> edit;
     juce::File projectFolder;
     bool untitled = true;
+    EngineUndo undo { *this };
 
     juce::Result writeProject (const juce::File& folder, const juce::var& uiState);
     void setCurrent (std::unique_ptr<tracktion::Edit>, const juce::File& folder, bool isUntitled);

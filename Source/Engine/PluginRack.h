@@ -118,8 +118,8 @@ public:
     juce::String getParameterText (const juce::String& pluginId, const juce::String& parameterId, float value) const;
 
     /** Sets a parameter (clamped to its range). continuesGesture joins the
-        previous call's undo step when that set the same parameter: a knob drag
-        is one step. */
+        previous call's undo step when that set the same parameter with nothing
+        undoable in between: a knob drag is one step (see EngineUndo). */
     bool setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture = false);
 
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
@@ -131,7 +131,6 @@ private:
 
     ProjectManager& projectManager;
     std::unique_ptr<ScanThread> scanThread;
-    juce::String openGestureKey;   ///< the parameter whose undo step a drag may still join
     std::atomic<bool> scanning { false };
 
     /** Set from the scan thread when its body starts on a thread other than startScan's caller. */

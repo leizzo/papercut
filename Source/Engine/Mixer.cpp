@@ -244,29 +244,6 @@ StereoLevel Mixer::getMasterLevel()
     return levelOf ("master", master != nullptr ? meterOnTrack (*master) : nullptr);
 }
 
-void Mixer::beginUndoStep (const juce::String& name)
-{
-    openGestureKey.clear();
-    projects.getEdit().getUndoManager().beginNewTransaction (name);
-}
-
-void Mixer::beginGestureStep (const juce::String& name, const juce::String& gestureKey, bool continues)
-{
-    // Join only while this gesture is still the open undo step. Another edit
-    // (or an undo) starts a new transaction, so a continued drag after that
-    // gets its own step — the same rule as ApplicationModel::setTrackVolume.
-    auto& undo = projects.getEdit().getUndoManager();
-    const bool join = continues
-                      && openGestureKey == gestureKey
-                      && undo.getCurrentTransactionName() == name
-                      && undo.getNumActionsInCurrentTransaction() > 0;
-
-    if (! join)
-        beginUndoStep (name);
-
-    openGestureKey = gestureKey;
-}
-
 juce::Result Mixer::addReturn (const juce::String& name)
 {
     auto& edit = projects.getEdit();
@@ -277,7 +254,7 @@ juce::Result Mixer::addReturn (const juce::String& name)
     if (ret == nullptr)
         return juce::Result::fail ("Couldn't add an aux return");
 
-    beginUndoStep ("Add Return");
+    projects.getUndo().beginStep ("Add Return");
     auto track = edit.insertNewAudioTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr);
 
     if (track == nullptr)
@@ -318,7 +295,7 @@ juce::Result Mixer::addSend (const juce::String& fromTrackId, int bus)
     if (send == nullptr)
         return juce::Result::fail ("Couldn't add a send");
 
-    beginUndoStep ("Add Send");
+    projects.getUndo().beginStep ("Add Send");
     auto index = 0;
 
     if (auto* volume = track->getVolumePlugin())
@@ -347,7 +324,7 @@ bool Mixer::setSendGain (const juce::String& trackId, const juce::String& sendId
     if (before == position)
         return false;
 
-    beginGestureStep ("Set Send Gain", "Set Send Gain:" + trackId + ":" + sendId, continuesGesture);
+    projects.getUndo().beginGestureStep ("Set Send Gain", "Set Send Gain:" + trackId + ":" + sendId, continuesGesture);
     // Set the fader position itself, as track volume does, so a repeated dB
     // lands on the same value and a no-op stays out of the undo history.
     send->gain->setParameter (position, juce::sendNotification);
@@ -377,7 +354,7 @@ bool Mixer::setSendMuted (const juce::String& trackId, const juce::String& sendI
     if (already == muted)
         return false;
 
-    beginUndoStep ("Mute Send");
+    projects.getUndo().beginStep ("Mute Send");
     send->setMute (muted);
     return true;
 }
@@ -406,7 +383,7 @@ std::vector<SendInfo> Mixer::getSends (const juce::String& trackId) const
 juce::Result Mixer::addBus (const juce::String& name)
 {
     auto& edit = projects.getEdit();
-    beginUndoStep ("Add Bus");
+    projects.getUndo().beginStep ("Add Bus");
     auto folder = edit.insertNewFolderTrack (te::TrackInsertPoint::getEndOfTracks (edit), nullptr, true);
 
     if (folder == nullptr)
@@ -427,7 +404,7 @@ bool Mixer::moveTrackToBus (const juce::String& trackId, const juce::String& bus
 
     auto children = bus->getAllSubTracks (false);
     te::Track* preceding = children.isEmpty() ? nullptr : children.getLast();
-    beginUndoStep ("Move to Bus");
+    projects.getUndo().beginStep ("Move to Bus");
     edit.moveTrack (track, te::TrackInsertPoint (bus, preceding));
     return track->getParentFolderTrack() == bus;
 }
@@ -486,7 +463,7 @@ bool Mixer::setMasterVolume (double db, bool continuesGesture)
     if (before == position)
         return false;
 
-    beginGestureStep ("Set Master Volume", "Set Master Volume", continuesGesture);
+    projects.getUndo().beginGestureStep ("Set Master Volume", "Set Master Volume", continuesGesture);
     plugin->setSliderPos (position);
     return plugin->volume.get() != before;
 }

@@ -208,7 +208,7 @@ bool Automation::addPoint (const juce::String& trackId, const juce::String& para
     const auto stored = publicToCurve (*param, parameterKey, value);
     const auto time = te::TimePosition::fromSeconds (juce::jmax (0.0, timeSeconds));
 
-    edit.getUndoManager().beginNewTransaction ("Add Automation Point");
+    projects.getUndo().beginStep ("Add Automation Point");
     param->getCurve().addPoint (time, stored, 0.0f, &edit.getUndoManager());
     return true;
 }
@@ -235,7 +235,7 @@ bool Automation::movePoint (const juce::String& trackId, const juce::String& par
         && nearlyEqual (stored, curve.getPointValue (index)))
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Move Automation Point");
+    projects.getUndo().beginStep ("Move Automation Point");
     curve.movePoint (index, te::TimePosition::fromSeconds (time), stored,
                      std::optional<juce::Range<float>> (param->getValueRange()),
                      false, &edit.getUndoManager());
@@ -251,7 +251,7 @@ bool Automation::removePoint (const juce::String& trackId, const juce::String& p
     if (param == nullptr || ! juce::isPositiveAndBelow (index, param->getCurve().getNumPoints()))
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Remove Automation Point");
+    projects.getUndo().beginStep ("Remove Automation Point");
     param->getCurve().removePoint (index, &edit.getUndoManager());
     return true;
 }
@@ -265,7 +265,7 @@ bool Automation::clear (const juce::String& trackId, const juce::String& paramet
     if (param == nullptr || param->getCurve().getNumPoints() == 0)
         return false;
 
-    edit.getUndoManager().beginNewTransaction ("Clear Automation");
+    projects.getUndo().beginStep ("Clear Automation");
     param->getCurve().clear (&edit.getUndoManager());
     return true;
 }
