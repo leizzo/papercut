@@ -42,12 +42,10 @@ void registerNoteCommands (CommandRegistry& registry, ApplicationModel& model)
     {
         juce::StringArray selected;
 
-        for (auto& track : model.getTracks())
-            for (auto& clip : track.clips)
-                if (clip.id == a.clipId)
-                    for (auto& note : clip.notes)
-                        if (note.selected)
-                            selected.add (note.id);
+        if (auto clip = model.getClip (a.clipId))
+            for (auto& note : clip->notes)
+                if (note.selected)
+                    selected.add (note.id);
 
         if (! selected.isEmpty())
             model.moveNotes (a.clipId, selected, 0.0, a.semitones);
@@ -58,11 +56,9 @@ void registerNoteCommands (CommandRegistry& registry, ApplicationModel& model)
     {
         juce::StringArray ids;
 
-        for (auto& track : model.getTracks())
-            for (auto& clip : track.clips)
-                if (clip.id == a.clipId)
-                    for (auto& note : clip.notes)
-                        ids.add (note.id);
+        if (auto clip = model.getClip (a.clipId))
+            for (auto& note : clip->notes)
+                ids.add (note.id);
 
         model.selectNotes (ids);
     });

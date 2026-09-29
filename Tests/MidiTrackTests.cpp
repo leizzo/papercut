@@ -123,6 +123,13 @@ struct MidiTrackTests : juce::UnitTest
             expectWithinAbsoluteError (clip.startSeconds, 3.0, 1e-6);
             expectWithinAbsoluteError (clip.lengthSeconds, 2.0, 1e-6);   // one bar at the default 120 bpm, 4/4
 
+            const auto found = f.model.getClip (clip.id);
+            expect (found.has_value());
+            expect (found->kind == TrackKind::midi);
+            expectWithinAbsoluteError (found->startSeconds, 3.0, 1e-6);
+            expect (! f.model.getClip ("no-such-clip").has_value());
+            expect (! f.model.getClip ({}).has_value());
+
             f.invoke (cmd::editUndo);
             expect (f.model.getTracks()[1].clips.empty());
             f.invoke (cmd::editUndo);   // the position and the selection are not undo steps; next is track.addMidi

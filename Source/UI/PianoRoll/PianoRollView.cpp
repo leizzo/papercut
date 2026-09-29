@@ -58,17 +58,16 @@ bool PianoRollView::isOpen() const
 
 void PianoRollView::openClip (const juce::String& clipId)
 {
-    for (auto& track : model.getTracks())
-        for (auto& clip : track.clips)
-            if (clip.id == clipId && clip.kind == TrackKind::midi)
-            {
-                view.setScrollSeconds (std::max (0.0, clip.startSeconds));
-                const auto rowOfMiddleC = 127 - 60;
-                const auto& metrics = themeManager.getMetrics();
-                view.setScrollY (rowOfMiddleC * metrics.pianoKeyHeight - metrics.pianoKeyHeight * metrics.pianoScrollMargin);
-                view.getState().setProperty (clipIdProperty, clipId, nullptr);
-                return;
-            }
+    const auto clip = model.getClip (clipId);
+
+    if (! clip || clip->kind != TrackKind::midi)
+        return;
+
+    view.setScrollSeconds (std::max (0.0, clip->startSeconds));
+    const auto rowOfMiddleC = 127 - 60;
+    const auto& metrics = themeManager.getMetrics();
+    view.setScrollY (rowOfMiddleC * metrics.pianoKeyHeight - metrics.pianoKeyHeight * metrics.pianoScrollMargin);
+    view.getState().setProperty (clipIdProperty, clipId, nullptr);
 }
 
 juce::String PianoRollView::openClipId() const

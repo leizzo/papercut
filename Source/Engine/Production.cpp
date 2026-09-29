@@ -1,5 +1,6 @@
 #include "Production.h"
 #include "Render.h"
+#include "EditTracks.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -11,15 +12,6 @@ namespace resamper
 namespace
 {
     const char* recoveryFolderName = "Recovery";
-
-    te::AudioTrack* findAudioTrack (te::Edit& edit, const juce::String& trackId)
-    {
-        for (auto* track : te::getAudioTracks (edit))
-            if (track->itemID.toString() == trackId)
-                return track;
-
-        return nullptr;
-    }
 
     juce::File recoveryFolder (const ProjectManager& projects)
     {

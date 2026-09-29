@@ -4,6 +4,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace resamper
@@ -114,8 +115,11 @@ public:
     {
         virtual ~Listener() = default;
 
-        /** Called asynchronously on the message thread after tracks, clips,
-            selection or the current Project changed. */
+        /** Called asynchronously on the message thread after any change to the
+            Edit (tracks, clips, Sends, Returns, Buses, the Master, Mixer
+            Inserts, Device Chains, automation; not transport state), the
+            selection or the current Project. It carries no payload: a listener
+            re-reads what it shows. */
         virtual void modelChanged() = 0;
     };
 
@@ -383,6 +387,9 @@ public:
     //==============================================================================
     // Queries
     std::vector<TrackInfo> getTracks() const;
+
+    /** One arrangement clip, as in getTracks(); nothing for an unknown id. */
+    std::optional<ClipInfo> getClip (const juce::String& clipId) const;
 
     /** Edit-timeline conversions, for the Piano Roll's beat grid. */
     double secondsToBeats (double seconds) const;

@@ -36,6 +36,7 @@ add_library(resamper_engine STATIC
     Source/Engine/EngineManager.cpp
     Source/Engine/ProjectManager.cpp
     Source/Engine/EngineUndo.cpp
+    Source/Engine/EditTracks.cpp
     Source/Engine/ApplicationModel.cpp
     Source/Engine/ClipWaveform.cpp
     Source/Engine/Production.cpp
