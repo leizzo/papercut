@@ -22,12 +22,17 @@ TrackKind trackKindOf (const te::Track& track)
     return track.state[trackKindProperty].toString() == midiKindValue ? TrackKind::midi : TrackKind::audio;
 }
 
+bool isMidi (const te::Track& track)
+{
+    return trackKindOf (track) == TrackKind::midi;
+}
+
 void markMidi (te::Track& track, juce::UndoManager* undoManager)
 {
     track.state.setProperty (trackKindProperty, midiKindValue, undoManager);
 }
 
-bool isReturn (const te::AudioTrack& track)
+bool isReturnTrack (const te::AudioTrack& track)
 {
     return ! track.pluginList.getPluginsOfType<te::AuxReturnPlugin>().isEmpty();
 }

@@ -1,6 +1,6 @@
 #include "Session.h"
-#include "ProjectManager.h"
 #include "EditTracks.h"
+#include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -176,7 +176,7 @@ juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, 
     if (track == nullptr)
         return juce::Result::fail ("Unknown track");
 
-    if (trackKindOf (*track) == TrackKind::midi)
+    if (isMidi (*track))
         return juce::Result::fail ("Slot clips go on audio tracks");
 
     te::AudioFile audio (edit.engine, audioFile);
@@ -227,7 +227,7 @@ juce::Result Session::addMidiSlotClip (const juce::String& trackId, int sceneInd
     if (track == nullptr)
         return juce::Result::fail ("Unknown track");
 
-    if (trackKindOf (*track) != TrackKind::midi)
+    if (! isMidi (*track))
         return juce::Result::fail ("MIDI slot clips go on MIDI tracks");
 
     if (! juce::isPositiveAndBelow (sceneIndex, edit.getSceneList().getNumScenes()))

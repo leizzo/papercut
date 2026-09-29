@@ -408,7 +408,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     te::AudioTrack* firstMidiTrack() const
     {
         for (auto* t : te::getAudioTracks (edit()))
-            if (trackKindOf (*t) == TrackKind::midi)
+            if (isMidi (*t))
                 return t;
 
         return nullptr;
@@ -678,7 +678,7 @@ bool ApplicationModel::setTrackArmed (const juce::String& trackId, bool armed)
 {
     auto* track = findAudioTrack (impl->edit(), trackId);
 
-    if (track == nullptr || (armed && isReturn (*track)))
+    if (track == nullptr || (armed && isReturnTrack (*track)))
         return false;
 
     auto* input = impl->inputOf (*track);
@@ -703,14 +703,14 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
 
     auto* track = impl->insertionTrack();
 
-    if (track != nullptr && trackKindOf (*track) == TrackKind::midi)
+    if (track != nullptr && isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
     impl->undo().beginStep ("Insert Clip");
 
     if (track == nullptr)
         for (auto* t : te::getAudioTracks (edit))
-            if (trackKindOf (*t) != TrackKind::midi)
+            if (! isMidi (*t))
             {
                 track = t;
                 break;
@@ -738,7 +738,7 @@ juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const 
     if (track == nullptr)
         return juce::Result::fail ("No track with that id");
 
-    if (trackKindOf (*track) == TrackKind::midi)
+    if (isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
     if (! te::AudioFile (impl->edit().engine, file).isValid())
@@ -752,7 +752,7 @@ juce::Result ApplicationModel::insertMidiClip()
 {
     auto* track = impl->insertionTrack();
 
-    if (track != nullptr && trackKindOf (*track) != TrackKind::midi)
+    if (track != nullptr && ! isMidi (*track))
         return juce::Result::fail ("Select a MIDI track");
 
     // Nothing selected: the first MIDI track, as clip.add uses the first audio track.
@@ -781,7 +781,7 @@ bool ApplicationModel::moveClip (const juce::String& clipId, double startSeconds
 
     // A clip stays on tracks of its own kind.
     if (clip == nullptr || track == nullptr
-         || (trackKindOf (*track) == TrackKind::midi) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
+         || isMidi (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
         return false;
 
     const auto start = te::TimePosition::fromSeconds (std::max (0.0, startSeconds));
@@ -868,7 +868,7 @@ juce::Result ApplicationModel::copyClip (const juce::String& clipId, double star
     if (clip == nullptr || track == nullptr)
         return juce::Result::fail ("No such clip or track");
 
-    if ((trackKindOf (*track) == TrackKind::midi) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
+    if (isMidi (*track) != (dynamic_cast<te::MidiClip*> (clip) != nullptr))
         return juce::Result::fail ("A clip only goes on a track of its own kind");
 
     impl->undo().beginStep ("Copy Clip");
@@ -1762,7 +1762,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         info.colourIndex = impl->colourOf (*t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
-        info.isReturn = isReturn (*t);
+        info.isReturn = isReturnTrack (*t);
 
         if (auto* input = impl->inputOf (*t, inputs))
         {

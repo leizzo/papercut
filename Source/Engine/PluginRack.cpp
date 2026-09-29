@@ -1,6 +1,6 @@
 #include "PluginRack.h"
-#include "ProjectManager.h"
 #include "EditTracks.h"
+#include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -474,7 +474,7 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
 
         plugin->state.setProperty (chainProperty, mixerChainValue, &edit.getUndoManager());
     }
-    else if (trackKindOf (*track) == TrackKind::midi && plugin->isSynth())
+    else if (isMidi (*track) && plugin->isSynth())
     {
         std::vector<te::Plugin::Ptr> replaced;
 
