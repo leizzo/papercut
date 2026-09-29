@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ApplicationModel.h"
+#include "PluginRack.h"
+
 #include <juce_core/juce_core.h>
 #include <memory>
 #include <vector>
@@ -40,15 +43,40 @@ struct StereoLevel
     float left = -100.0f, right = -100.0f;
 };
 
+/** What a Strip stands for. The Master is not a Strip: see Mixer::getMaster(). */
+enum class StripRole { track, bus, returnTrack };
+
+/** One Strip in the Mixer: everything its column shows, read from the Edit. */
+struct Strip
+{
+    juce::String id;                        ///< the track's id
+    juce::String name;
+    StripRole role = StripRole::track;
+    TrackKind kind = TrackKind::audio;      ///< a Bus or Return reports audio
+    int number = 0;                         ///< 1-based among track Strips; 0 on a Bus or Return
+    juce::String returnLetter;              ///< A..D on a Return
+    int colourIndex = 0;
+    bool selected = false;
+    double volumeDb = 0;                    ///< ApplicationModel::minVolumeDb is silence
+    double pan = 0;                         ///< -1 (left) to 1 (right)
+    bool muted = false, solo = false;
+    juce::String input;                     ///< the input it records from, or empty
+    bool armed = false;
+    std::vector<SendInfo> sends;
+    std::vector<PluginInfo> inserts;        ///< the Mixer Inserts
+    std::vector<PluginInfo> deviceChain;    ///< read-only here, edited in the Detail View
+    juce::String output = "Master";         ///< the Bus it sums into, or the Master
+};
+
 /** The Edit's master fader, not any track in ApplicationModel::getTracks(). */
 struct MasterInfo
 {
     double volumeDb = 0;
 };
 
-/** Facade over the current Edit's returns, sends, submix buses and master fader
-    Owns none of that state. Re-reads ProjectManager::getEdit()
-    on every call. Nothing above this layer sees a Tracktion header.
+/** Facade over the current Edit's returns, sends, submix buses and master fader,
+    and the read model of the Mixer's Strips. Owns none of that state. Re-reads
+    ProjectManager::getEdit() on every call. Nothing above this layer sees a Tracktion header.
 
     Undoable (Engine Undo): adding a return, a send or a bus, moving a track into
     a bus, send gain, and master volume. A continued fader drag
@@ -62,7 +90,9 @@ struct MasterInfo
 class Mixer
 {
 public:
-    explicit Mixer (ProjectManager&);
+    /** Reads tracks through the Application Model and chains through the
+        PluginRack; both must outlive it. */
+    Mixer (ProjectManager&, const ApplicationModel&, const PluginRack&);
     ~Mixer();
 
     /** An audio track with an aux return on the next free bus number. */
@@ -91,6 +121,11 @@ public:
 
     std::vector<BusInfo> getBuses() const;
 
+    /** Every Strip but the Master's, in signal-flow order: tracks in Edit order,
+        each Bus right after its last child (nested Buses alike), then the
+        Returns A..D. Folder-only Folders have no Strip. */
+    std::vector<Strip> getStrips() const;
+
     MasterInfo getMaster() const;
 
     /** Peaks of the track's level meter since the last read, left and right,
@@ -111,6 +146,8 @@ private:
     struct MeterState;
 
     ProjectManager& projects;
+    const ApplicationModel& model;
+    const PluginRack& plugins;
     std::unique_ptr<MeterState> meters;
     bool measuringRms = false;
 
