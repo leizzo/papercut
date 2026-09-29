@@ -18,7 +18,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          pattern='^[^ [:alnum:]]+ (feat|fix|perf|refactor|test|docs|build|ci|chore|style|revert)(\([^)]+\))?!?: .+'
+          pattern='[^ ]+ (feat|fix|perf|refactor|test|docs|build|ci|chore|style|revert)(\([^)]+\))?!?: .+'
           bad=$(git log --no-merges --format='%h %s' "$BASE..$HEAD" | grep -vE "^[0-9a-f]+ $pattern" || true)
           if [ -n "$bad" ]; then
             echo "::error::Commit subjects must look like '🐛 fix(scope): summary':"
