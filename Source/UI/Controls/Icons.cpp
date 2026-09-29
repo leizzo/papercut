@@ -37,6 +37,7 @@ namespace
             case Icon::music:         return { "M9 18 V5 L20 3 V16 M9 18 A3 3 0 1 1 8.99 18 M20 16 A3 3 0 1 1 19.99 16", false };
             case Icon::file:          return { "M6 3 H14 L19 8 V21 H6 Z M14 3 V8 H19", false };
             case Icon::gripVertical:  return { "M9 6 V6.1 M15 6 V6.1 M9 12 V12.1 M15 12 V12.1 M9 18 V18.1 M15 18 V18.1", false };
+            case Icon::gitMerge:      return { "M18 15 A3 3 0 1 1 17.99 15 Z M6 3 A3 3 0 1 1 5.99 3 Z M6 21 V9 A9 9 0 0 0 15 18", false };
         }
 
         return { "", false };

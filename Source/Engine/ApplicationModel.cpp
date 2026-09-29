@@ -36,25 +36,13 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     /** App-specific, on a MIDI note's ValueTree, so a note can be named across undo. */
     static const juce::Identifier noteIdProperty;
 
-    /** App-specific, on the track's ValueTree: its index in the track palette.
-        Absent (older projects, tracks the engine made): by track order. */
-    static const juce::Identifier trackColourProperty;
-
-    int colourOf (const te::AudioTrack& track) const
-    {
-        if (auto colour = track.state[trackColourProperty]; colour.isInt())
-            return juce::jlimit (0, trackPaletteSize - 1, (int) colour);
-
-        return te::getAudioTracks (edit()).indexOf (const_cast<te::AudioTrack*> (&track)) % trackPaletteSize;
-    }
-
     /** A new track takes the palette colour after the last track's. */
     void giveNextColour (te::AudioTrack& track)
     {
         auto tracks = te::getAudioTracks (edit());
         const auto index = tracks.indexOf (&track);
         const auto colour = index > 0 ? (colourOf (*tracks[index - 1]) + 1) % trackPaletteSize : 0;
-        track.state.setProperty (trackColourProperty, colour, &undoManager());
+        track.state.setProperty (colourProperty, colour, &undoManager());
     }
 
     juce::StringArray selectedNoteIds;
@@ -95,8 +83,8 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
     template <typename Get, typename Set>
     bool changeVolumePlugin (const juce::String& trackId, const juce::String& stepName, bool continues, Get get, Set set)
     {
-        auto* track = findAudioTrack (edit(), trackId);
-        auto* plugin = track != nullptr ? track->getVolumePlugin() : nullptr;
+        auto* track = findStripTrack (edit(), trackId);
+        auto* plugin = track != nullptr ? faderOf (*track) : nullptr;
 
         if (plugin == nullptr)
             return false;
@@ -126,9 +114,9 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
 
     void syncVolumeParametersFromState()
     {
-        for (auto* t : te::getAudioTracks (edit()))
+        for (auto* t : te::getAllTracks (edit()))
         {
-            if (auto* plugin = t->getVolumePlugin())
+            if (auto* plugin = faderOf (*t))
             {
                 syncAttached (plugin->volParam.get(), &plugin->volume);
                 syncAttached (plugin->panParam.get(), &plugin->pan);
@@ -392,7 +380,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
             info.loopLengthSeconds = audio->getLoopLength().inSeconds();
         }
 
-        if (auto colour = clip.state[trackColourProperty]; colour.isInt())
+        if (auto colour = clip.state[colourProperty]; colour.isInt())
             info.colourIndex = juce::jlimit (0, trackPaletteSize - 1, (int) colour);
     }
 
@@ -536,17 +524,16 @@ juce::String ApplicationModel::getProjectName() const   { return impl->projectMa
 
 //==============================================================================
 const juce::Identifier ApplicationModel::Impl::noteIdProperty { "resamperNoteId" };
-const juce::Identifier ApplicationModel::Impl::trackColourProperty { "resamperColour" };
 
 bool ApplicationModel::setTrackColour (const juce::String& trackId, int colourIndex)
 {
     auto* track = findAudioTrack (impl->edit(), trackId);
 
-    if (track == nullptr || ! juce::isPositiveAndBelow (colourIndex, trackPaletteSize) || impl->colourOf (*track) == colourIndex)
+    if (track == nullptr || ! juce::isPositiveAndBelow (colourIndex, trackPaletteSize) || colourOf (*track) == colourIndex)
         return false;
 
     impl->undo().beginStep ("Set Track Colour");
-    track->state.setProperty (Impl::trackColourProperty, colourIndex, &impl->undoManager());
+    track->state.setProperty (colourProperty, colourIndex, &impl->undoManager());
     return true;
 }
 
@@ -611,7 +598,7 @@ bool ApplicationModel::setTrackPan (const juce::String& trackId, double pan, boo
 
 bool ApplicationModel::setTrackMuted (const juce::String& trackId, bool muted)
 {
-    auto* track = findAudioTrack (impl->edit(), trackId);
+    auto* track = findStripTrack (impl->edit(), trackId);
 
     if (track == nullptr || track->isMuted (false) == muted)
         return false;
@@ -622,13 +609,25 @@ bool ApplicationModel::setTrackMuted (const juce::String& trackId, bool muted)
 
 bool ApplicationModel::setTrackSolo (const juce::String& trackId, bool solo)
 {
-    auto* track = findAudioTrack (impl->edit(), trackId);
+    auto* track = findStripTrack (impl->edit(), trackId);
 
     if (track == nullptr || track->isSolo (false) == solo)
         return false;
 
     track->setSolo (solo);
     return true;
+}
+
+bool ApplicationModel::isTrackMuted (const juce::String& trackId) const
+{
+    auto* track = findStripTrack (impl->edit(), trackId);
+    return track != nullptr && track->isMuted (false);
+}
+
+bool ApplicationModel::isTrackSolo (const juce::String& trackId) const
+{
+    auto* track = findStripTrack (impl->edit(), trackId);
+    return track != nullptr && track->isSolo (false);
 }
 
 //==============================================================================
@@ -1094,15 +1093,15 @@ bool ApplicationModel::setClipColour (const juce::String& clipId, int colourInde
     auto* clip = impl->findClip (clipId);
 
     if (clip == nullptr || colourIndex < -1 || colourIndex >= trackPaletteSize
-        || (int) clip->state.getProperty (Impl::trackColourProperty, -1) == colourIndex)
+        || (int) clip->state.getProperty (colourProperty, -1) == colourIndex)
         return false;
 
     impl->undo().beginStep ("Set Clip Colour");
 
     if (colourIndex < 0)
-        clip->state.removeProperty (Impl::trackColourProperty, &impl->undoManager());
+        clip->state.removeProperty (colourProperty, &impl->undoManager());
     else
-        clip->state.setProperty (Impl::trackColourProperty, colourIndex, &impl->undoManager());
+        clip->state.setProperty (colourProperty, colourIndex, &impl->undoManager());
 
     return true;
 }
@@ -1759,7 +1758,7 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
         info.name = t->getName();
         info.kind = trackKindOf (*t);
         info.selected = impl->selectionManager.isSelected (t);
-        info.colourIndex = impl->colourOf (*t);
+        info.colourIndex = colourOf (*t);
         info.muted = t->isMuted (false);
         info.solo = t->isSolo (false);
         info.isReturn = isReturnTrack (*t);

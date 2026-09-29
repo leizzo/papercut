@@ -40,6 +40,11 @@ struct Snapshots : juce::UnitTest
         f.invoke (cmd::transportSetLoopRange, { 0.0, 8.0 });
         f.model.selectClip (f.model.getTracks()[0].clips[0].id);
 
+        // Last: nesting the first track in a Bus reorders getTracks().
+        f.invoke (cmd::mixerAddBus, { "Drum Bus" });
+        f.invoke (cmd::mixerMoveToBus, { f.model.getTracks()[0].id, f.mixer.getBuses()[0].trackId });
+        f.plugins.insert (f.mixer.getBuses()[0].trackId, tracktion::CompressorPlugin::xmlTypeName, PluginChain::mixer);
+
         juce::ApplicationCommandManager commandManager;
         const auto size = juce::Point<int> (juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_W", "1600").getIntValue(),
                                             juce::SystemStats::getEnvironmentVariable ("SNAPSHOT_H", "1000").getIntValue());

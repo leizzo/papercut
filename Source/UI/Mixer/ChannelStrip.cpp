@@ -17,6 +17,9 @@ namespace
     /** The design's channel strip: fader track centred at 46 px, 7 px meter wells. */
     constexpr FaderSection::Geometry faderGeometry { 64, 7.0f };
 
+    /** A Bus Strip: narrower fader, wider meter wells. */
+    constexpr FaderSection::Geometry busFaderGeometry { 40, 9.0f };
+
     /** Signal-flow stages, as the mixer toolbar names them. */
     enum Stage { trackChainStage, insertsStage, sendsStage, faderStage };
 
@@ -75,9 +78,9 @@ struct ChannelStrip::SendRow : juce::Component
 };
 
 //==============================================================================
-ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm)
+ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm, StripRole role)
     : commands (c), themeManager (tm),
-      pan (tm, panKnobSpec(), "Pan", true), faderSection (tm, faderGeometry),
+      pan (tm, panKnobSpec(), "Pan", true), faderSection (tm, role == StripRole::bus ? busFaderGeometry : faderGeometry),
       mute (tm, TrackButton::Kind::mute), solo (tm, TrackButton::Kind::solo), arm (tm, TrackButton::Kind::arm)
 {
     input.setTitle ("Input");
@@ -311,7 +314,7 @@ void ChannelStrip::setState (const StripState& next)
 
     input.setSelectedItemIndex (state.strip.input.isEmpty() ? 0 : state.inputs.indexOf (state.strip.input) + 1,
                                 juce::dontSendNotification);
-    input.setEnabled (! state.isReturn());
+    input.setEnabled (! state.isReturn() && ! state.isBus());
 
     pan.setValue (state.strip.pan);
     faderSection.setVolume (state.strip.volumeDb, colour);
@@ -319,7 +322,7 @@ void ChannelStrip::setState (const StripState& next)
     mute.setToggleState (state.strip.muted, juce::dontSendNotification);
     solo.setToggleState (state.strip.solo, juce::dontSendNotification);
     arm.setToggleState (state.strip.armed, juce::dontSendNotification);
-    arm.setVisible (! state.isReturn());
+    arm.setVisible (! state.isReturn() && ! state.isBus());
 
     rebuildSends();
     rebuildInsertSlots();
@@ -413,15 +416,16 @@ void ChannelStrip::resized()
 
     // I/O
     ioArea = section (shown (Section::io), 2 * selectHeight + rowGap);
-    input.setVisible (shown (Section::io));
+    input.setVisible (shown (Section::io) && ! state.isBus());
 
     if (shown (Section::io))
         input.setBounds (content (ioArea).removeFromTop (selectHeight));
 
-    // Track chain (read-only) and the flow arrow into the inserts.
-    chainArea = section (shown (Section::inserts), chainLinkHeight);
-    chainLink = shown (Section::inserts) ? content (chainArea) : juce::Rectangle<int>();
-    flowArea = shown (Section::inserts) ? r.removeFromTop (flowHeight) : juce::Rectangle<int>();
+    // Track chain (read-only) and the flow arrow into the inserts; a Bus Strip has neither.
+    const auto showChain = shown (Section::inserts) && ! state.isBus();
+    chainArea = section (showChain, chainLinkHeight);
+    chainLink = showChain ? content (chainArea) : juce::Rectangle<int>();
+    flowArea = showChain ? r.removeFromTop (flowHeight) : juce::Rectangle<int>();
 
     // Mixer inserts: 4 slots show; a fuller chain grows the section up to 8.
     const auto slots = juce::jlimit (visibleInsertSlots, PluginRack::maxMixerInserts, (int) state.strip.inserts.size() + 1);
@@ -475,8 +479,8 @@ void ChannelStrip::paintSectionHeader (juce::Graphics& g, juce::Rectangle<int> a
     auto& theme = themeManager.getTheme();
     auto row = area.reduced (padX, sectionPadY).removeFromTop (labelHeight);
     const auto labelStyle = TypeStyle { 8.5f, false, 600, true, 0.5f };
-    drawStyledText (g, themeManager, title, labelStyle, row, juce::Justification::centredLeft, theme.textDim);
 
+    // The badge first, so a narrow strip's title never runs under it.
     if (tag.isNotEmpty())
     {
         const auto width = juce::GlyphArrangement::getStringWidthInt (themeManager.font (theme.micro), theme.micro.apply (tag)) + 8;
@@ -484,7 +488,10 @@ void ChannelStrip::paintSectionHeader (juce::Graphics& g, juce::Rectangle<int> a
         g.setColour (tagColour.withAlpha (0.15f));
         g.fillRoundedRectangle (badge.toFloat(), theme.radiusSm);
         drawStyledText (g, themeManager, tag, theme.micro, badge, juce::Justification::centred, tagColour);
+        row.removeFromRight (4);
     }
+
+    drawStyledText (g, themeManager, title, labelStyle, row, juce::Justification::centredLeft, theme.textDim);
 }
 
 void ChannelStrip::paint (juce::Graphics& g)
@@ -496,16 +503,33 @@ void ChannelStrip::paint (juce::Graphics& g)
     g.setColour (state.strip.selected ? theme.bgElevated : theme.bgTrack);
     g.fillRoundedRectangle (bounds, radius);
 
+    if (state.isBus())
+    {
+        g.setColour (colour.withAlpha (0.08f));
+        g.fillRoundedRectangle (bounds, radius);
+        g.setColour (colour.withAlpha (0.6f));
+        g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
+    }
+
     // Head: colour bar, number in the track colour, name (ellipsis; the tooltip has it all).
     paintColourBar (g, bounds, radius, colour);
 
     auto head = headArea.withTrimmedTop (colourBarHeight).reduced (padX, sectionPadY);
-    const auto number = state.isReturn() ? state.strip.returnLetter : twoDigits (state.strip.number);
-    const auto numberFont = themeManager.numberFont (TypeStyle { 10.0f, true, 600 });
-    g.setFont (numberFont);
-    g.setColour (colour);
-    g.drawText (number, head.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (numberFont, number)),
-                juce::Justification::centredLeft, false);
+
+    if (state.isBus())
+    {
+        drawIcon (g, Icon::gitMerge, head.removeFromLeft (12).toFloat().withSizeKeepingCentre (12.0f, 12.0f), colour);
+    }
+    else
+    {
+        const auto number = state.isReturn() ? state.strip.returnLetter : twoDigits (state.strip.number);
+        const auto numberFont = themeManager.numberFont (TypeStyle { 10.0f, true, 600 });
+        g.setFont (numberFont);
+        g.setColour (colour);
+        g.drawText (number, head.removeFromLeft (juce::GlyphArrangement::getStringWidthInt (numberFont, number)),
+                    juce::Justification::centredLeft, false);
+    }
+
     head.removeFromLeft (7);
     drawStyledText (g, themeManager, state.strip.name, TypeStyle { 12.0f, false, 600 }, head,
                     juce::Justification::centredLeft, theme.textPrimary);
@@ -519,12 +543,25 @@ void ChannelStrip::paint (juce::Graphics& g)
         }
     };
 
-    // I/O: the input select draws itself; the output is read-only for now.
+    // I/O: the input select draws itself (a Bus shows its input chip); the output is read-only for now.
     if (! ioArea.isEmpty())
     {
         divider (ioArea);
         paintSectionHeader (g, ioArea, "I/O", {}, {});
-        auto out = ioArea.reduced (padX, sectionPadY).withTrimmedTop (labelHeight + rowGap + selectHeight + rowGap).withHeight (selectHeight);
+        auto rows = ioArea.reduced (padX, sectionPadY).withTrimmedTop (labelHeight + rowGap);
+
+        if (state.isBus())
+        {
+            auto chip = rows.withHeight (selectHeight);
+            g.setColour (colour.withAlpha (0.15f));
+            g.fillRoundedRectangle (chip.toFloat(), theme.radiusMd);
+            const auto count = state.strip.inputCount;
+            drawStyledText (g, themeManager, juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x90 ")) + juce::String (count)
+                                                 + (count == 1 ? " track" : " tracks"),
+                            theme.bodySm, chip.reduced (7, 0), juce::Justification::centredLeft, colour);
+        }
+
+        auto out = rows.withTrimmedTop (selectHeight + rowGap).withHeight (selectHeight);
         g.setColour (theme.bgSlot);
         g.fillRoundedRectangle (out.toFloat(), theme.radiusMd);
         drawStyledText (g, themeManager, juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x92 ")) + state.strip.output, theme.bodySm,
@@ -557,7 +594,7 @@ void ChannelStrip::paint (juce::Graphics& g)
         drawIcon (g, Icon::arrowDown, flowArea.toFloat().withSizeKeepingCentre (9.0f, 9.0f), theme.textDim);
 
     if (! insertsArea.isEmpty())
-        paintSectionHeader (g, insertsArea, "Mixer inserts", "Post", theme.accent);
+        paintSectionHeader (g, insertsArea, state.isBus() ? "Inserts" : "Mixer inserts", "Post", theme.accent);
 
     if (! sendsArea.isEmpty())
     {

@@ -16,8 +16,8 @@ class CommandRegistry;
 class Mixer;
 
 /** The Mixer view (PRD §10.1): the 40 px toolbar, then the strips area — the
-    track strips, the return strips, and the master strip — scrolling
-    sideways when they don't fit. Meters refresh at 30 Hz while the mixer
+    track and Bus Strips in signal-flow order, the return strips, and the
+    master strip — scrolling sideways when they don't fit. Meters refresh at 30 Hz while the mixer
     shows, and pause while it's hidden (§19).
 
     Toolbar: the title, an add menu (return, bus, send, move to bus), section
@@ -83,7 +83,7 @@ private:
 
     void refresh();
     void layoutStrips();
-    void showStripMenu (const juce::String& trackId, bool isReturn);
+    void showStripMenu (const Strip&);
     void showEffectPicker (const juce::String& trackId, InsertSlot&, const juce::String& replacing);
     void applySections();
     void applyMeterMode();
