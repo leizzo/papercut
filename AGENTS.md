@@ -53,6 +53,8 @@ perch close <issue-id> --reason "..."              # set aside a false positive,
 
 `check` and `scan` exit 3 while something is still wrong. Results live in `.perch/`; only `closed.jsonl` and `rules/` there are committed. Custom rules go in `perch.yaml` or `.perch/rules/*.yaml` (`perch rules add ...`).
 
+Before a PR, in this order: build and tests pass → `perch scan --since origin/main` exits 0 (fix or `close` every finding) → run the `code-review` skill against `main`. perch covers method-level defects, code-review covers repo standards and the spec; neither replaces the other, and perch goes first so the review sees final code.
+
 ## Agent skills
 
 ### Issue tracker
