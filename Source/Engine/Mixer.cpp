@@ -37,10 +37,8 @@ namespace
     /** The bus a Return track listens on, or -1 on any other track. */
     int returnBusOf (te::AudioTrack& track)
     {
-        for (auto* ret : track.pluginList.getPluginsOfType<te::AuxReturnPlugin>())
-            return ret->busNumber.get();
-
-        return -1;
+        const auto returns = track.pluginList.getPluginsOfType<te::AuxReturnPlugin>();
+        return returns.isEmpty() ? -1 : returns.getFirst()->busNumber.get();
     }
 
     /** A track's Output: the nearest Bus above it, else the Master. A Folder-only
@@ -190,6 +188,11 @@ void Mixer::MeterState::detach (te::Edit& edit, Slot& slot)
     slot.client.reset();
     slot.added = false;
     slot.pluginId.clear();
+}
+
+juce::String returnLetterFor (int bus)
+{
+    return juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, bus)));
 }
 
 Mixer::Mixer (ProjectManager& pm, const ApplicationModel& m, const PluginRack& p)
@@ -523,7 +526,7 @@ std::vector<Strip> Mixer::getStrips() const
             if (const auto bus = returnBusOf (*audio); bus >= 0)
             {
                 strip.role = StripRole::returnTrack;
-                strip.returnLetter = juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, bus)));
+                strip.returnLetter = returnLetterFor (bus);
                 returns.emplace_back (bus, std::move (strip));
             }
             else

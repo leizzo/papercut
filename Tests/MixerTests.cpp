@@ -22,13 +22,14 @@ struct MixerTests : juce::UnitTest
             return false;
         }
 
-        std::optional<Strip> strip (const juce::String& id) const
+        /** The Strip for a track, or one with an empty id if it has none. */
+        Strip strip (const juce::String& id) const
         {
             for (auto& s : mixer.getStrips())
                 if (s.id == id)
                     return s;
 
-            return std::nullopt;
+            return {};
         }
 
         juce::String busId (const juce::String& name) const
@@ -159,19 +160,22 @@ struct MixerTests : juce::UnitTest
         beginTest ("getStrips: tracks in Edit order, each Bus after its last child, then Returns; no Strip for a Folder-only Folder");
         {
             MixerFixture f;
-            f.invoke (cmd::mixerAddReturn);   // first in the Edit, still last among the Strips
+            f.invoke (cmd::mixerAddReturn);   // A, first in the Edit
 
             for (int i = 0; i < 4; ++i)
                 f.invoke (cmd::trackAdd);
 
+            f.invoke (cmd::mixerAddReturn);   // B
+
             const auto tracks = f.model.getTracks();
-            const auto returnId = tracks[0].id, t1 = tracks[1].id, t2 = tracks[2].id, t3 = tracks[3].id, t4 = tracks[4].id;
+            const auto returnA = tracks[0].id, t1 = tracks[1].id, t2 = tracks[2].id, t3 = tracks[3].id, t4 = tracks[4].id;
+            const auto returnB = tracks[5].id;
 
             f.invoke (cmd::mixerAddBus, { "Drums" });
             f.invoke (cmd::mixerAddBus, { "Kick" });
             const auto drums = f.busId ("Drums"), kick = f.busId ("Kick");
 
-            // Return, t3, Drums { t1, Kick { t2 } }, Folder { t4 }
+            // t3, B, Drums { t1, Kick { t2 } }, Folder { t4, A }: B comes before A in the Edit
             f.invoke (cmd::mixerMoveToBus, { t1, drums });
             f.nest (kick, drums);
             f.invoke (cmd::mixerMoveToBus, { t2, kick });
@@ -179,6 +183,7 @@ struct MixerTests : juce::UnitTest
             auto& edit = f.projects.getEdit();
             auto folder = edit.insertNewFolderTrack (tracktion::TrackInsertPoint::getEndOfTracks (edit), nullptr, false);
             f.nest (t4, folder->itemID.toString());
+            f.nest (returnA, folder->itemID.toString());
 
             juce::StringArray order, outputs;
 
@@ -189,17 +194,18 @@ struct MixerTests : juce::UnitTest
             }
 
             expectEquals (order.joinIntoString (","),
-                          juce::StringArray { t3, t1, t2, kick, drums, t4, returnId }.joinIntoString (","));
-            expectEquals (outputs.joinIntoString (","), juce::String ("Master,Drums,Kick,Drums,Master,Master,Master"));
+                          juce::StringArray { t3, t1, t2, kick, drums, t4, returnA, returnB }.joinIntoString (","));
+            expectEquals (outputs.joinIntoString (","), juce::String ("Master,Drums,Kick,Drums,Master,Master,Master,Master"));
 
-            expect (f.strip (drums)->role == StripRole::bus);
-            expect (f.strip (returnId)->role == StripRole::returnTrack);
-            expectEquals (f.strip (returnId)->returnLetter, juce::String ("A"));
-            expectEquals (f.strip (returnId)->number, 0);
-            expectEquals (f.strip (t3)->number, 1);
-            expectEquals (f.strip (t2)->number, 3);
-            expectEquals (f.strip (t4)->number, 4);
-            expect (! f.strip (folder->itemID.toString()).has_value());
+            expect (f.strip (drums).role == StripRole::bus);
+            expect (f.strip (returnA).role == StripRole::returnTrack);
+            expectEquals (f.strip (returnA).returnLetter, juce::String ("A"));
+            expectEquals (f.strip (returnB).returnLetter, juce::String ("B"));
+            expectEquals (f.strip (returnA).number, 0);
+            expectEquals (f.strip (t3).number, 1);
+            expectEquals (f.strip (t2).number, 3);
+            expectEquals (f.strip (t4).number, 4);
+            expect (f.strip (folder->itemID.toString()).id.isEmpty());
         }
 
         beginTest ("A Strip's Output follows moveTrackToBus, and undo puts it back");
@@ -209,25 +215,28 @@ struct MixerTests : juce::UnitTest
             const auto trackId = f.model.getTracks()[0].id;
             f.invoke (cmd::mixerAddBus, { "Drums" });
 
-            expectEquals (f.strip (trackId)->output, juce::String ("Master"));
+            expectEquals (f.strip (trackId).output, juce::String ("Master"));
             f.invoke (cmd::mixerMoveToBus, { trackId, f.busId ("Drums") });
-            expectEquals (f.strip (trackId)->output, juce::String ("Drums"));
+            expectEquals (f.strip (trackId).output, juce::String ("Drums"));
 
             f.invoke (cmd::editUndo);
-            expectEquals (f.strip (trackId)->output, juce::String ("Master"));
+            expectEquals (f.strip (trackId).output, juce::String ("Master"));
         }
 
-        beginTest ("A Strip carries its fader, sends and inserts");
+        beginTest ("A Strip carries its fader, sends and inserts, and follows undo");
         {
             SendFixture f;
             f.invoke (cmd::trackSetVolume, { f.sourceId, -6.0, false });
 
             const auto strip = f.strip (f.sourceId);
-            expect (strip.has_value());
-            expectWithinAbsoluteError (strip->volumeDb, -6.0, 1.0e-2);
-            expectEquals ((int) strip->sends.size(), 1);
-            expectEquals (strip->sends[0].id, f.sendId);
-            expect (strip->inserts.empty());
+            expectEquals (strip.id, f.sourceId);
+            expectWithinAbsoluteError (strip.volumeDb, -6.0, 1.0e-2);
+            expectEquals ((int) strip.sends.size(), 1);
+            expectEquals (strip.sends[0].id, f.sendId);
+            expect (strip.inserts.empty());
+
+            f.invoke (cmd::editUndo);
+            expectWithinAbsoluteError (f.strip (f.sourceId).volumeDb, 0.0, 1.0e-2);
         }
 
         beginTest ("setMasterVolume changes the master only; undo restores it");

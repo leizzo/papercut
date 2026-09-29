@@ -68,6 +68,9 @@ struct Strip
     juce::String output = "Master";         ///< the Bus it sums into, or the Master
 };
 
+/** The letter a Return and the Sends to it show for its bus: A for bus 0. */
+juce::String returnLetterFor (int bus);
+
 /** The Edit's master fader, not any track in ApplicationModel::getTracks(). */
 struct MasterInfo
 {

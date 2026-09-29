@@ -297,7 +297,7 @@ void ChannelStrip::setState (const StripState& next)
 {
     state = next;
     colour = state.isReturn() ? themeManager.getTheme().returnColours[0]
-                            : themeManager.getTheme().trackColour (state.strip.colourIndex);
+                              : themeManager.getTheme().trackColour (state.strip.colourIndex);
 
     setTitle (state.strip.name);
     setTooltip (state.strip.name);
@@ -353,7 +353,7 @@ void ChannelStrip::rebuildSends()
         auto& row = *sendRows[i];
         row.send = state.strip.sends[i];
         row.trackId = state.strip.id;
-        row.letter = juce::String::charToString ((juce::juce_wchar) ('A' + juce::jlimit (0, 25, state.strip.sends[i].bus)));
+        row.letter = returnLetterFor (state.strip.sends[i].bus);
         row.level.setValue (state.strip.sends[i].gainDb);
         row.repaint();
     }

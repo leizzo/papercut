@@ -181,14 +181,14 @@ void MixerView::refresh()
     returnOrder.clear();
     std::map<juce::String, std::unique_ptr<ChannelStrip>> kept;
 
-    for (auto& next : mixer.getStrips())
+    for (auto& stripInfo : mixer.getStrips())
     {
         // Bus Strips are not drawn yet (#100).
-        if (next.role == StripRole::bus)
+        if (stripInfo.role == StripRole::bus)
             continue;
 
-        StripState stripState { next, next.kind == TrackKind::midi ? midiInputs : audioInputs };
-        const auto id = next.id;
+        StripState stripState { stripInfo, stripInfo.kind == TrackKind::midi ? midiInputs : audioInputs };
+        const auto id = stripInfo.id;
         (stripState.isReturn() ? returnOrder : trackOrder).push_back (id);
 
         auto existing = strips.find (id);
