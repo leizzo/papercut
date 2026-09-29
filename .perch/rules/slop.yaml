@@ -1,0 +1,30 @@
+- name: no-narrating-comments
+  each: method
+  where: Source/**/*.{cpp,h}
+  ensure: >-
+    Comments inside this method say why, or name a non-obvious invariant, unit
+    or thread. A comment that restates the next line ('// set the volume', '//
+    loop over tracks', '// return the result'), numbers steps ('// Step 1:'), or
+    describes an edit history ('// NEW', '// fixed', '// changed to', '// now
+    uses') breaks this. A method with no comments passes.
+  min: 70
+- name: no-placeholder-code
+  each: method
+  where: Source/**/*.{cpp,h}
+  ensure: >-
+    The method is a real implementation. A stub that returns a hard-coded or
+    fake value, a comment such as 'simplified', 'for now', 'in a real
+    implementation', 'placeholder' or a TODO standing in for behaviour the name
+    promises, or example/dummy data breaks this.
+  min: 70
+- name: no-defensive-noise
+  each: method
+  where: Source/**/*.{cpp,h}
+  ensure: >-
+    Each check in this method guards a case that can actually happen given its
+    types and callers. A null check on a reference or on a pointer just
+    constructed, a try/catch around code that cannot throw, a fallback default
+    that hides a failure the caller should see ('return 0.0f; // fallback'), or
+    a jassert followed by code that carries on as though the impossible case
+    were fine breaks this.
+  min: 70
