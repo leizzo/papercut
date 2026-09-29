@@ -303,11 +303,27 @@ PluginRack::PluginRack (ProjectManager& pm) : projectManager (pm)
 
 PluginRack::~PluginRack()
 {
-    if (scanThread != nullptr)
-    {
-        scanThread->signalThreadShouldExit();
-        scanThread->stopThread (120000);
-    }
+    stopScan();
+}
+
+void PluginRack::stopScan()
+{
+    if (scanThread == nullptr)
+        return;
+
+    scanThread->signalThreadShouldExit();
+
+    // An AU is created on the message thread while the scan waits for it: blocking
+    // that thread here would stall the scan until the timeout killed it mid-call.
+    auto* messages = juce::MessageManager::getInstanceWithoutCreating();
+    const auto deadline = juce::Time::getMillisecondCounter() + scanStopTimeoutMs;
+
+    if (messages != nullptr && messages->isThisTheMessageThread())
+        while (scanThread->isThreadRunning() && juce::Time::getMillisecondCounter() < deadline)
+            messages->runDispatchLoopUntil (10);
+
+    scanThread->stopThread (scanStopTimeoutMs);
+    scanThread.reset();
 }
 
 juce::Array<PluginInfo> PluginRack::getCatalogue() const
@@ -340,12 +356,7 @@ void PluginRack::startScan()
     if (scanning.load())
         return;
 
-    if (scanThread != nullptr)
-    {
-        scanThread->signalThreadShouldExit();
-        scanThread->stopThread (120000);
-        scanThread.reset();
-    }
+    stopScan();
 
     scanning.store (true);
     scanBodyRanOffCaller.store (false);

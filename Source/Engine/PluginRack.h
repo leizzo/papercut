@@ -140,7 +140,13 @@ private:
     mutable juce::CriticalSection snapshotLock;
     juce::Array<PluginInfo> externalSnapshot;
 
+    static constexpr int scanStopTimeoutMs = 120000;
+
     void runScan();
+
+    /** Asks a running scan to stop and waits for it, keeping the message loop
+        running meanwhile when called on the message thread. */
+    void stopScan();
     void publishExternalSnapshot();
 
     JUCE_DECLARE_NON_COPYABLE (PluginRack)
