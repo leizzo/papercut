@@ -738,14 +738,9 @@ std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& p
     if (pluginId.isEmpty())
         return {};
 
-    auto& edit = projectManager.getEdit();
-
-    for (auto* track : te::getAllTracks (edit))
-        if (isStripTrack (*track))
-            for (auto* plugin : track->pluginList)
-                if (plugin->itemID.toString() == pluginId)
-                    if (auto editor = plugin->createEditor())
-                        return std::unique_ptr<juce::Component> (editor.release());
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+        if (auto editor = plugin->createEditor())
+            return std::unique_ptr<juce::Component> (editor.release());
 
     return {};
 }

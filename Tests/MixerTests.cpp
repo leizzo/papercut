@@ -294,7 +294,21 @@ struct MixerTests : juce::UnitTest
             expect (strip.deviceChain.empty());
             expectEquals ((int) strip.sends.size(), 1);
             expectEquals (strip.colourIndex, 4);   // its first child's
-            expectEquals (strip.inputCount, 2);
+            expectEquals (strip.childCount, 2);
+            expectWithinAbsoluteError (f.mixer.getTrackLevel (bus).left, (float) ApplicationModel::minVolumeDb, 1.0e-3f);
+
+            // The Send sits before the Bus fader, so the fader doesn't move it.
+            auto* folder = tracktion::findTrackForID (f.projects.getEdit(), tracktion::EditItemID::fromString (bus));
+            auto& list = folder->pluginList;
+            const auto sends = list.getPluginsOfType<tracktion::AuxSendPlugin>();
+            const auto faders = list.getPluginsOfType<tracktion::VolumeAndPanPlugin>();
+            expect (! sends.isEmpty() && ! faders.isEmpty() && list.indexOf (sends.getFirst()) < list.indexOf (faders.getFirst()));
+
+            // A saved colour wins; an empty Bus takes palette 0.
+            folder->state.setProperty ("resamperColour", 2, nullptr);
+            expectEquals (f.strip (bus).colourIndex, 2);
+            f.invoke (cmd::mixerAddBus, { "Empty" });
+            expectEquals (f.strip (f.busId ("Empty")).colourIndex, 0);
         }
 
         beginTest ("setMasterVolume changes the master only; undo restores it");

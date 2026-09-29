@@ -1,6 +1,7 @@
 #include "TestFixture.h"
 #include "Commands/ApplicationCommandTable.h"
 #include "UI/MainWindow/MainComponent.h"
+#include "UI/Mixer/ChannelStrip.h"
 
 namespace resamper::test
 {
@@ -106,6 +107,41 @@ struct AppTests : juce::UnitTest
 
             expect (f.invoke (cmd::uiEscape));
             expect (f.model.getSelectedClipId().isEmpty());
+        }
+
+        beginTest ("The Mixer draws a Bus Strip at the Bus width, right after its child");
+        {
+            Fixture f;
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::mixerAddBus, { "Drums" });
+            const auto busId = f.mixer.getBuses()[0].trackId;
+            f.invoke (cmd::mixerMoveToBus, { f.model.getTracks()[0].id, busId });
+
+            expect (f.theme.load().wasOk());
+            juce::ApplicationCommandManager commandManager;
+            MainComponent main (f.app, commandManager);
+            main.setSize (1600, 1000);
+            f.invoke (cmd::viewMixer);
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+
+            std::vector<ChannelStrip*> strips;
+            std::function<void (juce::Component&)> collect = [&] (juce::Component& c)
+            {
+                if (auto* strip = dynamic_cast<ChannelStrip*> (&c))
+                    strips.push_back (strip);
+
+                for (auto* child : c.getChildren())
+                    collect (*child);
+            };
+            collect (main);
+            std::sort (strips.begin(), strips.end(), [] (auto* a, auto* b) { return a->getX() < b->getX(); });
+
+            expectEquals ((int) strips.size(), 3);
+            expect (strips.size() == 3 && strips[2]->getState().strip.id == busId);
+            expect (strips.size() == 3 && strips[2]->getState().isBus());
+            expect (strips.size() == 3 && strips[2]->getWidth() == f.theme.getMetrics().stripBusWidth);
+            expect (strips.size() == 3 && strips[1]->getWidth() == f.theme.getMetrics().stripWidth);
         }
     }
 };

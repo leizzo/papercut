@@ -555,7 +555,7 @@ void ChannelStrip::paint (juce::Graphics& g)
             auto chip = rows.withHeight (selectHeight);
             g.setColour (colour.withAlpha (0.15f));
             g.fillRoundedRectangle (chip.toFloat(), theme.radiusMd);
-            const auto count = state.strip.inputCount;
+            const auto count = state.strip.childCount;
             drawStyledText (g, themeManager, juce::String (juce::CharPointer_UTF8 ("\xe2\x86\x90 ")) + juce::String (count)
                                                  + (count == 1 ? " track" : " tracks"),
                             theme.bodySm, chip.reduced (7, 0), juce::Justification::centredLeft, colour);

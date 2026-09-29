@@ -496,7 +496,7 @@ std::vector<Strip> Mixer::getStrips() const
         strip.colourIndex = colourOf (folder);
         strip.muted = folder.isMuted (false);
         strip.solo = folder.isSolo (false);
-        strip.inputCount = folder.getAllSubTracks (false).size();
+        strip.childCount = folder.getAllSubTracks (false).size();
         strip.sends = getSends (strip.id);
         strip.inserts = plugins.getChain (strip.id, PluginChain::mixer);
         strip.deviceChain = plugins.getChain (strip.id, PluginChain::device);
