@@ -13,7 +13,13 @@ namespace
     std::unique_ptr<te::SmartThumbnail> makeThumbnail (te::Engine& engine, const te::AudioFile& file,
                                                        juce::Component& repaintTarget)
     {
-        return std::make_unique<te::SmartThumbnail> (engine, file, repaintTarget, nullptr);
+        auto thumb = std::make_unique<te::SmartThumbnail> (engine, file, repaintTarget, nullptr);
+
+        // Left to its timer, a thumbnail reads nothing until the first tick, so a
+        // waveform made for a split clip, or a time-stretched clip's new proxy,
+        // paints empty once even when the cache holds its file's peaks (#89).
+        thumb->audioFileChanged();
+        return thumb;
     }
 
     /** The file is there and has audio a reader can open. The engine caches a
