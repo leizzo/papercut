@@ -334,6 +334,39 @@ struct MixerTests : juce::UnitTest
             expectEquals (f.model.getTracks()[0].id, trackId);
         }
 
+        // Before the fix, the render hangs or crashes on a freed client under MallocScribble=1.
+        beginTest ("A Mixer detaches from the meters it read when it is destroyed, a Bus's and a removed track's");
+        {
+            MixerFixture f;
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::mixerAddBus, { "Drums" });
+            const auto bus = f.busId ("Drums");
+            const auto first = f.model.getTracks()[0].id, last = f.model.getTracks()[1].id;
+            const auto tone = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke (cmd::clipInsertAt, { tone, first, 0.0 });
+            f.invoke (cmd::clipInsertAt, { tone, last, 0.0 });
+            f.invoke (cmd::mixerMoveToBus, { first, bus });
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+
+            {
+                Mixer other (f.projects, f.model, f.plugins);
+                other.getTrackLevel (bus);
+                other.getTrackLevel (last);
+
+                // Its meter lives on in the plug-in cache, and undo brings it back.
+                f.model.selectTrack (last);
+                f.invoke (cmd::trackRemove);
+                expect (f.model.getTracks().size() == 1 && f.model.getTracks()[0].id == first);
+                other.getTrackLevel (last);
+                f.invoke (cmd::editUndo);
+                expect (f.model.getTracks().size() == 2);
+            }
+
+            // A client left on either meter would be written to after it was freed.
+            expectGreaterThan (renderPeak (f), 0.1f);
+        }
+
         beginTest ("getTrackLevel is silence when the track has not played");
         {
             MixerFixture f;

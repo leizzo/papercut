@@ -143,29 +143,12 @@ namespace
         return meters.isEmpty() ? nullptr : meters.getLast();
     }
 
+    /** By id in the Edit's plug-in cache, so a meter whose track was deleted, and may
+        come back on undo, is still found. */
     te::LevelMeterPlugin* findMeterById (te::Edit& edit, const juce::String& pluginId)
     {
-        if (pluginId.isEmpty())
-            return nullptr;
-
-        auto matches = [&] (te::Track& track) -> te::LevelMeterPlugin*
-        {
-            for (auto* meter : track.pluginList.getPluginsOfType<te::LevelMeterPlugin>())
-                if (meter->itemID.toString() == pluginId)
-                    return meter;
-
-            return nullptr;
-        };
-
-        for (auto* track : te::getAudioTracks (edit))
-            if (auto* meter = matches (*track))
-                return meter;
-
-        if (auto* master = edit.getMasterTrack())
-            if (auto* meter = matches (*master))
-                return meter;
-
-        return nullptr;
+        auto plugin = edit.getPluginCache().getPluginFor (te::EditItemID::fromString (pluginId));
+        return dynamic_cast<te::LevelMeterPlugin*> (plugin.get());
     }
 
     StereoLevel readPeaks (te::LevelMeasurer::Client& client)
