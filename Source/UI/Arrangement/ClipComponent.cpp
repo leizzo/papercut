@@ -13,8 +13,10 @@ ClipComponent::ClipComponent (ApplicationModel& m, ThemeManager& tm, const ClipI
 
 void ClipComponent::setClip (const ClipInfo& info)
 {
+    // A time-stretched clip plays a proxy made for its timing: a trim or a tempo
+    // change can make a new one.
     const bool audioFileChanged = info.kind == TrackKind::audio
-                               && (info.file != clip.file || waveform == nullptr);
+                               && (info.playbackFile != clip.playbackFile || waveform == nullptr);
 
     if (info.kind != TrackKind::audio)
         waveform.reset();
@@ -104,16 +106,24 @@ void ClipComponent::paint (juce::Graphics& g)
         if (! visible.isEmpty())
         {
             const auto secondsPerPixel = clip.lengthSeconds / getWidth();
-            const auto sourceStart = clip.sourceOffsetSeconds + visible.getX() * secondsPerPixel;
-            const auto sourceEnd = clip.sourceOffsetSeconds + visible.getRight() * secondsPerPixel;
 
             g.setColour (content);
-            waveform->draw (g, visible, sourceStart, sourceEnd);
+            waveform->draw (g, visible, visible.getX() * secondsPerPixel, visible.getRight() * secondsPerPixel,
+                            clip.sourceOffsetSeconds);
 
+            // Text only while there is nothing to draw; over a waveform still
+            // being completed, just the progress, out of its way.
             if (waveform->isGenerating())
-                drawStyledText (g, themeManager,
-                                "Preparing audio " + juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%",
-                                theme.bodySm, visible.reduced (6), juce::Justification::centredLeft, ink);
+            {
+                const auto percent = juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%";
+
+                if (waveform->hasDrawableAudio())
+                    drawStyledText (g, themeManager, percent, theme.bodySm, visible.reduced (6, 2),
+                                    juce::Justification::bottomRight, ink);
+                else
+                    drawStyledText (g, themeManager, "Preparing audio " + percent, theme.bodySm, visible.reduced (6),
+                                    juce::Justification::centredLeft, ink);
+            }
         }
     }
 

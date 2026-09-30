@@ -6,15 +6,17 @@
 namespace resamper::test
 {
 
-juce::File writeSineWav (const juce::File& file, double seconds, int numChannels, double acidTempo)
+juce::File writeSineWav (const juce::File& file, double seconds, int numChannels, double acidTempo, double toneSeconds)
 {
     constexpr double sampleRate = 44100.0;
     const auto numSamples = (int) (seconds * sampleRate);
+    const auto numToneSamples = toneSeconds > 0 ? std::min (numSamples, (int) (toneSeconds * sampleRate)) : numSamples;
 
     juce::AudioBuffer<float> buffer (numChannels, numSamples);
+    buffer.clear();
 
     for (int ch = 0; ch < numChannels; ++ch)
-        for (int i = 0; i < numSamples; ++i)
+        for (int i = 0; i < numToneSamples; ++i)
             buffer.setSample (ch, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * 440.0 * i / sampleRate));
 
     file.getParentDirectory().createDirectory();

@@ -163,7 +163,7 @@ void TrackLanes::paintOverChildren (juce::Graphics& g)
         if (auto waveform = recordingWaveforms.find (recording.trackId); waveform != recordingWaveforms.end())
         {
             g.setColour (theme.waveform);
-            waveform->second->draw (g, area.withTrimmedTop (metrics.clipHeaderHeight), 0.0, recording.lengthSeconds);
+            waveform->second->draw (g, area.withTrimmedTop (metrics.clipHeaderHeight), 0.0, recording.lengthSeconds, 0.0);
         }
     }
 }

@@ -45,6 +45,7 @@ struct ClipInfo
     double loopLengthSeconds = 0;     ///< the repeating part, when looping
     bool reversed = false;            ///< an audio clip playing backwards
     int colourIndex = -1;             ///< into the track palette; -1: the track's colour
+    juce::File playbackFile;          ///< what an audio clip plays: its file, or a proxy rendered from it for this clip's timing
 };
 
 /** Read-only snapshot of a track, for views. */
@@ -404,7 +405,8 @@ public:
     int getBeatsPerBar (double seconds) const;
 
     /** Creates a background-generated waveform for the clip; repaintTarget is
-        repainted as data arrives. Returns nullptr for an unknown clip. */
+        repainted as data arrives. It stays valid while ClipInfo::playbackFile
+        does. Returns nullptr for an unknown clip. */
     std::unique_ptr<ClipWaveform> createWaveform (const juce::String& clipId,
                                                   juce::Component& repaintTarget) const;
 

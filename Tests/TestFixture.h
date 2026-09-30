@@ -16,8 +16,10 @@ namespace resamper::test
 EngineManager& getEngineManager();
 
 /** Writes a sine-wave WAV file and returns it. A non-zero acidTempo adds an
-    ACID loop chunk, as tempo-tagged sample-library loops carry. */
-juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2, double acidTempo = 0);
+    ACID loop chunk, as tempo-tagged sample-library loops carry. A non-zero
+    toneSeconds makes only the first toneSeconds a tone, silence after. */
+juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2, double acidTempo = 0,
+                         double toneSeconds = 0);
 
 /** A fresh untitled Project in the app exactly as the app builds it, every
     Command registered, except that file choosers and messages are plain

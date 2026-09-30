@@ -317,6 +317,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
                             selectionManager.isSelected (wave),
                             takesOf (*wave).getNumChildren(),
                             currentTakeOf (*wave) };
+            clip.playbackFile = wave->getPlaybackFile().getFile();
             clip.reversed = wave->getIsReversed();
             describeLoopAndColour (*wave, clip);
             return clip;
@@ -1788,11 +1789,32 @@ std::vector<TrackInfo> ApplicationModel::getTracks() const
 std::unique_ptr<ClipWaveform> ApplicationModel::createWaveform (const juce::String& clipId,
                                                                 juce::Component& repaintTarget) const
 {
-    if (auto* clip = dynamic_cast<te::WaveAudioClip*> (impl->findClip (clipId)))
-        return std::make_unique<ClipWaveform> (
-            std::make_unique<ClipWaveform::Impl> (clip->edit.engine, clip->getPlaybackFile().getFile(), repaintTarget));
+    auto* clip = dynamic_cast<te::WaveAudioClip*> (impl->findClip (clipId));
 
-    return nullptr;
+    if (clip == nullptr)
+        return nullptr;
+
+    auto& engine = clip->edit.engine;
+    const auto playbackFile = clip->getPlaybackFile();
+    const auto sourceFile = clip->getAudioFile();
+    auto waveform = std::make_unique<ClipWaveform::Impl> (engine, playbackFile.getFile(), repaintTarget);
+
+    // A proxy can take seconds to render: draw its source meanwhile, where the clip plays it.
+    if (playbackFile != sourceFile)
+    {
+        waveform->playbackInClipTime = clip->usesTimeStretchedProxy();
+        waveform->source = ClipWaveform::Impl::makeThumbnail (engine, sourceFile.getFile(), repaintTarget);
+
+        const auto segments = te::AudioSegmentList::create (*clip, true, false);
+
+        if (const auto sampleRate = sourceFile.getSampleRate(); sampleRate > 0)
+            for (auto& segment : segments->getSegments())
+                waveform->segments.push_back ({ segment.start.inSeconds(), segment.length.inSeconds(),
+                                                (double) segment.startSample / sampleRate,
+                                                (double) segment.lengthSample / sampleRate });
+    }
+
+    return std::make_unique<ClipWaveform> (std::move (waveform));
 }
 
 std::vector<RecordingInfo> ApplicationModel::getRecordings() const
