@@ -32,6 +32,8 @@ public:
     juce::String describeActiveAudioDevice() const;
 
 private:
+    // Declared before the engine so it outlives the thread it may still be queued on.
+    std::unique_ptr<juce::TimeSliceClient> thumbnailPriority;
     std::unique_ptr<tracktion::Engine> engine;
 
     JUCE_DECLARE_NON_COPYABLE (EngineManager)

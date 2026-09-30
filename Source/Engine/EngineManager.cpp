@@ -44,13 +44,32 @@ namespace
                 juce::MessageManager::getInstance()->runDispatchLoopUntil (1);
         }
     };
+
+    /** Runs once on the thread it is added to and raises that thread to normal
+        priority. Thread::setPriority is protected and only acts on the calling
+        thread, so it has to run there. */
+    class NormalPriority : public juce::TimeSliceClient
+    {
+    public:
+        int useTimeSlice() override
+        {
+           #if JUCE_MAC
+            pthread_set_qos_class_self_np (QOS_CLASS_DEFAULT, 0);
+           #endif
+            return -1;
+        }
+    };
 }
 
 EngineManager::EngineManager (const juce::String& applicationName, AudioDevice audioDevice)
-    : engine (std::make_unique<te::Engine> (applicationName,
+    : thumbnailPriority (std::make_unique<NormalPriority>()),
+      engine (std::make_unique<te::Engine> (applicationName,
                                             std::make_unique<ResamperUIBehaviour>(),
                                             std::make_unique<ResamperEngineBehaviour> (audioDevice)))
 {
+    // JUCE runs the shared thumbnail thread at low priority, which on macOS
+    // (utility QoS) reads waveforms about 3x slower than normal (#87).
+    engine->getAudioFileManager().getAudioThumbnailCache().getTimeSliceThread().addTimeSliceClient (thumbnailPriority.get());
 }
 
 EngineManager::~EngineManager() = default;

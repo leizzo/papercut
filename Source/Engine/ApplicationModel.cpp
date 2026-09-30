@@ -317,6 +317,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
                             selectionManager.isSelected (wave),
                             takesOf (*wave).getNumChildren(),
                             currentTakeOf (*wave) };
+            clip.playbackFile = wave->getPlaybackFile().getFile();
             clip.reversed = wave->getIsReversed();
             describeLoopAndColour (*wave, clip);
             return clip;
@@ -1789,8 +1790,7 @@ std::unique_ptr<ClipWaveform> ApplicationModel::createWaveform (const juce::Stri
                                                                 juce::Component& repaintTarget) const
 {
     if (auto* clip = dynamic_cast<te::WaveAudioClip*> (impl->findClip (clipId)))
-        return std::make_unique<ClipWaveform> (
-            std::make_unique<ClipWaveform::Impl> (clip->edit.engine, clip->getPlaybackFile().getFile(), repaintTarget));
+        return std::make_unique<ClipWaveform> (std::make_unique<ClipWaveform::Impl> (*clip, repaintTarget));
 
     return nullptr;
 }
