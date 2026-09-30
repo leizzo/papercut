@@ -1,5 +1,12 @@
 #include "TestFixture.h"
 #include "UI/Arrangement/ClipComponent.h"
+#include "UI/Arrangement/TrackLanes.h"
+#include "UI/State/ArrangementViewState.h"
+#include "UI/State/UIStateStore.h"
+
+#include <tracktion_engine/tracktion_engine.h>
+
+namespace te = tracktion;
 
 namespace resamper::test
 {
@@ -31,20 +38,52 @@ namespace
         return image;
     }
 
-    /** How many pixels in region differ between two images. */
-    int differingPixels (const juce::Image& a, const juce::Image& b, juce::Rectangle<int> region)
+    /** How many pixels in region counts (x, y) is true for. */
+    template <typename Predicate>
+    int countPixels (juce::Rectangle<int> region, Predicate counts)
     {
-        int differing = 0;
+        int n = 0;
 
         for (int y = region.getY(); y < region.getBottom(); ++y)
             for (int x = region.getX(); x < region.getRight(); ++x)
-                if (a.getPixelAt (x, y) != b.getPixelAt (x, y))
-                    ++differing;
+                if (counts (x, y))
+                    ++n;
 
-        return differing;
+        return n;
+    }
+
+    /** How many pixels in region differ between two images. */
+    int differingPixels (const juce::Image& a, const juce::Image& b, juce::Rectangle<int> region)
+    {
+        return countPixels (region, [&] (int x, int y) { return a.getPixelAt (x, y) != b.getPixelAt (x, y); });
     }
 
     constexpr int clipWidth = 400, clipHeight = 60, lanesWidth = 300;
+
+    /** The lanes' component for a clip, or nullptr. */
+    ClipComponent* findClip (TrackLanes& lanes, const juce::String& id)
+    {
+        for (auto* child : lanes.getChildren())
+            if (auto* clip = dynamic_cast<ClipComponent*> (child); clip != nullptr && clip->getClip().id == id)
+                return clip;
+
+        return nullptr;
+    }
+
+    /** How many pixels of a clip's body a waveform inks: those unlike the fill,
+        kept clear of the rounded corners and the selection outline. */
+    int waveformInk (ClipComponent& clip, const ThemeManager& theme)
+    {
+        constexpr int cornerInset = 4;
+        const auto image = paintClip (clip);
+        const auto body = clip.getLocalBounds().withTrimmedTop (theme.getMetrics().clipHeaderHeight).reduced (cornerInset);
+        const auto fill = image.getPixelAt (body.getX(), body.getY());
+
+        return countPixels (body, [&] (int x, int y) { return image.getPixelAt (x, y) != fill; });
+    }
+
+    /** More waveformInk than "Preparing audio" alone (about 500): a waveform is drawn. */
+    constexpr int minWaveformInk = 2000;
 }
 
 /** A clip in the Arrangement, as it paints (PRD §8.1). */
@@ -96,6 +135,64 @@ struct ClipViewTests : juce::UnitTest
 
             const juce::Rectangle<int> visibleStart (offScreen, 0, 40, f.theme.getMetrics().clipHeaderHeight);
             expectGreaterThan (differingPixels (paintClip (unnamed), paintClip (named), visibleStart), 0);
+        }
+
+        // Unwarped, and time-stretched (an ACID loop): a split gives both halves a new
+        // proxy. A move keeps the clip and its file, so its waveform too.
+        for (const bool timeStretched : { false, true })
+        {
+            for (const bool split : { true, false })
+            {
+                beginTest (juce::String (split ? "Splitting" : "Moving") + " an audio clip draws its waveform in the first paint (#89)"
+                           + (timeStretched ? ", time-stretched" : ""));
+
+                Fixture f;
+                expect (f.theme.load().wasOk());
+                f.invoke (cmd::trackAdd);
+                f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 10.0, 2, timeStretched ? 100.0 : 0.0);
+                f.invoke (cmd::clipAdd);
+
+                UIStateStore store;
+                ArrangementViewState view (store.getState ("arrangement"));
+                view.setPixelsPerSecond (40.0);
+                TrackLanes lanes (f.model, f.commands, f.theme, view);
+                lanes.setSize (1000, 200);
+                lanes.setTracks (f.model.getTracks());
+
+                // Its waveform drawn from the file it plays (a proxy, once rendered), every
+                // peak read. A thumbnail yet to attach its reader reports fully loaded too.
+                const auto clip = f.model.getTracks()[0].clips[0];
+                auto& engine = f.projects.getEdit().engine;
+                expect (dispatchUntil ([&] { return clip.playbackFile.existsAsFile()
+                                                 && te::SmartThumbnail::areThumbnailsFullyLoaded (engine)
+                                                 && waveformInk (*findClip (lanes, clip.id), f.theme) > minWaveformInk; }));
+
+                if (split)
+                {
+                    f.model.selectClip (clip.id);
+                    f.invoke (cmd::transportSetPosition, 5.0);
+                    expect (f.invoke (cmd::clipSplit));
+                }
+                else
+                {
+                    expect (f.invoke (cmd::clipMove, { clip.id, 12.0 }));
+                }
+
+                lanes.setTracks (f.model.getTracks());
+
+                // No messages dispatched: this is the paint that follows.
+                const auto clips = f.model.getTracks()[0].clips;
+                expectEquals ((int) clips.size(), split ? 2 : 1);
+
+                // Playing the same file, every waveform has its peaks whole from the
+                // cache rather than reading them again (a new proxy has to render).
+                if (! timeStretched)
+                    expect (te::SmartThumbnail::areThumbnailsFullyLoaded (engine), "a waveform is reading its file again");
+
+                for (auto& c : clips)
+                    expectGreaterThan (waveformInk (*findClip (lanes, c.id), f.theme), minWaveformInk,
+                                       c.id == clip.id ? "the kept clip" : "the new clip");
+            }
         }
     }
 };

@@ -67,4 +67,14 @@ struct Fixture
     returns the peak level (0 if nothing rendered). */
 float renderPeak (Fixture&);
 
+/** Dispatches messages until done() or about a minute has passed; returns done(). */
+template <typename Predicate>
+bool dispatchUntil (Predicate done)
+{
+    for (int i = 0; i < 6000 && ! done(); ++i)
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+
+    return done();
+}
+
 } // namespace resamper::test
