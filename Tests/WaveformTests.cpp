@@ -89,9 +89,13 @@ struct WaveformTests : juce::UnitTest
             const auto proxy = clip.playbackFile;
             expect (proxy != f.audioFileToChoose);
 
+            // Nothing has dispatched since the clip was added, so its proxy job hasn't started.
+            auto& engine = f.projects.getEdit().engine;
+            expect (! engine.getAudioFileManager().proxyGenerator.isProxyBeingGenerated (tracktion::AudioFile (engine, proxy)));
+
             juce::Component repaintTarget;
             auto waveform = f.model.createWaveform (clip.id, repaintTarget);
-            expect (waveform->isGenerating(), "reported ready before the proxy was rendered");
+            expect (waveform->isGenerating(), "reported ready before the proxy job started");
 
             // The source's peaks take a fraction of the proxy's render; they load
             // from the start, so that's where to look.
@@ -130,13 +134,28 @@ struct WaveformTests : juce::UnitTest
                 expectLessThan (inkedPixels (*waveform, 2.0, 2.2, clip.sourceOffsetSeconds), silenceInk, from + ": silence later");
             };
 
+            // As above, the source's first peaks come long before the proxy.
             expect (dispatchUntil ([&] { return waveform->hasDrawableAudio(); }));
-
-            if (! clip.playbackFile.existsAsFile())
-                expectToneThenSilence ("source");
+            expect (! clip.playbackFile.existsAsFile(), "the proxy was ready before the source was drawn");
+            expectToneThenSilence ("source");
 
             expect (dispatchUntil ([&] { return ! waveform->isGenerating(); }));
             expectToneThenSilence ("proxy");
+        }
+
+        beginTest ("A clip whose file has gone is not left generating");
+        {
+            Fixture f;
+            f.invoke (cmd::trackAdd);
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("gone.wav"), 1.0);
+            f.invoke (cmd::clipAdd);
+            expect (f.audioFileToChoose.deleteFile());
+
+            juce::Component repaintTarget;
+            auto waveform = f.model.createWaveform (f.model.getTracks()[0].clips[0].id, repaintTarget);
+
+            expect (dispatchUntil ([&] { return ! waveform->isGenerating(); }));
+            expect (! waveform->hasDrawableAudio());
         }
     }
 };

@@ -121,7 +121,7 @@ void ClipComponent::paint (juce::Graphics& g)
                     drawStyledText (g, themeManager, percent, theme.bodySm, visible.reduced (metrics.spaceSm, metrics.space2xs),
                                     juce::Justification::bottomRight, ink);
                 else
-                    drawStyledText (g, themeManager, "Preparing audio " + percent, theme.bodySm, visible.reduced (6),
+                    drawStyledText (g, themeManager, "Preparing audio " + percent, theme.bodySm, visible.reduced (metrics.spaceSm),
                                     juce::Justification::centredLeft, ink);
             }
         }
