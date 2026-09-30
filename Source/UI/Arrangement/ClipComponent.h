@@ -19,6 +19,10 @@ public:
     const ClipInfo& getClip() const noexcept   { return clip; }
     void setClip (const ClipInfo&);
 
+    /** What its body draws; nullptr for a MIDI clip. Kept while the clip plays
+        the same file, so a move doesn't read the audio again (#90). */
+    const ClipWaveform* getWaveform() const noexcept   { return waveform.get(); }
+
     /** Its track's colour, and whether the track is muted (clips then draw at 50 %). */
     void setTrackLook (juce::Colour, bool muted);
 

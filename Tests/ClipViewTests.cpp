@@ -82,6 +82,17 @@ namespace
         return countPixels (body, [&] (int x, int y) { return image.getPixelAt (x, y) != fill; });
     }
 
+    /** A left-button mouse event on c at p, for a gesture that went down at downAt. */
+    juce::MouseEvent mouseEvent (juce::Component& c, juce::Point<int> p, juce::Point<int> downAt, bool dragged)
+    {
+        const auto now = juce::Time::getCurrentTime();
+        return { juce::Desktop::getInstance().getMainMouseSource(), p.toFloat(),
+                 juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier),
+                 juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation,
+                 juce::MouseInputSource::defaultRotation, juce::MouseInputSource::defaultTiltX,
+                 juce::MouseInputSource::defaultTiltY, &c, &c, now, downAt.toFloat(), now, 1, dragged };
+    }
+
     /** More waveformInk than "Preparing audio" alone (about 500): a waveform is drawn. */
     constexpr int minWaveformInk = 2000;
 }
@@ -192,6 +203,73 @@ struct ClipViewTests : juce::UnitTest
                 for (auto& c : clips)
                     expectGreaterThan (waveformInk (*findClip (lanes, c.id), f.theme), minWaveformInk,
                                        c.id == clip.id ? "the kept clip" : "the new clip");
+            }
+        }
+
+        // The drag previews the clip where it would land, then the Command moves it:
+        // neither makes a new waveform, time-stretched or not (#90).
+        for (const bool timeStretched : { false, true })
+        {
+            for (const bool toOtherTrack : { false, true })
+            {
+                beginTest (juce::String ("Dragging an audio clip") + (toOtherTrack ? " to another track" : "")
+                           + " keeps its waveform (#90)" + (timeStretched ? ", time-stretched" : ""));
+
+                Fixture f;
+                expect (f.theme.load().wasOk());
+                f.invoke (cmd::trackAdd);
+                f.invoke (cmd::trackAdd);
+                f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 10.0, 2, timeStretched ? 100.0 : 0.0);
+                f.invoke (cmd::clipAdd);
+
+                UIStateStore store;
+                ArrangementViewState view (store.getState ("arrangement"));
+                view.setPixelsPerSecond (40.0);
+                TrackLanes lanes (f.model, f.commands, f.theme, view);
+                lanes.setSize (1000, 400);
+                lanes.setTracks (f.model.getTracks());
+
+                const auto clip = f.model.getTracks()[0].clips[0];
+                auto& engine = f.projects.getEdit().engine;
+                auto* component = findClip (lanes, clip.id);
+                expect (component != nullptr);
+
+                if (component == nullptr)
+                    continue;
+
+                expect (dispatchUntil ([&] { return clip.playbackFile.existsAsFile()
+                                                 && te::SmartThumbnail::areThumbnailsFullyLoaded (engine)
+                                                 && waveformInk (*component, f.theme) > minWaveformInk; }));
+
+                const auto* waveform = component->getWaveform();
+                const auto grab = component->getBounds().getCentre();
+                const auto drop = grab + juce::Point<int> (120, toOtherTrack ? lanes.laneHeight() : 0);
+
+                lanes.mouseDown (mouseEvent (lanes, grab, grab, false));
+
+                for (int step = 1; step <= 4; ++step)
+                {
+                    lanes.mouseDrag (mouseEvent (lanes, grab + (drop - grab) * step / 4, grab, true));
+                    expect (component->getWaveform() == waveform, "the drag preview made a new waveform");
+                }
+
+                lanes.mouseUp (mouseEvent (lanes, drop, grab, true));
+                lanes.setTracks (f.model.getTracks());
+
+                // No messages dispatched: this is the paint that follows.
+                const auto moved = f.model.getTracks()[toOtherTrack ? 1 : 0].clips;
+                expectEquals ((int) moved.size(), 1);
+                expect (moved[0].id == clip.id);
+                expectGreaterThan (moved[0].startSeconds, clip.startSeconds);
+                expect (moved[0].playbackFile == clip.playbackFile, "the moved clip plays a new file");
+
+                expect (findClip (lanes, clip.id) == component, "the moved clip has a new component");
+                expect (component->getWaveform() == waveform, "the moved clip has a new waveform");
+
+                // Unlike a split, a move keeps a time-stretched clip's proxy: its hash
+                // leaves out the clip's start. So nothing reads its file again.
+                expect (te::SmartThumbnail::areThumbnailsFullyLoaded (engine), "a waveform is reading its file again");
+                expectGreaterThan (waveformInk (*component, f.theme), minWaveformInk);
             }
         }
     }
