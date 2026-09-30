@@ -51,6 +51,14 @@ void ClipComponent::paint (juce::Graphics& g)
     g.setColour (colour);
     g.fillRoundedRectangle (bounds.toFloat(), radius);
 
+    // The part its parent shows: a clip can start off-screen or be far wider
+    // than the screen. Not g.getClipBounds(): a partial repaint, such as the
+    // Playhead's strip, would move whatever is placed by it (#88).
+    auto shown = getLocalBounds();
+
+    if (auto* parent = getParentComponent())
+        shown = shown.getIntersection (getLocalArea (parent, parent->getLocalBounds()));
+
     auto header = bounds.removeFromTop (metrics.clipHeaderHeight);
     {
         juce::Graphics::ScopedSaveState save (g);
@@ -62,7 +70,7 @@ void ClipComponent::paint (juce::Graphics& g)
     }
 
     // Keep the name readable when the clip starts off-screen.
-    auto nameArea = header.withLeft (std::max (header.getX(), g.getClipBounds().getX())).reduced (6, 0);
+    auto nameArea = header.withLeft (shown.getX()).reduced (6, 0);
     const auto take = clip.numTakes == 0 ? juce::String()
                     : clip.currentTake < 0 ? "  (" + juce::String (clip.numTakes) + " takes)"
                                            : "  (Take " + juce::String (clip.currentTake + 1) + "/" + juce::String (clip.numTakes) + ")";
@@ -100,8 +108,9 @@ void ClipComponent::paint (juce::Graphics& g)
     }
     else if (waveform != nullptr && getWidth() > 0 && clip.lengthSeconds > 0)
     {
-        // Only the visible slice: a zoomed-in clip can be far wider than the screen.
+        // Only the slice being painted: a zoomed-in clip can be far wider than the screen.
         auto visible = body.getIntersection (g.getClipBounds());
+        const auto textArea = body.getIntersection (shown);
 
         if (! visible.isEmpty())
         {
@@ -118,10 +127,10 @@ void ClipComponent::paint (juce::Graphics& g)
                 const auto percent = juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%";
 
                 if (waveform->hasDrawableAudio())
-                    drawStyledText (g, themeManager, percent, theme.bodySm, visible.reduced (metrics.spaceSm, metrics.space2xs),
+                    drawStyledText (g, themeManager, percent, theme.bodySm, textArea.reduced (metrics.spaceSm, metrics.space2xs),
                                     juce::Justification::bottomRight, ink);
                 else
-                    drawStyledText (g, themeManager, "Preparing audio " + percent, theme.bodySm, visible.reduced (metrics.spaceSm),
+                    drawStyledText (g, themeManager, "Preparing audio " + percent, theme.bodySm, textArea.reduced (metrics.spaceSm),
                                     juce::Justification::centredLeft, ink);
             }
         }
