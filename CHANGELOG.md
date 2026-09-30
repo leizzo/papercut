@@ -9,10 +9,24 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-30
+
+Mixer Bus Strips and release automation on top of **M1 — Core**.
+
 ### Added
 
+- The Mixer draws a Strip for each Bus, after its last child: tinted in the Bus colour, with its
+  input count, Output, Mixer Inserts, Sends, pan, mute/solo and meter. A Bus gets **Add Send** from
+  the strip menu, and its fader, pan, mute and solo undo like a track's.
 - Each GitHub release ships the macOS app (Apple Silicon, signed and notarized) as a DMG, and its
   notes list every change with links to the commits and pull requests.
+
+### Changed
+
+- Mixer track numbers count tracks only, and Returns are ordered A–D.
+- A track's Output in the Mixer is the nearest Bus above it, following nested Buses, else the Master.
+- Internal: one Track Kind rule and track lookup for the Engine, and the Mixer reads a Strip model
+  in signal-flow order instead of re-deriving Bus and Return membership in the view.
 
 ## [0.1.1] - 2026-09-29
 
@@ -81,6 +95,7 @@ basic Mixer, and the Resamper design system.
 - Silent tempo-tagged loops with no waveform.
 - M1 review findings and design parity in lanes, devices and the mixer.
 
-[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/leizzo/resamper/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/leizzo/resamper/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leizzo/resamper/releases/tag/v0.1.0
