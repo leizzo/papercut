@@ -232,6 +232,11 @@ struct ClipViewTests : juce::UnitTest
                 const auto clip = f.model.getTracks()[0].clips[0];
                 auto& engine = f.projects.getEdit().engine;
                 auto* component = findClip (lanes, clip.id);
+                expect (component != nullptr);
+
+                if (component == nullptr)
+                    continue;
+
                 expect (dispatchUntil ([&] { return clip.playbackFile.existsAsFile()
                                                  && te::SmartThumbnail::areThumbnailsFullyLoaded (engine)
                                                  && waveformInk (*component, f.theme) > minWaveformInk; }));
@@ -260,6 +265,9 @@ struct ClipViewTests : juce::UnitTest
 
                 expect (findClip (lanes, clip.id) == component, "the moved clip has a new component");
                 expect (component->getWaveform() == waveform, "the moved clip has a new waveform");
+
+                // Unlike a split, a move keeps a time-stretched clip's proxy: its hash
+                // leaves out the clip's start. So nothing reads its file again.
                 expect (te::SmartThumbnail::areThumbnailsFullyLoaded (engine), "a waveform is reading its file again");
                 expectGreaterThan (waveformInk (*component, f.theme), minWaveformInk);
             }
