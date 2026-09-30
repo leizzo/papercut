@@ -40,9 +40,11 @@ namespace
 
     constexpr int toneInk = 1500, silenceInk = 1000;
 
-    tracktion::WaveAudioClip& firstWaveClip (Fixture& f)
+    /** The first track's first clip, which each test adds from an audio file. */
+    bool usesTimeStretchedProxy (Fixture& f)
     {
-        return *dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);
+        auto* clip = dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);
+        return clip != nullptr && clip->usesTimeStretchedProxy();
     }
 }
 
@@ -61,7 +63,7 @@ struct WaveformTests : juce::UnitTest
             f.invoke (cmd::clipAdd);
 
             const auto clip = f.model.getTracks()[0].clips[0];
-            expect (! firstWaveClip (f).usesTimeStretchedProxy());
+            expect (! usesTimeStretchedProxy (f));
             expect (clip.playbackFile == f.audioFileToChoose);
 
             juce::Component repaintTarget;
@@ -81,8 +83,7 @@ struct WaveformTests : juce::UnitTest
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 30.0, 2, 100.0);
             f.invoke (cmd::clipAdd);
 
-            auto& waveClip = firstWaveClip (f);
-            expect (waveClip.usesTimeStretchedProxy());
+            expect (usesTimeStretchedProxy (f));
 
             const auto clip = f.model.getTracks()[0].clips[0];
             const auto proxy = clip.playbackFile;
@@ -118,7 +119,7 @@ struct WaveformTests : juce::UnitTest
 
             const auto clip = f.model.getTracks()[0].clips[0];
             expectGreaterThan (clip.sourceOffsetSeconds, 0.0);
-            expect (firstWaveClip (f).usesTimeStretchedProxy());
+            expect (usesTimeStretchedProxy (f));
 
             juce::Component repaintTarget;
             auto waveform = f.model.createWaveform (clip.id, repaintTarget);

@@ -118,7 +118,7 @@ void ClipComponent::paint (juce::Graphics& g)
                 const auto percent = juce::String (juce::roundToInt (waveform->getProgress() * 100.0)) + "%";
 
                 if (waveform->hasDrawableAudio())
-                    drawStyledText (g, themeManager, percent, theme.bodySm, visible.reduced (6, 2),
+                    drawStyledText (g, themeManager, percent, theme.bodySm, visible.reduced (metrics.spaceSm, metrics.space2xs),
                                     juce::Justification::bottomRight, ink);
                 else
                     drawStyledText (g, themeManager, "Preparing audio " + percent, theme.bodySm, visible.reduced (6),
