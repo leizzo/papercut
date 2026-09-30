@@ -334,6 +334,25 @@ struct MixerTests : juce::UnitTest
             expectEquals (f.model.getTracks()[0].id, trackId);
         }
 
+        beginTest ("A Mixer detaches from a Bus meter it read when it goes");
+        {
+            MixerFixture f;
+            f.invoke (cmd::trackAdd);
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke (cmd::clipAdd);
+            f.invoke (cmd::mixerAddBus, { "Drums" });
+            const auto bus = f.busId ("Drums");
+            f.invoke (cmd::mixerMoveToBus, { f.model.getTracks()[0].id, bus });
+
+            {
+                Mixer other (f.projects, f.model, f.plugins);
+                other.getTrackLevel (bus);
+            }
+
+            // A client left on the Bus meter would be written to, freed, by this render.
+            expectGreaterThan (renderPeak (f), 0.1f);
+        }
+
         beginTest ("getTrackLevel is silence when the track has not played");
         {
             MixerFixture f;

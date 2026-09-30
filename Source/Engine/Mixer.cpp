@@ -157,9 +157,10 @@ namespace
             return nullptr;
         };
 
-        for (auto* track : te::getAudioTracks (edit))
-            if (auto* meter = matches (*track))
-                return meter;
+        for (auto* track : te::getAllTracks (edit))
+            if (isStripTrack (*track))
+                if (auto* meter = matches (*track))
+                    return meter;
 
         if (auto* master = edit.getMasterTrack())
             if (auto* meter = matches (*master))
