@@ -6,6 +6,17 @@ namespace resamper::test
 
 namespace
 {
+    /** A MIDI clip, which paints without a waveform to wait for. */
+    ClipInfo midiClip (const juce::String& name)
+    {
+        ClipInfo info;
+        info.id = "clip";
+        info.name = name;
+        info.kind = TrackKind::midi;
+        info.lengthSeconds = 4;
+        return info;
+    }
+
     /** The clip as painted into a clip-sized image, limited to region when it is
         not empty, as a partial repaint limits it. */
     juce::Image paintClip (ClipComponent& clip, juce::Rectangle<int> region = {})
@@ -32,6 +43,8 @@ namespace
 
         return differing;
     }
+
+    constexpr int clipWidth = 400, clipHeight = 60, lanesWidth = 300;
 }
 
 /** A clip in the Arrangement, as it paints (PRD §8.1). */
@@ -46,19 +59,20 @@ struct ClipViewTests : juce::UnitTest
             Fixture f;
             expect (f.theme.load().wasOk());
 
-            ClipInfo info;
-            info.id = "clip";
-            info.name = "Clip";
-            info.kind = TrackKind::midi;
-            info.lengthSeconds = 4;
-
-            ClipComponent clip (f.model, f.theme, info);
+            ClipComponent clip (f.model, f.theme, midiClip ("Clip"));
             clip.setTrackLook (juce::Colours::darkorange, false);
-            clip.setBounds (0, 0, 400, 60);
 
-            const auto full = paintClip (clip);
-            const juce::Rectangle<int> strip (200, 0, 20, clip.getHeight());
-            expectEquals (differingPixels (full, paintClip (clip, strip), strip), 0);
+            juce::Component lanes;
+            lanes.setSize (lanesWidth, clipHeight);
+            lanes.addAndMakeVisible (clip);
+
+            // On screen from its start, then starting off-screen.
+            for (const int offScreen : { 0, 200 })
+            {
+                clip.setBounds (-offScreen, 0, clipWidth, clipHeight);
+                const juce::Rectangle<int> playheadStrip (offScreen + 100, 0, 20, clipHeight);
+                expectEquals (differingPixels (paintClip (clip), paintClip (clip, playheadStrip), playheadStrip), 0);
+            }
         }
 
         beginTest ("A clip that starts off-screen keeps its title at the visible edge");
@@ -66,26 +80,21 @@ struct ClipViewTests : juce::UnitTest
             Fixture f;
             expect (f.theme.load().wasOk());
 
-            ClipInfo info;
-            info.id = "clip";
-            info.kind = TrackKind::midi;
-            info.lengthSeconds = 4;
-
-            ClipComponent unnamed (f.model, f.theme, info);
-            info.name = "Clip";
-            ClipComponent named (f.model, f.theme, info);
+            ClipComponent unnamed (f.model, f.theme, midiClip ({}));
+            ClipComponent named (f.model, f.theme, midiClip ("Clip"));
 
             juce::Component lanes;
-            lanes.setSize (300, 60);
+            lanes.setSize (lanesWidth, clipHeight);
+            constexpr int offScreen = 200;
 
             for (auto* clip : { &unnamed, &named })
             {
                 clip->setTrackLook (juce::Colours::darkorange, false);
                 lanes.addAndMakeVisible (*clip);
-                clip->setBounds (-200, 0, 400, 60);
+                clip->setBounds (-offScreen, 0, clipWidth, clipHeight);
             }
 
-            const juce::Rectangle<int> visibleStart (200, 0, 40, f.theme.getMetrics().clipHeaderHeight);
+            const juce::Rectangle<int> visibleStart (offScreen, 0, 40, f.theme.getMetrics().clipHeaderHeight);
             expectGreaterThan (differingPixels (paintClip (unnamed), paintClip (named), visibleStart), 0);
         }
     }
