@@ -816,7 +816,7 @@ namespace
                 parameter->removeListener (this);
         }
 
-        void curveHasChanged (te::AutomatableParameter&) override {}
+        void curveHasChanged (te::AutomatableParameter&) override {}   // required; only a gesture is a touch
 
         void parameterChangeGestureBegin (te::AutomatableParameter& parameter) override
         {
