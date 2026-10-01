@@ -33,16 +33,18 @@ namespace
                                                               std::initializer_list<juce::Point<int>> path)
     {
         std::vector<juce::Rectangle<int>> bounds;
+        auto last = downAt;
         control.mouseDown (mouseEvent (control, downAt, downAt, false));
 
         for (auto p : path)
         {
+            last = p;
             control.mouseDrag (mouseEvent (control, p, downAt, true));
             auto* tag = visibleValueTag (control);
             bounds.push_back (tag != nullptr ? tag->getBounds() : juce::Rectangle<int>());
         }
 
-        control.mouseUp (mouseEvent (control, *std::prev (path.end()), downAt, true));
+        control.mouseUp (mouseEvent (control, last, downAt, path.size() > 0));
         return bounds;
     }
 
@@ -149,9 +151,9 @@ struct ControlViewTests : juce::UnitTest
 
         beginTest ("Clicking a Fader away from the cap jumps it to that dB, as one undo step (#95)");
         {
+            std::vector<std::pair<double, bool>> changes;
             Fader fader (f.theme);
             fader.setBounds (0, 0, 60, 300);
-            std::vector<std::pair<double, bool>> changes;
             fader.onChange = [&] (double v, bool continues) { changes.emplace_back (v, continues); };
 
             // On the scale, at the -12 dB mark.

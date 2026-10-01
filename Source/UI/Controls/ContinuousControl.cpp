@@ -11,6 +11,9 @@ namespace
 
     /** A trackpad scroll this far (in JUCE wheel units) counts as one notch. */
     constexpr float smoothWheelPerNotch = 0.05f;
+
+    /** Space between a ValueTag and the shape it sits beside. */
+    constexpr int valueTagGap = 6;
 }
 
 //==============================================================================
@@ -41,7 +44,7 @@ void ValueTag::show (juce::Component& owner, juce::Rectangle<float> anchor,
         top->addChildComponent (this);
 
     const auto area = top->getLocalArea (&owner, anchor);
-    setBounds (juce::Rectangle<int> (juce::roundToInt (area.getRight()) + 6, juce::roundToInt (area.getCentreY()) - height / 2,
+    setBounds (juce::Rectangle<int> (juce::roundToInt (area.getRight()) + valueTagGap, juce::roundToInt (area.getCentreY()) - height / 2,
                                      width, height)
                    .constrainedWithin (top->getLocalBounds()));
     setVisible (true);
