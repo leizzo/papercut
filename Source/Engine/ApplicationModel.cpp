@@ -413,12 +413,13 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         return clip != nullptr ? dynamic_cast<te::AudioTrack*> (clip->getTrack()) : nullptr;
     }
 
-    /** Puts the audio file on the track as a clip starting at start, inside the
-        caller's undo step. */
-    juce::Result placeAudioClip (te::AudioTrack& track, const juce::File& file, te::TimePosition start)
+    /** Puts the audio file on the track as a clip named name, starting at start,
+        inside the caller's undo step. */
+    juce::Result placeAudioClip (te::AudioTrack& track, const juce::File& file, const juce::String& name,
+                                 te::TimePosition start)
     {
         te::AudioFile audioFile (edit().engine, file);
-        auto clip = track.insertWaveClip (file.getFileNameWithoutExtension(), file,
+        auto clip = track.insertWaveClip (name, file,
                                           { { start, te::TimeDuration::fromSeconds (audioFile.getLength()) }, {} },
                                           false);
 
@@ -726,7 +727,7 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     for (auto* c : track->getClips())
         start = std::max (start, c->getPosition().getEnd());
 
-    return impl->placeAudioClip (*track, playable, start);
+    return impl->placeAudioClip (*track, playable, file.getFileNameWithoutExtension(), start);
 }
 
 juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const juce::String& trackId, double startSeconds)
@@ -745,7 +746,8 @@ juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const 
         return r;
 
     impl->undo().beginStep ("Insert Clip");
-    return impl->placeAudioClip (*track, playable, te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
+    return impl->placeAudioClip (*track, playable, file.getFileNameWithoutExtension(),
+                                 te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
 }
 
 juce::Result ApplicationModel::insertMidiClip()
@@ -1042,7 +1044,7 @@ juce::Result ApplicationModel::consolidateSelectedClips()
     for (auto* clip : selected)
         clip->removeFromParent();
 
-    if (auto r = impl->placeAudioClip (*track, file, range.getStart()); r.failed())
+    if (auto r = impl->placeAudioClip (*track, file, file.getFileNameWithoutExtension(), range.getStart()); r.failed())
         return r;
 
     return juce::Result::ok();

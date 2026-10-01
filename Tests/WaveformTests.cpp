@@ -53,7 +53,8 @@ struct WaveformTests : juce::UnitTest
             f.invoke (cmd::clipAdd);
 
             const auto clip = f.model.getTracks()[0].clips[0];
-            expect (firstClip (f) != nullptr && ! firstClip (f)->getAutoTempo());
+            auto* waveClip = firstClip (f);
+            expect (waveClip != nullptr && ! waveClip->getAutoTempo());
             expect (clip.playbackFile == f.audioFileToChoose);
 
             juce::Component repaintTarget;
@@ -74,8 +75,8 @@ struct WaveformTests : juce::UnitTest
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 30.0, 2, 100.0);
             f.invoke (cmd::clipAdd);
 
-            expect (firstClip (f) != nullptr && firstClip (f)->getAutoTempo());
-            expect (firstClip (f) != nullptr && ! firstClip (f)->canUseProxy());
+            auto* waveClip = firstClip (f);
+            expect (waveClip != nullptr && waveClip->getAutoTempo() && ! waveClip->canUseProxy());
 
             const auto clip = f.model.getTracks()[0].clips[0];
             expect (clip.playbackFile == f.audioFileToChoose);

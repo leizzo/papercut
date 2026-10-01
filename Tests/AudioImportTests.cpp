@@ -56,6 +56,7 @@ struct AudioImportTests : juce::UnitTest
             if (clips.size() == 2)
             {
                 expect (clips[0].playbackFile != clips[1].playbackFile);
+                expectEquals (clips[1].name, juce::String ("loop"), "named after the file the user added");
                 expect (clips[0].playbackFile.existsAsFile() && clips[1].playbackFile.existsAsFile());
             }
         }

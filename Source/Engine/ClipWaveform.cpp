@@ -66,8 +66,8 @@ namespace
     }
 }
 
-ClipWaveform::Impl::Impl (te::WaveAudioClip& c, juce::Component& repaintTarget)
-    : thumbnail (makeThumbnail (c.edit.engine, c.getPlaybackFile(), repaintTarget)), clip (&c)
+ClipWaveform::Impl::Impl (te::WaveAudioClip& waveClip, juce::Component& repaintTarget)
+    : thumbnail (makeThumbnail (waveClip.edit.engine, waveClip.getPlaybackFile(), repaintTarget)), clip (&waveClip)
 {
 }
 
@@ -140,9 +140,11 @@ void ClipWaveform::draw (juce::Graphics& g, juce::Rectangle<int> area,
 
         const auto x1 = area.getX() + juce::roundToInt ((start - clipStartSeconds) * pixelsPerSecond);
         const auto x2 = area.getX() + juce::roundToInt ((end - clipStartSeconds) * pixelsPerSecond);
-        const auto toSource = [&] (double t)
+        const auto sourceStart = (double) segment.startSample / sampleRate;
+        const auto sourceLength = (double) segment.lengthSample / sampleRate;
+        const auto toSource = [=] (double t)
         {
-            return ((double) segment.startSample + (t - segmentStart) / segmentLength * (double) segment.lengthSample) / sampleRate;
+            return sourceStart + (t - segmentStart) / segmentLength * sourceLength;
         };
 
         drawChannels (thumb, g, area.withLeft (x1).withRight (x2), toSource (start), toSource (end));
