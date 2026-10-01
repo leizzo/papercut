@@ -15,8 +15,8 @@ class CommandRegistry;
 
     The chain ends in a drop zone. Browser devices dropped on the chain go to
     its end: a native device then takes keyboard focus, a plug-in opens its
-    window. A card dragged by its title bar moves within it. Each native
-    device's size (folded, compact, expanded) is kept in the UI State. The whole content can be swapped for another
+    window. A card dragged by its title bar moves within it. A native device's
+    size is saved on the device (plugin.setSize). The whole content can be swapped for another
     inspector (the Automation and Folder / Bus inspectors, later). */
 class DetailView : public juce::Component,
                    private ApplicationModel::Listener
@@ -26,6 +26,10 @@ public:
     ~DetailView() override;
 
     std::function<void (const juce::String& pluginId)> onOpenEditor;
+
+    /** Opens a native device, expanded, in its own window (one at a time). It
+        follows the device's state and closes when the device goes. */
+    void openDeviceWindow (const juce::String& trackId, const juce::String& pluginId);
 
     /** The plug-in whose window is open (empty: none); its card says so. */
     void setOpenEditor (const juce::String& pluginId);
@@ -45,6 +49,7 @@ public:
 private:
     struct ClipPanel;
     struct Chain;
+    struct DeviceWindow;
 
     ApplicationModel& model;
     PluginRack& rack;
@@ -58,9 +63,11 @@ private:
     juce::Viewport chainView;
     juce::Component* inspector = nullptr;
     juce::String openEditorId;
+    std::unique_ptr<DeviceWindow> deviceWindow;
     int heightAtDragStart = 0;
 
     void refresh();
+    void refreshDeviceWindow();
     bool onResizeEdge (juce::Point<int>) const;
     void modelChanged() override   { refresh(); }
 };

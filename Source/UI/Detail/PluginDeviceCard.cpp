@@ -146,13 +146,13 @@ PluginDeviceCard::PluginDeviceCard (CommandRegistry& c, PluginRack& r, ThemeMana
     locate->setComponentID ("locate");
     replace->setComponentID ("replace");
     pinLearn->setComponentID ("pinLearn");
-    locate->setTooltip ("Scan the plug-in folders again for it");
+    locate->setTooltip ("Point at the plug-in's file");
     replace->setTooltip ("Put another plug-in in its place");
     pinLearn->setTooltip ("Pin parameters: touch them in the plug-in's window");
 
     power.onClick = [this] { toggleBypass(); };
     openWindow->onClick = [this] { if (onOpenEditor) onOpenEditor(); };
-    locate->onClick = [this] { commands.invoke (cmd::pluginScan); };
+    locate->onClick = [this] { commands.invoke (cmd::pluginLocate, { trackId, plugin.id }); };
     replace->onClick = [this] { showReplaceMenu(); };
     pinLearn->onClick = [this] { setLearningPins (! isLearningPins()); };
 
@@ -172,7 +172,7 @@ juce::String PluginDeviceCard::formatBadge() const
     return plugin.format == "AudioUnit" ? juce::String ("AU") : plugin.format;
 }
 
-void PluginDeviceCard::setState (const PluginInfo& info, DeviceSize)
+void PluginDeviceCard::setState (const PluginInfo& info)
 {
     plugin = info;
     setTitle (plugin.name);

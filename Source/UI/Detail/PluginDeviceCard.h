@@ -25,7 +25,7 @@ namespace resamper
     The card's menu pins and unpins by name too.
 
     A missing plug-in keeps its name, gets a red dashed outline and a Missing
-    badge, and offers Locate (scan again) and Replace instead of its window. */
+    badge, and offers Locate (point at its file) and Replace instead of its window. */
 class PluginDeviceCard : public DeviceCard,
                          private juce::Timer
 {
@@ -35,7 +35,7 @@ public:
     PluginDeviceCard (CommandRegistry&, PluginRack&, ThemeManager&, const juce::String& trackId, const PluginInfo&);
     ~PluginDeviceCard() override;
 
-    void setState (const PluginInfo&, DeviceSize) override;
+    void setState (const PluginInfo&) override;
     int getPreferredWidth (int) const override   { return width; }
     void setWindowOpen (bool) override;
 

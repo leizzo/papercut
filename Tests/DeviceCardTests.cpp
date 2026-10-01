@@ -63,6 +63,57 @@ namespace
         void setStateInformation (const void*, int) override          {}
     };
 
+    /** A plug-in format whose ".fakeplugin" files hold FakePlugin: what Locate scans. */
+    struct FakeFormat : juce::AudioPluginFormat
+    {
+        static constexpr const char* extension = ".fakeplugin";
+
+        juce::String getName() const override   { return "Fake"; }
+
+        void findAllTypesForFile (juce::OwnedArray<juce::PluginDescription>& results, const juce::String& path) override
+        {
+            if (! fileMightContainThisPluginType (path))
+                return;
+
+            auto d = FakePlugin::description();
+            d.pluginFormatName = getName();
+            d.fileOrIdentifier = path;
+            results.add (new juce::PluginDescription (d));
+        }
+
+        bool fileMightContainThisPluginType (const juce::String& path) override   { return path.endsWith (extension); }
+        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return path; }
+        bool pluginNeedsRescanning (const juce::PluginDescription&) override      { return false; }
+        bool doesPluginStillExist (const juce::PluginDescription&) override       { return true; }
+        bool canScanForPlugins() const override                                   { return false; }
+        bool isTrivialToScan() const override                                     { return true; }
+        juce::StringArray searchPathsForPlugins (const juce::FileSearchPath&, bool, bool) override { return {}; }
+        juce::FileSearchPath getDefaultLocationsToSearch() override               { return {}; }
+        bool requiresUnblockedMessageThreadDuringCreation (const juce::PluginDescription&) const override { return false; }
+
+        void createPluginInstance (const juce::PluginDescription&, double, int, PluginCreationCallback callback) override
+        {
+            callback (std::make_unique<FakePlugin>(), {});
+        }
+
+        /** Registers the format with the engine once per run (a format can't be removed). */
+        static void registerWith (te::PluginManager& manager)
+        {
+            static bool registered = false;
+
+            if (! std::exchange (registered, true))
+                manager.pluginFormatManager.addFormat (std::make_unique<FakeFormat>());
+        }
+
+        /** Forgets what Locate found, so later tests see the plug-in missing again. */
+        static void forgetFound (te::PluginManager& manager)
+        {
+            for (auto& type : manager.knownPluginList.getTypes())
+                if (type.pluginFormatName == "Fake")
+                    manager.knownPluginList.removeType (type);
+        }
+    };
+
     /** While alive, the engine knows FakePlugin as a scanned VST3 and can create it. */
     struct ScannedPlugin
     {
@@ -462,6 +513,130 @@ struct DeviceCardTests : juce::UnitTest
             expect (! card->isLearningPins());
             touch (4);
             expectEquals (f.plugins.getChain (f.trackId(), PluginChain::device).back().pinnedParameters.size(), 3);
+        }
+
+        beginTest ("A native device's size is saved with the device, not as an undo step");
+        {
+            Cards f;
+            const auto id = f.insert (reverb);
+            auto view = f.view();
+            click (findOne (*findOne (*view, "DeviceCard/Native"), "fold"));
+            expect (f.plugins.getChain (f.trackId(), PluginChain::device).front().size == DeviceSize::folded);
+
+            // One undo takes back the insert itself: folding was no step of its own.
+            f.invoke (cmd::editUndo);
+            expect (f.plugins.getChain (f.trackId(), PluginChain::device).empty(), "folding made an undo step");
+            f.invoke (cmd::editRedo);
+
+            f.invoke (cmd::pluginSetSize, { id, DeviceSize::expanded });
+            f.projectSaveLocation = f.scratchDir().getChildFile ("Sizes");
+            f.invoke (cmd::projectSaveAs);
+
+            Fixture reopened;
+            reopened.projectToOpen = f.projectSaveLocation;
+            reopened.invoke (cmd::projectOpen);
+            auto chain = reopened.plugins.getChain (reopened.model.getTracks().front().id, PluginChain::device);
+            expect (chain.size() == 1 && chain[0].size == DeviceSize::expanded);
+        }
+
+        beginTest ("A device declares its Output parameters; an instrument's effect mixes aren't its output");
+        {
+            Cards f;
+            f.invoke (cmd::trackAddMidi);
+            const auto midi = f.model.getTracks()[1].id;
+            const auto compressor = f.insert (te::CompressorPlugin::xmlTypeName);
+            f.invoke (cmd::pluginInsert, { midi, te::FourOscPlugin::xmlTypeName });
+            const auto synth = f.plugins.getChain (midi, PluginChain::device).back().id;
+
+            auto outputs = [&] (const juce::String& id)
+            {
+                juce::StringArray ids;
+
+                for (auto& p : f.plugins.getParameters (id))
+                    if (p.output)
+                        ids.add (p.id);
+
+                return ids.joinIntoString (",");
+            };
+
+            expectEquals (outputs (compressor), juce::String ("output gain"));
+            expectEquals (outputs (synth), juce::String ("masterLevel"));
+        }
+
+        beginTest ("Open in Window floats the device expanded; it follows the device and closes when it goes");
+        {
+            Cards f;
+            const auto id = f.insert (reverb);
+            auto view = f.view();
+            auto* card = dynamic_cast<DeviceCard*> (findOne (*view, "DeviceCard/Native"));
+            expect (card != nullptr && card->onFloat != nullptr);
+
+            if (card == nullptr || card->onFloat == nullptr)
+                return;
+
+            auto deviceWindows = [] () -> juce::Component*
+            {
+                for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i)
+                    if (auto* c = juce::Desktop::getInstance().getComponent (i); c->getComponentID() == "DeviceWindow" && c->isVisible())
+                        return c;
+
+                return nullptr;
+            };
+
+            card->onFloat();
+            auto* window = deviceWindows();
+            expect (window != nullptr);
+
+            if (window == nullptr)
+                return;
+
+            for (auto& p : f.plugins.getParameters (id))
+                expect (findOne (*window, p.id) != nullptr && findOne (*window, p.id)->isVisible(), p.name + " isn't in the window");
+
+            expect (findOne (*window, "fold") == nullptr || ! findOne (*window, "fold")->isVisible());
+            expect (f.plugins.getChain (f.trackId(), PluginChain::device).front().size == DeviceSize::compact,
+                    "floating it changed the docked card's size");
+
+            f.invoke (cmd::pluginRemove, { f.trackId(), id });
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+            expect (deviceWindows() == nullptr, "the removed device's window stayed open");
+        }
+
+        beginTest ("Locate loads a missing plug-in from the file the user points at");
+        {
+            Cards f;
+            f.projectSaveLocation = f.scratchDir().getChildFile ("Locate");
+
+            {
+                ScannedPlugin scanned (f);
+                f.insert (pinboard);
+                f.invoke (cmd::projectSaveAs);
+            }
+
+            auto& manager = f.projects.getEdit().engine.getPluginManager();
+            FakeFormat::registerWith (manager);
+
+            Cards reopened;
+            reopened.projectToOpen = f.projectSaveLocation;
+            reopened.invoke (cmd::projectOpen);
+            reopened.invoke (cmd::trackSelect, { reopened.trackId() });
+            expect (reopened.plugins.getChain (reopened.trackId(), PluginChain::device).front().missing);
+
+            // A file that holds no plug-in is refused.
+            reopened.pluginFileToChoose = reopened.scratchDir().getChildFile ("Readme.txt");
+            auto view = reopened.view();
+            click (findOne (*findOne (*view, "DeviceCard/Plugin"), "locate"));
+            expect (reopened.errors.size() == 1 && reopened.errors[0].contains ("No plug-in"), reopened.errors.joinIntoString ("; "));
+
+            reopened.pluginFileToChoose = reopened.scratchDir().getChildFile (juce::String ("Moved/Pinboard") + FakeFormat::extension);
+            click (findOne (*findOne (*view, "DeviceCard/Plugin"), "locate"));
+            expectEquals (reopened.errors.size(), 1, reopened.errors.joinIntoString ("; "));
+
+            auto chain = reopened.plugins.getChain (reopened.trackId(), PluginChain::device);
+            expect (chain.size() == 1 && ! chain[0].missing && chain[0].name == "Pinboard");
+
+            reopened.invoke (cmd::projectNew);
+            FakeFormat::forgetFound (manager);
         }
 
         beginTest ("Deleting a plug-in closes its window");

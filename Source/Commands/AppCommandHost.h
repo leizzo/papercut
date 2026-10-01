@@ -18,6 +18,7 @@ struct AppCommandHost
     std::function<void (FileCallback)> chooseAudioFile;
     std::function<void (FileCallback)> chooseProjectToOpen;
     std::function<void (FileCallback)> chooseProjectSaveLocation;
+    std::function<void (FileCallback)> choosePluginFile;   ///< a plug-in bundle or file (Locate)
 
     std::function<juce::var()> captureUIState;
     std::function<void (const juce::var&)> restoreUIState;

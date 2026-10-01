@@ -7,7 +7,6 @@ namespace resamper
 
 namespace
 {
-    constexpr int foregroundPollMs = 250;
 
     class EmptyPluginEditor : public juce::Component
     {
@@ -38,12 +37,8 @@ namespace
 }
 
 PluginEditorWindow::PluginEditorWindow (PluginRack& rack, ThemeManager& theme, const juce::String& id)
-    : juce::DocumentWindow ("Plug-in", theme.getTheme().background, juce::DocumentWindow::closeButton),
-      themeManager (theme), pluginId (id)
+    : FloatingWindow (theme, "Plug-in", "PluginEditorWindow"), pluginId (id)
 {
-    setComponentID ("PluginEditorWindow");
-    setLookAndFeel (&themeManager.getLookAndFeel());
-    setTitleBarHeight (themeManager.getMetrics().trackControlHeight);
     setResizable (true, false);
 
     auto content = rack.createEditor (id);
@@ -55,39 +50,7 @@ PluginEditorWindow::PluginEditorWindow (PluginRack& rack, ThemeManager& theme, c
     if (content->getWidth() <= 0 || content->getHeight() <= 0)
         content->setSize (fallback.getWidth(), fallback.getHeight());
 
-    setContentOwned (content.release(), true);
-    centreWithSize (getWidth(), getHeight());
-    themeManager.addListener (this);
-    timerCallback();
-    startTimer (foregroundPollMs);
-    setVisible (true);
-}
-
-PluginEditorWindow::~PluginEditorWindow()
-{
-    themeManager.removeListener (this);
-    setLookAndFeel (nullptr);
-}
-
-void PluginEditorWindow::closeButtonPressed()
-{
-    setVisible (false);
-
-    if (onClose)
-        onClose();
-}
-
-void PluginEditorWindow::timerCallback()
-{
-    setAlwaysOnTop (juce::Process::isForegroundProcess());
-}
-
-void PluginEditorWindow::themeChanged()
-{
-    setBackgroundColour (themeManager.getTheme().background);
-
-    if (auto* content = getContentComponent())
-        content->repaint();
+    show (std::move (content));
 }
 
 } // namespace resamper

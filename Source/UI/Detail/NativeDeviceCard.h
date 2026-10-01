@@ -22,7 +22,8 @@ namespace resamper
     the power, the name running down it and the Mods indicator; clicking the
     strip unfolds it. Compact (the default) shows the first controls and the outputs
     and never scrolls. Expanded docks across the detail view and shows every
-    parameter. A device's colour comes from its type, so the same device looks
+    parameter, docked across the detail view or floating in its own window
+    (the menu's Open in Window). A device's colour comes from its type, so the same device looks
     the same on every track.
 
     The preset menu, A/B compare and the Mods Drawer come with their own
@@ -34,7 +35,10 @@ public:
 
     NativeDeviceCard (CommandRegistry&, PluginRack&, ThemeManager&, const juce::String& trackId, const PluginInfo&);
 
-    void setState (const PluginInfo&, DeviceSize) override;
+    void setState (const PluginInfo&) override;
+
+    /** Shown in its own window: always expanded, without fold, expand or Open in Window. */
+    void setFloating (bool);
     int getPreferredWidth (int dockedWidth) const override;
     void focusFirstControl() override;
 
@@ -52,6 +56,7 @@ private:
 
     juce::Colour colour;
     DeviceSize size = DeviceSize::compact;
+    bool floating = false;
     DevicePowerButton power;
     DeviceHeaderButton preset, ab, mods, fold, expand, options;
     std::vector<Parameter> parameters;

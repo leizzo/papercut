@@ -13,11 +13,6 @@ namespace resamper
 
 class CommandRegistry;
 
-/** How much of a native device shows (PRD §9.2.1a): a 28 px strip, the 164 px
-    card that never scrolls, or every parameter docked across the detail view.
-    A plug-in card has one size. */
-enum class DeviceSize { folded, compact, expanded };
-
 /** target, or back to compact when already there: what a fold or expand toggle does. */
 inline DeviceSize toggledSize (DeviceSize current, DeviceSize target)
 {
@@ -40,8 +35,8 @@ public:
 
     const PluginInfo& getPlugin() const noexcept   { return plugin; }
 
-    /** New state from the model. A plug-in card ignores the size. */
-    virtual void setState (const PluginInfo&, DeviceSize) = 0;
+    /** New state from the model. */
+    virtual void setState (const PluginInfo&) = 0;
 
     /** Width in the chain. dockedWidth is what an expanded device fills at least. */
     virtual int getPreferredWidth (int dockedWidth) const = 0;
@@ -54,6 +49,7 @@ public:
 
     std::function<void (DeviceSize)> onSizeChange;
     std::function<void()> onOpenEditor;
+    std::function<void()> onFloat;   ///< a native device: open it, expanded, in its own window
 
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;

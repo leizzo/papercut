@@ -84,6 +84,7 @@ Fixture::Fixture()
     host.chooseAudioFile = pick (audioFileToChoose);
     host.chooseProjectToOpen = pick (projectToOpen);
     host.chooseProjectSaveLocation = pick (projectSaveLocation);
+    host.choosePluginFile = pick (pluginFileToChoose);
     host.reportError = [this] (const juce::String& e) { errors.add (e); };
     host.notify = [this] (const juce::String& n, bool) { notifications.add (n); };
 }

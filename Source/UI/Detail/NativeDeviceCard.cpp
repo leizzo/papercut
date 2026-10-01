@@ -20,16 +20,6 @@ namespace
     constexpr int foldedPadding = 6, foldedGap = 8, stripeHeight = 3, foldedNameHeight = 100, foldedModsSize = 10;
     const TypeStyle foldedNameStyle { 10.0f, false, 700 };
 
-    /** Mix, Wet / Dry and Out belong in the Output zone, after the divider. */
-    bool isOutputParameter (const juce::String& name)
-    {
-        for (auto* word : { "mix", "wet", "dry" })
-            if (name.containsIgnoreCase (word))
-                return true;
-
-        return name.startsWithIgnoreCase ("out");
-    }
-
     int zoneWidth (int columns)
     {
         return columns > 0 ? columns * knobWidth + (columns - 1) * knobGap : 0;
@@ -98,7 +88,7 @@ void NativeDeviceCard::rebuild (const std::vector<PluginParameter>& list)
             knob->setTooltip (p.name);
             knob->onChange = setterFor (p.id);
             addChildComponent (*knob);
-            parameters.push_back ({ p.id, isOutputParameter (p.name), std::move (knob) });
+            parameters.push_back ({ p.id, p.output, std::move (knob) });
         }
 
         // Controls first, then the Output zone, each in the device's own order.
@@ -118,11 +108,17 @@ void NativeDeviceCard::rebuild (const std::vector<PluginParameter>& list)
     resized();
 }
 
-void NativeDeviceCard::setState (const PluginInfo& info, DeviceSize newSize)
+void NativeDeviceCard::setFloating (bool b)
+{
+    floating = b;
+    setState (plugin);
+}
+
+void NativeDeviceCard::setState (const PluginInfo& info)
 {
     auto& theme = themeManager.getTheme();
     plugin = info;
-    size = newSize;
+    size = floating ? DeviceSize::expanded : plugin.size;
     // A stable pick from the track palette by device type (the design: EQ Eight is always arp, Saturator bass).
     colour = theme.trackColour ((int) ((juce::uint32) (plugin.manufacturer + "/" + plugin.name).hashCode()
                                        % (juce::uint32) theme.trackPalette.size()));
@@ -201,8 +197,12 @@ juce::Rectangle<int> NativeDeviceCard::getTitleBar() const
 void NativeDeviceCard::addMenuItems (juce::PopupMenu& menu)
 {
     auto resize = [this] (DeviceSize s) { return [this, s] { if (onSizeChange) onSizeChange (s); }; };
+    if (floating)
+        return;
+
     menu.addItem ("Fold", true, size == DeviceSize::folded, resize (toggledSize (size, DeviceSize::folded)));
     menu.addItem ("Expand", true, size == DeviceSize::expanded, resize (toggledSize (size, DeviceSize::expanded)));
+    menu.addItem ("Open in Window", [this] { if (onFloat) onFloat(); });
     menu.addSeparator();
 }
 
@@ -220,8 +220,12 @@ void NativeDeviceCard::resized()
 {
     const auto folded = size == DeviceSize::folded;
 
-    for (auto* b : std::initializer_list<juce::Component*> { &preset, &ab, &fold, &expand, &options })
+    for (auto* b : std::initializer_list<juce::Component*> { &preset, &ab, &options })
         b->setVisible (! folded);
+
+    // A floating device is always expanded: nothing to fold or expand.
+    fold.setVisible (! folded && ! floating);
+    expand.setVisible (! folded && ! floating);
 
     for (auto& p : parameters)
         p.knob->setVisible (false);
@@ -253,6 +257,9 @@ void NativeDeviceCard::resized()
 
     for (auto* b : { &options, &expand, &fold })
     {
+        if (! b->isVisible())
+            continue;
+
         b->setBounds (header.removeFromRight (b->getIdealWidth()).withSizeKeepingCentre (b->getIdealWidth(), partHeight));
         header.removeFromRight (headerGap - iconSlack);
     }

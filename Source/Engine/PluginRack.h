@@ -18,6 +18,12 @@ namespace test { struct PluginRackTests; }
     mixer inserts are console processing after it, edited in the mixer strip. */
 enum class PluginChain { device, mixer };
 
+/** How much of a native device's card shows (PRD §9.2.1a): a 28 px strip,
+    the 164 px card that never scrolls, or every parameter docked across the
+    detail view. Saved with the device (§20 NativeDevice.collapsed). A
+    plug-in's card has one size. */
+enum class DeviceSize { folded, compact, expanded };
+
 /** One plug-in in the catalogue, or one on a track.
 
     In the catalogue, id is empty. Once inserted, id is the plug-in's EditItemID.
@@ -38,6 +44,7 @@ struct PluginInfo
     bool sandboxed = false;                     ///< runs out of process; never yet, plug-ins are hosted in-process
     int latencySamples = 0;                     ///< the latency the plug-in reports
     juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
+    DeviceSize size = DeviceSize::compact;      ///< a native device's card
 };
 
 /** One automatable parameter of a plug-in on a track, in its own units. */
@@ -46,6 +53,7 @@ struct PluginParameter
     juce::String id, name;
     float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
     bool automated = false;   ///< has an automation curve
+    bool output = false;      ///< a native device's Mix / Out: its card's last zone
 };
 
 /** Facade over the current Edit's plug-ins.
@@ -149,6 +157,15 @@ public:
         learns what to pin. Empty for an unknown plug-in. */
     std::unique_ptr<TouchWatch> watchTouches (const juce::String& pluginId,
                                               std::function<void (const juce::String& parameterId)> onTouch);
+
+    /** Folds, unfolds or expands a native device's card. A view of the device,
+        so not an undo step, but saved with the project. */
+    juce::Result setSize (const juce::String& pluginId, DeviceSize);
+
+    /** Finds a missing plug-in in file (a bundle or plug-in file the user
+        points at): scans it, then loads the plug-in from it. Fails if the
+        plug-in isn't missing or the file doesn't hold it. */
+    juce::Result locate (const juce::String& pluginId, const juce::File&);
 
     /** The share of the audio callback the plug-in last took, 0..1. */
     double getCpuLoad (const juce::String& pluginId) const;

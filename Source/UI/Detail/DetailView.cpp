@@ -1,4 +1,6 @@
 #include "DetailView.h"
+#include "NativeDeviceCard.h"
+#include "UI/MainWindow/FloatingWindow.h"
 #include "Commands/CommandRegistry.h"
 #include "Commands/PluginCommands.h"
 #include "UI/Browser/Library.h"
@@ -14,15 +16,6 @@ namespace
     constexpr int clipPanelWidth = 230, resizeEdge = 4, chainPadding = 14, cardGap = 10;
 
     constexpr int dropZoneWidth = 150;
-
-    /** A native device's size in the UI State: "folded" or "expanded"; absent is compact. */
-    juce::Identifier sizeKey (const juce::String& pluginId)   { return "size_" + pluginId; }
-
-    DeviceSize sizeIn (const juce::ValueTree& state, const juce::String& pluginId)
-    {
-        const auto value = state[sizeKey (pluginId)].toString();
-        return value == "folded" ? DeviceSize::folded : value == "expanded" ? DeviceSize::expanded : DeviceSize::compact;
-    }
 
     /** The end of the chain (§6.3), drawn to the design's Drop Zone: a bordered
         150 px column, a square-dashed icon, "Drop device" over "or plug-in here".
@@ -185,13 +178,10 @@ struct DetailView::Chain : juce::Component,
                 auto card = DeviceCard::create (owner.commands, owner.rack, owner.themeManager, track, plugin);
                 card->onSizeChange = [this, id = plugin.id] (DeviceSize size)
                 {
-                    if (size == DeviceSize::compact)
-                        owner.state.removeProperty (sizeKey (id), nullptr);
-                    else
-                        owner.state.setProperty (sizeKey (id), size == DeviceSize::folded ? "folded" : "expanded", nullptr);
-
+                    owner.commands.invoke (cmd::pluginSetSize, { id, size });
                     owner.refresh();
                 };
+                card->onFloat = [this, id = plugin.id] { owner.openDeviceWindow (trackId, id); };
                 card->onOpenEditor = [this, id = plugin.id] { if (owner.onOpenEditor) owner.onOpenEditor (id); };
                 addAndMakeVisible (*card);
                 cards.push_back (std::move (card));
@@ -200,7 +190,7 @@ struct DetailView::Chain : juce::Component,
 
         for (size_t i = 0; i < plugins.size(); ++i)
         {
-            cards[i]->setState (plugins[i], sizeIn (owner.state, plugins[i].id));
+            cards[i]->setState (plugins[i]);
             cards[i]->setWindowOpen (plugins[i].id == owner.openEditorId);
         }
 
@@ -333,6 +323,32 @@ struct DetailView::Chain : juce::Component,
 };
 
 //==============================================================================
+/** A native device expanded in its own window (§9.2.1a: Expanded, floating). */
+struct DetailView::DeviceWindow : FloatingWindow
+{
+    DeviceWindow (DetailView& owner, const juce::String& track, const PluginInfo& info)
+        : FloatingWindow (owner.themeManager, info.name, "DeviceWindow"), trackId (track), pluginId (info.id)
+    {
+        auto native = std::make_unique<NativeDeviceCard> (owner.commands, owner.rack, owner.themeManager, track, info);
+        card = native.get();
+        card->setFloating (true);
+        card->setSize (card->getPreferredWidth (floatingWidth), DeviceCard::height);
+        show (std::move (native));
+    }
+
+    void update (const PluginInfo& info)
+    {
+        setName (info.name);
+        card->setState (info);
+        card->setSize (card->getPreferredWidth (floatingWidth), DeviceCard::height);
+    }
+
+    static constexpr int floatingWidth = 720;
+    juce::String trackId, pluginId;
+    NativeDeviceCard* card = nullptr;
+};
+
+//==============================================================================
 DetailView::DetailView (ApplicationModel& m, PluginRack& r, CommandRegistry& c, ThemeManager& tm, ShellState& s, juce::ValueTree uiState)
     : model (m), rack (r), commands (c), themeManager (tm), shell (s), state (std::move (uiState)),
       clipPanel (std::make_unique<ClipPanel> (tm)), chain (std::make_unique<Chain> (*this))
@@ -366,6 +382,39 @@ void DetailView::setInspector (juce::Component* c)
     clipPanel->setVisible (inspector == nullptr);
     chainView.setVisible (inspector == nullptr);
     resized();
+}
+
+void DetailView::openDeviceWindow (const juce::String& trackId, const juce::String& pluginId)
+{
+    for (auto& info : rack.getChain (trackId, PluginChain::device))
+        if (info.id == pluginId && ! info.external)
+        {
+            if (deviceWindow != nullptr && deviceWindow->pluginId == pluginId)
+            {
+                deviceWindow->toFront (true);
+                return;
+            }
+
+            deviceWindow = std::make_unique<DeviceWindow> (*this, trackId, info);
+            deviceWindow->onClose = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<DetailView> (this)]
+                                                                              { if (safe != nullptr) safe->deviceWindow.reset(); }); };
+        }
+}
+
+void DetailView::refreshDeviceWindow()
+{
+    if (deviceWindow == nullptr)
+        return;
+
+    // It follows its device, and goes with it.
+    for (auto& info : rack.getChain (deviceWindow->trackId, PluginChain::device))
+        if (info.id == deviceWindow->pluginId)
+        {
+            deviceWindow->update (info);
+            return;
+        }
+
+    deviceWindow.reset();
 }
 
 void DetailView::setOpenEditor (const juce::String& pluginId)
@@ -426,6 +475,7 @@ void DetailView::refresh()
     }
 
     clipPanel->repaint();
+    refreshDeviceWindow();
     chain->setChain (trackId, trackId.isNotEmpty() ? rack.getChain (trackId, PluginChain::device) : std::vector<PluginInfo>());
 }
 

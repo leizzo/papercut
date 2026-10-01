@@ -164,6 +164,12 @@ private:
             choose ("Save Project As (creates a folder)", {}, FB::saveMode | FB::canSelectFiles, std::move (cb));
         };
 
+        commandHost.choosePluginFile = [this] (auto cb)
+        {
+            choose ("Locate Plug-in", "*.vst3;*.component;*.clap",
+                    FB::openMode | FB::canSelectFiles | FB::canSelectDirectories, std::move (cb));
+        };
+
         // Errors are toasts, not modal dialogs (PRD §16.7); before the window exists, a dialog.
         commandHost.reportError = [this] (const juce::String& message)
         {

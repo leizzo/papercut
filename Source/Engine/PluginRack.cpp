@@ -4,6 +4,8 @@
 
 #include <tracktion_engine/tracktion_engine.h>
 
+#include <map>
+
 namespace te = tracktion;
 
 namespace resamper
@@ -21,6 +23,29 @@ namespace
     juce::StringArray pinsOf (const te::Plugin& plugin)
     {
         return juce::StringArray::fromLines (plugin.state[pinsProperty].toString());
+    }
+
+    /** On a native device's state: "folded" or "expanded"; absent is compact. */
+    const juce::Identifier sizeProperty { "resamperSize" };
+
+    DeviceSize sizeOf (const te::Plugin& plugin)
+    {
+        const auto value = plugin.state[sizeProperty].toString();
+        return value == "folded" ? DeviceSize::folded : value == "expanded" ? DeviceSize::expanded : DeviceSize::compact;
+    }
+
+    /** A built-in's Mix and Out parameters, by type: the last zone of its card (§9.2.1a). */
+    bool isOutputParameter (const juce::String& pluginType, const juce::String& parameterId)
+    {
+        static const std::map<juce::String, juce::StringArray> outputs {
+            { te::ReverbPlugin::xmlTypeName,     { "wet level", "dry level" } },
+            { te::CompressorPlugin::xmlTypeName, { "output gain" } },
+            { te::DelayPlugin::xmlTypeName,      { "mix proportion" } },
+            { te::FourOscPlugin::xmlTypeName,    { "masterLevel" } },
+        };
+
+        auto found = outputs.find (pluginType);
+        return found != outputs.end() && found->second.contains (parameterId);
     }
 
     PluginChain chainOf (const te::Plugin& plugin)
@@ -137,6 +162,7 @@ namespace
         {
             info.format = te::PluginManager::builtInPluginFormatName;
             info.category = info.instrument ? "Synth" : "Effect";
+            info.size = sizeOf (plugin);
         }
 
         info.midiEffect = isMidiEffect (plugin);
@@ -736,7 +762,8 @@ std::vector<PluginParameter> PluginRack::getParameters (const juce::String& plug
             const auto range = parameter->getValueRange();
             result.push_back ({ parameter->paramID, parameter->getParameterName(), range.getStart(), range.getEnd(),
                                 parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()),
-                                parameter->hasAutomationPoints() });
+                                parameter->hasAutomationPoints(),
+                                isOutputParameter (plugin->getPluginType(), parameter->paramID) });
         }
     }
 
@@ -841,6 +868,62 @@ std::unique_ptr<PluginRack::TouchWatch> PluginRack::watchTouches (const juce::St
         return std::make_unique<ParameterTouchWatch> (*plugin, std::move (onTouch));
 
     return {};
+}
+
+juce::Result PluginRack::setSize (const juce::String& pluginId, DeviceSize size)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (plugin == nullptr)
+        return juce::Result::fail ("No such plug-in");
+
+    if (dynamic_cast<te::ExternalPlugin*> (plugin.get()) != nullptr)
+        return juce::Result::fail ("A plug-in's card has one size");
+
+    if (size == DeviceSize::compact)
+        plugin->state.removeProperty (sizeProperty, nullptr);
+    else
+        plugin->state.setProperty (sizeProperty, size == DeviceSize::folded ? "folded" : "expanded", nullptr);
+
+    return juce::Result::ok();
+}
+
+juce::Result PluginRack::locate (const juce::String& pluginId, const juce::File& file)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+
+    if (external == nullptr || ! external->isMissing())
+        return juce::Result::fail ("That plug-in isn't missing");
+
+    if (scanning.load())
+        return juce::Result::fail ("A plug-in scan is in progress");
+
+    auto& manager = projectManager.getEdit().engine.getPluginManager();
+    auto& formats = manager.pluginFormatManager;
+    const auto path = file.getFullPathName();
+    bool foundAny = false;
+
+    for (auto* format : formats.getFormats())
+    {
+        if (format == nullptr || ! format->fileMightContainThisPluginType (path))
+            continue;
+
+        juce::OwnedArray<juce::PluginDescription> found;
+        manager.knownPluginList.scanAndAddFile (path, true, found, *format);
+        foundAny = foundAny || ! found.isEmpty();
+    }
+
+    if (! foundAny)
+        return juce::Result::fail ("No plug-in in " + file.getFileName());
+
+    publishExternalSnapshot();
+    external->forceFullReinitialise();
+
+    if (external->isMissing())
+        return juce::Result::fail (file.getFileName() + " doesn't hold " + external->desc.name);
+
+    return juce::Result::ok();
 }
 
 double PluginRack::getCpuLoad (const juce::String& pluginId) const
