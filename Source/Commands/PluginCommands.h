@@ -65,6 +65,21 @@ struct PluginReplaceArgs
     juce::String plugin;
 };
 
+/** Pins a plug-in parameter to its card, or unpins it. */
+struct PluginPinArgs
+{
+    juce::String pluginId;
+    juce::String parameterId;
+    bool pinned = true;
+};
+
+/** A native device card's new size. */
+struct PluginSizeArgs
+{
+    juce::String pluginId;
+    DeviceSize size = DeviceSize::compact;
+};
+
 namespace cmd
 {
     inline constexpr CommandRef<> pluginScan { "plugin.scan" };
@@ -76,6 +91,9 @@ namespace cmd
     inline constexpr CommandRef<PluginCopyArgs> pluginCopyInsert { "plugin.copyInsert" };
     inline constexpr CommandRef<PluginParameterArgs> pluginSetParameter { "plugin.setParameter" };
     inline constexpr CommandRef<PluginReplaceArgs> pluginReplace { "plugin.replace" };
+    inline constexpr CommandRef<PluginPinArgs> pluginSetPinned { "plugin.setPinned" };
+    inline constexpr CommandRef<PluginSizeArgs> pluginSetSize { "plugin.setSize" };       ///< a view: never undoable
+    inline constexpr CommandRef<PluginArgs> pluginLocate { "plugin.locate" };             ///< asks for the missing plug-in's file
 }
 
 /** Registers the plug-in Commands above. */

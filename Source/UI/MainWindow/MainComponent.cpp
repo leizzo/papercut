@@ -78,7 +78,16 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
 
     detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id)
     {
+        // An open window comes forward; any other replaces it.
+        if (pluginEditor != nullptr && pluginEditor->getPluginId() == id && pluginEditor->isVisible())
+        {
+            pluginEditor->toFront (true);
+            return;
+        }
+
         pluginEditor = std::make_unique<PluginEditorWindow> (app.plugins, app.theme, id);
+        pluginEditor->onClose = [this] { detailView.setOpenEditor ({}); };
+        detailView.setOpenEditor (id);
     };
 
     for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &detailView,
@@ -276,6 +285,13 @@ void MainComponent::mouseDown (const juce::MouseEvent& e)
 
 void MainComponent::modelChanged()
 {
+    // A window never outlives its plug-in (deleted, its insert undone, its track or Project gone).
+    if (pluginEditor != nullptr && ! app.plugins.contains (pluginEditor->getPluginId()))
+    {
+        pluginEditor.reset();
+        detailView.setOpenEditor ({});
+    }
+
     updateStatusBar();
     commandManager.commandStatusChanged();   // undo/redo enablement
 }

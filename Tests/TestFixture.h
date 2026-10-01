@@ -51,7 +51,7 @@ struct Fixture
     AppCommandHost& host = app.host;
 
     // What the choosers "pick". An invalid File means the user cancelled.
-    juce::File audioFileToChoose, projectToOpen, projectSaveLocation;
+    juce::File audioFileToChoose, projectToOpen, projectSaveLocation, pluginFileToChoose;
 
     juce::StringArray errors, notifications;
 

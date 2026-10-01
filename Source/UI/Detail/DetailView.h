@@ -13,8 +13,10 @@ class CommandRegistry;
     panel (230) and the track's device chain, a horizontal row of DeviceCards.
     Its top edge drags its height (120–420, kept in the shell's UI State).
 
-    Browser devices dropped on the chain go to its end; a card dragged by its
-    title bar moves within it. The whole content can be swapped for another
+    The chain ends in a drop zone. Browser devices dropped on the chain go to
+    its end: a native device then takes keyboard focus, a plug-in opens its
+    window. A card dragged by its title bar moves within it. A native device's
+    size is saved on the device (plugin.setSize). The whole content can be swapped for another
     inspector (the Automation and Folder / Bus inspectors, later). */
 class DetailView : public juce::Component,
                    private ApplicationModel::Listener
@@ -24,6 +26,13 @@ public:
     ~DetailView() override;
 
     std::function<void (const juce::String& pluginId)> onOpenEditor;
+
+    /** Opens a native device, expanded, in its own window (one at a time). It
+        follows the device's state and closes when the device goes. */
+    void openDeviceWindow (const juce::String& trackId, const juce::String& pluginId);
+
+    /** The plug-in whose window is open (empty: none); its card says so. */
+    void setOpenEditor (const juce::String& pluginId);
 
     /** Shows this inspector in place of the clip panel and chain; nullptr restores them. */
     void setInspector (juce::Component*);
@@ -40,6 +49,7 @@ public:
 private:
     struct ClipPanel;
     struct Chain;
+    struct DeviceWindow;
 
     ApplicationModel& model;
     PluginRack& rack;
@@ -52,9 +62,12 @@ private:
     std::unique_ptr<Chain> chain;
     juce::Viewport chainView;
     juce::Component* inspector = nullptr;
+    juce::String openEditorId;
+    std::unique_ptr<DeviceWindow> deviceWindow;
     int heightAtDragStart = 0;
 
     void refresh();
+    void refreshDeviceWindow();
     bool onResizeEdge (juce::Point<int>) const;
     void modelChanged() override   { refresh(); }
 };

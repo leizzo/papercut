@@ -130,6 +130,9 @@ public:
     /** Label and value to the right of the dial, left-aligned (a strip's pan row), not under it. */
     void setReadoutBeside (bool);
 
+    /** `Knob/Automated`: a red dot by the dial while the parameter has automation. */
+    void setAutomated (bool);
+
     void paint (juce::Graphics&) override;
 
 protected:
@@ -141,7 +144,7 @@ private:
     juce::String label;
     bool bipolar, dimmed = false;
     std::optional<juce::Colour> arcColour;
-    bool readoutBeside = false;
+    bool readoutBeside = false, automated = false;
     int dialSize = 30;
 
     juce::Rectangle<float> dialBounds() const;

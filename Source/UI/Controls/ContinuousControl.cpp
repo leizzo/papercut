@@ -352,6 +352,12 @@ void Knob::setReadoutBeside (bool b)
     repaint();
 }
 
+void Knob::setAutomated (bool b)
+{
+    if (std::exchange (automated, b) != b)
+        repaint();
+}
+
 juce::Rectangle<float> Knob::dialBounds() const
 {
     const auto size = (float) juce::jmin (dialSize, getWidth(), getHeight());
@@ -407,6 +413,17 @@ void Knob::paint (juce::Graphics& g)
     g.fillEllipse (cap);
     g.setColour (theme.border);
     g.drawEllipse (cap, 1.0f);
+
+    if (automated)
+    {
+        // `Knob/Automated`: a 6 px rec dot ringed in the panel colour, in the dial's top-right corner (24, 0 of 30).
+        const auto size = dial.getWidth() * 0.2f;
+        const auto dot = juce::Rectangle<float> (dial.getRight() - size, dial.getY(), size, size);
+        g.setColour (theme.rec);
+        g.fillEllipse (dot);
+        g.setColour (theme.bgPanel);
+        g.drawEllipse (dot, 1.0f);
+    }
 
     auto text = getReadoutBounds();
 

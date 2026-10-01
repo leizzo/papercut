@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -17,6 +18,12 @@ namespace test { struct PluginRackTests; }
     mixer inserts are console processing after it, edited in the mixer strip. */
 enum class PluginChain { device, mixer };
 
+/** How much of a native device's card shows (PRD §9.2.1a): a 28 px strip,
+    the 164 px card that never scrolls, or every parameter docked across the
+    detail view. Saved with the device (§20 NativeDevice.collapsed). A
+    plug-in's card has one size. */
+enum class DeviceSize { folded, compact, expanded };
+
 /** One plug-in in the catalogue, or one on a track.
 
     In the catalogue, id is empty. Once inserted, id is the plug-in's EditItemID.
@@ -27,12 +34,17 @@ struct PluginInfo
 {
     juce::String id;
     juce::String name, manufacturer, format, path, category;
+    juce::String version;                       ///< an external plug-in's own version; empty for a built-in
     bool instrument = false;
     bool midiEffect = false;
     bool external = false;                      ///< a scanned plug-in (VST3, AU), not a built-in
     PluginChain chain = PluginChain::device;   ///< on a track: which chain it is on
     bool enabled = true;                        ///< false when bypassed
     bool missing = false;                       ///< saved in the project but not installed; audio passes through
+    bool sandboxed = false;                     ///< runs out of process; never yet, plug-ins are hosted in-process
+    int latencySamples = 0;                     ///< the latency the plug-in reports
+    juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
+    DeviceSize size = DeviceSize::compact;      ///< a native device's card
 };
 
 /** One automatable parameter of a plug-in on a track, in its own units. */
@@ -40,6 +52,8 @@ struct PluginParameter
 {
     juce::String id, name;
     float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
+    bool automated = false;   ///< has an automation curve
+    bool output = false;      ///< a native device's Mix / Out: its card's last zone
 };
 
 /** Facade over the current Edit's plug-ins.
@@ -73,7 +87,8 @@ public:
     /** Built-in engine plug-ins, plus whatever the scan has already found. */
     juce::Array<PluginInfo> getCatalogue() const;
 
-    /** Returns immediately. The disk scan runs on a juce::Thread. No-op if one is running. */
+    /** Returns immediately. The disk scan runs on a juce::Thread. No-op if one is
+        running. When it finishes, missing plug-ins it found load (a card's Locate). */
     void startScan();
     bool isScanning() const;
 
@@ -81,6 +96,7 @@ public:
     juce::StringArray getHostedFormats() const;
 
     static constexpr int maxMixerInserts = 8;
+    static constexpr int maxPinnedParameters = 4;
 
     /** Adds a plug-in at the end of a chain. typeOrIdentifier is a built-in type
         name (ReverbPlugin::xmlTypeName, ...) or a catalogue path / identifier. */
@@ -111,6 +127,9 @@ public:
         level meter, aux sends or aux returns. */
     std::vector<PluginInfo> getChain (const juce::String& trackId, PluginChain) const;
 
+    /** Whether the Edit still holds the plug-in (on any track's chain). */
+    bool contains (const juce::String& pluginId) const;
+
     /** A plug-in's parameters, in its own order. Empty for an unknown id. */
     std::vector<PluginParameter> getParameters (const juce::String& pluginId) const;
 
@@ -121,6 +140,35 @@ public:
         previous call's undo step when that set the same parameter with nothing
         undoable in between: a knob drag is one step (see EngineUndo). */
     bool setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture = false);
+
+    /** Pins a parameter of an external plug-in to its card (at the end), or
+        unpins it. At most maxPinnedParameters; a built-in edits every parameter
+        on its card, so it pins none. Saved with the project; one undo step. */
+    juce::Result setPinned (const juce::String& pluginId, const juce::String& parameterId, bool pinned);
+
+    /** Watches a plug-in while alive; see watchTouches. */
+    struct TouchWatch
+    {
+        virtual ~TouchWatch() = default;
+    };
+
+    /** Calls onTouch with a parameter's id each time the user takes hold of it
+        in the plug-in's own window (its change gesture begins): how a card
+        learns what to pin. Empty for an unknown plug-in. */
+    std::unique_ptr<TouchWatch> watchTouches (const juce::String& pluginId,
+                                              std::function<void (const juce::String& parameterId)> onTouch);
+
+    /** Folds, unfolds or expands a native device's card. A view of the device,
+        so not an undo step, but saved with the project. */
+    juce::Result setSize (const juce::String& pluginId, DeviceSize);
+
+    /** Finds a missing plug-in in file (a bundle or plug-in file the user
+        points at): scans it, then loads the plug-in from it. Fails if the
+        plug-in isn't missing or the file doesn't hold it. */
+    juce::Result locate (const juce::String& pluginId, const juce::File&);
+
+    /** The share of the audio callback the plug-in last took, 0..1. */
+    double getCpuLoad (const juce::String& pluginId) const;
 
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
     std::unique_ptr<juce::Component> createEditor (const juce::String& pluginId);
@@ -149,6 +197,10 @@ private:
     void stopScan();
     void publishExternalSnapshot();
 
+    /** Loads each missing plug-in of the Edit that the scan now knows. Message thread. */
+    void reloadMissing();
+
+    JUCE_DECLARE_WEAK_REFERENCEABLE (PluginRack)
     JUCE_DECLARE_NON_COPYABLE (PluginRack)
 };
 

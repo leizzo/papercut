@@ -72,6 +72,27 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     {
         host.report (rack.replace (a.trackId, a.pluginId, a.plugin));
     });
+
+    registry.add (cmd::pluginSetPinned, { "Pin Parameter" }, [&rack, &host] (const PluginPinArgs& a)
+    {
+        host.report (rack.setPinned (a.pluginId, a.parameterId, a.pinned));
+    });
+
+    registry.add (cmd::pluginSetSize, { "Resize Device" }, [&rack, &host] (const PluginSizeArgs& a)
+    {
+        host.report (rack.setSize (a.pluginId, a.size));
+    });
+
+    registry.add (cmd::pluginLocate, { "Locate Plug-in" }, [&rack, &host] (const PluginArgs& a)
+    {
+        if (! host.choosePluginFile)
+            return;
+
+        host.choosePluginFile ([&rack, &host, id = a.pluginId] (const juce::File& file)
+        {
+            host.report (rack.locate (id, file));
+        });
+    });
 }
 
 } // namespace resamper

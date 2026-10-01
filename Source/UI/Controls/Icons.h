@@ -5,12 +5,15 @@
 namespace resamper
 {
 
-/** The design's line icons, drawn in a 24 x 24 box (lucide-style, 2 px strokes). */
+/** The design's line icons, drawn in a 24 x 24 box (lucide-style, 2 px strokes). The
+    plug-in and device icons from plug on are lucide's own geometry, as the design's Icon components use. */
 enum class Icon
 {
     play, stop, record, skipBack, spline, rotateCcw, metronome, follow,
     chevronDown, chevronRight, layers, arrowUpRight, arrowDown, power, search,
-    folder, plus, x, audioLines, music, file, gripVertical, gitMerge
+    folder, plus, x, audioLines, music, file, gripVertical, gitMerge,
+    plug, appWindow, externalLink, pin, cpu, timer, shieldCheck, ellipsis, maximize2, minimize2,
+    foldVertical, unfoldVertical, squareDashed
 };
 
 /** Draws the icon centred in area, stroked (or filled, for solid glyphs) in colour. */
