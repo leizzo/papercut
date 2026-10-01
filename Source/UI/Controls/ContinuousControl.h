@@ -8,7 +8,7 @@
 namespace resamper
 {
 
-/** The accent pill that follows the pointer while a value is dragged (`ValueTag`):
+/** The accent pill beside a control while its value is dragged (`ValueTag`):
     an optional position and the value, both mono. It floats over the top-level
     component and ignores the mouse. */
 class ValueTag : public juce::Component
@@ -16,8 +16,9 @@ class ValueTag : public juce::Component
 public:
     explicit ValueTag (ThemeManager&);
 
-    /** Shows the tag beside screenPosition, over owner's top-level component. */
-    void show (juce::Component& owner, juce::Point<int> screenPosition,
+    /** Shows the tag to the right of anchor (in owner's coordinates), centred on it,
+        over owner's top-level component. */
+    void show (juce::Component& owner, juce::Rectangle<float> anchor,
                const juce::String& value, const juce::String& position = {});
     void hide();
 
@@ -31,7 +32,8 @@ private:
 /** Base of every continuous control (knob, slider, fader, bar, value field),
     carrying the one PRD §16.2 interaction model (see ContinuousValue):
 
-    - drag along the axis; Shift is fine; a ValueTag follows the pointer;
+    - drag along the axis; Shift is fine; a ValueTag sits beside the focus
+      shape (a knob's dial, a fader's cap), not the pointer;
     - double-click (or Alt+click) resets to the default;
     - the wheel steps;
     - clicking the readout opens inline entry: Enter commits, Esc cancels;
@@ -90,6 +92,10 @@ protected:
     virtual juce::Rectangle<float> getFocusBounds() const   { return getLocalBounds().toFloat(); }
     virtual float getFocusRadius() const                    { return themeManager.getTheme().radiusMd; }
 
+    /** Where a press at position puts the value, as a proportion of the travel, so
+        the press jumps there. Empty (the default): a press drags from the value. */
+    virtual std::optional<double> getProportionAt (juce::Point<float>) const   { return {}; }
+
     bool isEditingText() const noexcept                     { return editor != nullptr; }
 
 private:
@@ -102,7 +108,7 @@ private:
     bool doubleClickEdits = false, pressedOnReadout = false, resetOnPress = false;
 
     void closeTextEntry (bool commit);
-    void showTag (const juce::MouseEvent&);
+    void showTag();
 };
 
 /** `Knob` (arc from the start) and `Knob/Bipolar` (arc from 12 o'clock): a dial

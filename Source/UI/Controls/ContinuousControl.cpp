@@ -11,6 +11,9 @@ namespace
 
     /** A trackpad scroll this far (in JUCE wheel units) counts as one notch. */
     constexpr float smoothWheelPerNotch = 0.05f;
+
+    /** Space between a ValueTag and the shape it sits beside. */
+    constexpr int valueTagGap = 6;
 }
 
 //==============================================================================
@@ -20,7 +23,7 @@ ValueTag::ValueTag (ThemeManager& tm) : themeManager (tm)
     setAlwaysOnTop (true);
 }
 
-void ValueTag::show (juce::Component& owner, juce::Point<int> screenPosition,
+void ValueTag::show (juce::Component& owner, juce::Rectangle<float> anchor,
                      const juce::String& newValue, const juce::String& newPosition)
 {
     auto* top = owner.getTopLevelComponent();
@@ -40,8 +43,9 @@ void ValueTag::show (juce::Component& owner, juce::Point<int> screenPosition,
     if (getParentComponent() != top)
         top->addChildComponent (this);
 
-    const auto local = top->getLocalPoint (nullptr, screenPosition);
-    setBounds (juce::Rectangle<int> (local.x + 14, local.y - height - 6, width, height)
+    const auto area = top->getLocalArea (&owner, anchor);
+    setBounds (juce::Rectangle<int> (juce::roundToInt (area.getRight()) + valueTagGap, juce::roundToInt (area.getCentreY()) - height / 2,
+                                     width, height)
                    .constrainedWithin (top->getLocalBounds()));
     setVisible (true);
     toFront (false);
@@ -110,9 +114,9 @@ void ContinuousControl::enablementChanged()
     applyEnablement (*this, themeManager.getTheme());
 }
 
-void ContinuousControl::showTag (const juce::MouseEvent& e)
+void ContinuousControl::showTag()
 {
-    tag.show (*this, e.getScreenPosition(), model.getText());
+    tag.show (*this, getFocusBounds(), model.getText());
 }
 
 void ContinuousControl::mouseDown (const juce::MouseEvent& e)
@@ -131,7 +135,11 @@ void ContinuousControl::mouseDown (const juce::MouseEvent& e)
 
     pressedOnReadout = ! doubleClickEdits && getReadoutBounds().contains (e.getPosition());
     lastDragPosition = e.position;
-    model.beginDrag();
+
+    if (const auto proportion = getProportionAt (e.position))
+        model.beginDragAt (*proportion);
+    else
+        model.beginDrag();
 }
 
 void ContinuousControl::mouseDrag (const juce::MouseEvent& e)
@@ -146,7 +154,7 @@ void ContinuousControl::mouseDrag (const juce::MouseEvent& e)
     if (delta != 0.0f)
         model.dragBy (delta, e.mods.isShiftDown());
 
-    showTag (e);
+    showTag();
 }
 
 void ContinuousControl::mouseUp (const juce::MouseEvent& e)
@@ -364,12 +372,13 @@ juce::Rectangle<int> Knob::getReadoutBounds() const
 
 juce::Rectangle<float> Knob::getFocusBounds() const
 {
-    return dialBounds().expanded (2.0f);
+    // On the dial's rim, not around it: the dial can touch the component's edge.
+    return dialBounds();
 }
 
 float Knob::getFocusRadius() const
 {
-    return dialBounds().getWidth();
+    return dialBounds().getWidth() / 2.0f;
 }
 
 void Knob::paint (juce::Graphics& g)

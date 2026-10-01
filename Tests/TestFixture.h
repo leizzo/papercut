@@ -67,6 +67,17 @@ struct Fixture
     returns the peak level (0 if nothing rendered). */
 float renderPeak (Fixture&);
 
+/** A left-button mouse event on c at p, for a gesture that went down at downAt. */
+inline juce::MouseEvent mouseEvent (juce::Component& c, juce::Point<int> p, juce::Point<int> downAt, bool dragged)
+{
+    const auto now = juce::Time::getCurrentTime();
+    return { juce::Desktop::getInstance().getMainMouseSource(), p.toFloat(),
+             juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier),
+             juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation,
+             juce::MouseInputSource::defaultRotation, juce::MouseInputSource::defaultTiltX,
+             juce::MouseInputSource::defaultTiltY, &c, &c, now, downAt.toFloat(), now, 1, dragged };
+}
+
 /** Dispatches messages until done() or about a minute has passed; returns done(). */
 template <typename Predicate>
 bool dispatchUntil (Predicate done)

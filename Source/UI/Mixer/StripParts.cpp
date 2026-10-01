@@ -68,6 +68,16 @@ juce::Rectangle<float> Fader::capBounds() const
     return juce::Rectangle<float> ((float) capWidth, (float) capHeight).withCentre ({ travel.getCentreX(), y });
 }
 
+std::optional<double> Fader::getProportionAt (juce::Point<float> position) const
+{
+    if (capBounds().contains (position))
+        return {};
+
+    // The model's proportion runs up the travel; the law's travel runs down it.
+    const auto travel = getTravelBounds().toFloat();
+    return 1.0 - juce::jlimit (0.0, 1.0, (double) ((position.y - travel.getY()) / travel.getHeight()));
+}
+
 void Fader::paint (juce::Graphics& g)
 {
     auto& theme = themeManager.getTheme();
