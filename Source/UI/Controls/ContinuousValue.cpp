@@ -43,6 +43,13 @@ void ContinuousValue::beginDrag()
     dragProportion = proportionOf (value);
 }
 
+void ContinuousValue::beginDragAt (double proportion)
+{
+    beginDrag();
+    dragProportion = juce::jlimit (0.0, 1.0, proportion);
+    change (valueAt (dragProportion), false);
+}
+
 void ContinuousValue::dragBy (float pixels, bool fine)
 {
     if (! dragging)

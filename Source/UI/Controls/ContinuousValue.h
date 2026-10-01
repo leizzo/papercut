@@ -58,6 +58,10 @@ public:
 
     void beginDrag();
 
+    /** Begins a drag by jumping to proportion of the travel (a click on a fader's
+        track); the jump starts the gesture, so it and the drag are one undo step. */
+    void beginDragAt (double proportion);
+
     /** Moves by pixels along the travel (positive = up / right = larger). */
     void dragBy (float pixels, bool fine);
 

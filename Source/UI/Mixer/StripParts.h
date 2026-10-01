@@ -20,7 +20,8 @@ namespace StripMetrics
     scale on the left, a track in bg-slot filled in the track colour up to the
     cap, and a 26 x 38 cap with a centre line in the track colour. The
     continuous-control rules apply: 200 px of drag is the whole travel, Shift
-    is fine, double-click or Alt+click resets to 0 dB, the wheel steps 0.5 dB. */
+    is fine, double-click or Alt+click resets to 0 dB, the wheel steps 0.5 dB.
+    A press away from the cap (the scale or the track) jumps the cap there first. */
 class Fader : public ContinuousControl
 {
 public:
@@ -33,10 +34,13 @@ public:
 
     void paint (juce::Graphics&) override;
 
+protected:
+    juce::Rectangle<float> getFocusBounds() const override   { return capBounds(); }
+    std::optional<double> getProportionAt (juce::Point<float>) const override;
+
 private:
     juce::Colour colour;
     juce::Rectangle<float> capBounds() const;
-    juce::Rectangle<float> getFocusBounds() const override   { return capBounds(); }
 };
 
 /** `Meter/Stereo`: two 7 px wells. The level fill is one full-height gradient
