@@ -255,6 +255,7 @@ target_sources(ResamperTests PRIVATE
     Tests/AppTests.cpp
     Tests/WaveformTests.cpp
     Tests/ClipViewTests.cpp
+    Tests/AudioImportTests.cpp
     Tests/Snapshots.cpp)
 
 # Tests may reach into the engine to verify rendered audio, so they get the

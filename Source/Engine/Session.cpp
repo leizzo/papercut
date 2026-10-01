@@ -199,6 +199,11 @@ juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, 
     if (slots == nullptr)
         return juce::Result::fail ("No slot for that scene");
 
+    juce::File playable;
+
+    if (auto r = projects.importAudio (audioFile, playable); r.failed())
+        return r;
+
     projects.getUndo().beginStep ("Add Slot Clip");
     slots->ensureNumberOfSlots (sceneIndex + 1);
 
@@ -208,14 +213,14 @@ juce::Result Session::addSlotClip (const juce::String& trackId, int sceneIndex, 
         return juce::Result::fail ("No slot for that scene");
 
     // Parent is the ClipSlot, not the track, so getClips() on the track stays empty.
-    auto clip = te::insertWaveClip (*slot, audioFile.getFileNameWithoutExtension(), audioFile,
+    auto clip = te::insertWaveClip (*slot, audioFile.getFileNameWithoutExtension(), playable,
                                     { { te::TimePosition(), te::TimeDuration::fromSeconds (length) }, {} },
                                     te::DeleteExistingClips::yes);
 
     if (clip == nullptr)
         return juce::Result::fail ("The engine refused the clip: " + audioFile.getFullPathName());
 
-    clip->getSourceFileReference().setToFile (audioFile, te::SourceFileReference::PathStyle::alwaysAbsolute, false);
+    projects.setClipSource (*clip, playable);
     return juce::Result::ok();
 }
 
@@ -474,10 +479,7 @@ juce::Result Session::recordIntoArrangement()
             if (clip == nullptr)
                 continue;
 
-            clip->getSourceFileReference().setToFile (cap.wave->getOriginalFile(),
-                                                      te::SourceFileReference::PathStyle::alwaysAbsolute,
-                                                      false);
-            clip->beginRenderingNewProxyIfNeeded();
+            projects.setClipSource (*clip, cap.wave->getOriginalFile());
             ++inserted;
         }
         else if (cap.midi != nullptr)

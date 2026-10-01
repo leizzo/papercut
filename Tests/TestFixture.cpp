@@ -6,22 +6,46 @@
 namespace resamper::test
 {
 
+namespace
+{
+    constexpr double sineSampleRate = 44100.0;
+
+    /** A 440 Hz sine, its first toneSeconds a tone and silence after (all of it if 0). */
+    juce::AudioBuffer<float> makeSine (double seconds, int numChannels, double toneSeconds)
+    {
+        const auto numSamples = (int) (seconds * sineSampleRate);
+        const auto numToneSamples = toneSeconds > 0 ? std::min (numSamples, (int) (toneSeconds * sineSampleRate)) : numSamples;
+
+        juce::AudioBuffer<float> buffer (numChannels, numSamples);
+        buffer.clear();
+
+        for (int ch = 0; ch < numChannels; ++ch)
+            for (int i = 0; i < numToneSamples; ++i)
+                buffer.setSample (ch, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * 440.0 * i / sineSampleRate));
+
+        return buffer;
+    }
+
+    juce::File writeSine (juce::AudioFormat& format, const juce::File& file, const juce::AudioBuffer<float>& buffer,
+                          const std::unordered_map<juce::String, juce::String>& metadata)
+    {
+        file.getParentDirectory().createDirectory();
+        file.deleteFile();
+
+        std::unique_ptr<juce::OutputStream> out (file.createOutputStream().release());
+        auto writer = format.createWriterFor (out,
+                                              juce::AudioFormatWriterOptions().withSampleRate (sineSampleRate)
+                                                                              .withNumChannels (buffer.getNumChannels())
+                                                                              .withBitsPerSample (16)
+                                                                              .withMetadataValues (metadata));
+        jassert (writer != nullptr);
+        writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+        return file;
+    }
+}
+
 juce::File writeSineWav (const juce::File& file, double seconds, int numChannels, double acidTempo, double toneSeconds)
 {
-    constexpr double sampleRate = 44100.0;
-    const auto numSamples = (int) (seconds * sampleRate);
-    const auto numToneSamples = toneSeconds > 0 ? std::min (numSamples, (int) (toneSeconds * sampleRate)) : numSamples;
-
-    juce::AudioBuffer<float> buffer (numChannels, numSamples);
-    buffer.clear();
-
-    for (int ch = 0; ch < numChannels; ++ch)
-        for (int i = 0; i < numToneSamples; ++i)
-            buffer.setSample (ch, i, 0.5f * (float) std::sin (juce::MathConstants<double>::twoPi * 440.0 * i / sampleRate));
-
-    file.getParentDirectory().createDirectory();
-    file.deleteFile();
-
     std::unordered_map<juce::String, juce::String> metadata;
 
     if (acidTempo > 0)
@@ -35,15 +59,13 @@ juce::File writeSineWav (const juce::File& file, double seconds, int numChannels
     }
 
     juce::WavAudioFormat wav;
-    std::unique_ptr<juce::OutputStream> out (file.createOutputStream().release());
-    auto writer = wav.createWriterFor (out,
-                                       juce::AudioFormatWriterOptions().withSampleRate (sampleRate)
-                                                                       .withNumChannels (numChannels)
-                                                                       .withBitsPerSample (16)
-                                                                       .withMetadataValues (metadata));
-    jassert (writer != nullptr);
-    writer->writeFromAudioSampleBuffer (buffer, 0, numSamples);
-    return file;
+    return writeSine (wav, file, makeSine (seconds, numChannels, toneSeconds), metadata);
+}
+
+juce::File writeSineFlac (const juce::File& file, double seconds, int numChannels)
+{
+    juce::FlacAudioFormat flac;
+    return writeSine (flac, file, makeSine (seconds, numChannels, 0), {});
 }
 
 Fixture::Fixture()

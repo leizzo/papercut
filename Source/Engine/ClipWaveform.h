@@ -11,9 +11,8 @@ namespace resamper
     as data arrives; or a recording's, growing as it records. Obtain one from
     ApplicationModel::createWaveform() or createRecordingWaveform().
 
-    A time-stretched clip plays from a proxy file that takes a while to render;
-    until it is ready the waveform draws the source file, mapped to where the
-    clip plays it.
+    A warped clip's file is drawn where the clip plays it, following its trim
+    and the tempo as they change.
 */
 class ClipWaveform
 {
@@ -23,13 +22,11 @@ public:
     explicit ClipWaveform (std::unique_ptr<Impl>);
     ~ClipWaveform();
 
-    /** True until the waveform is complete: while the clip's audio (a
-        time-stretched proxy) is still to be produced, or its peak data is still
-        being read on a background thread. */
+    /** True until the waveform is complete: while its peak data is still being
+        read on a background thread. */
     bool isGenerating() const;
 
-    /** True once there is something to draw, perhaps partial or from the source
-        file while a proxy renders. */
+    /** True once there is something to draw, perhaps partial. */
     bool hasDrawableAudio() const;
 
     /** 0..1 while generating; 1 when complete. */

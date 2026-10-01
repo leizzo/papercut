@@ -5,7 +5,7 @@
 #include <juce_core/juce_core.h>
 #include <memory>
 
-namespace tracktion::inline engine { class Edit; }
+namespace tracktion::inline engine { class Edit; class AudioClipBase; }
 
 namespace resamper
 {
@@ -52,6 +52,17 @@ public:
     juce::String getProjectName() const;
 
     tracktion::Edit& getEdit() const noexcept;
+
+    /** Readies an audio file to become a clip, and sets playable to the file the
+        clip should play. A WAV or AIFF plays where it is. A compressed file (FLAC,
+        OGG, MP3) is decoded to a 32-bit float WAV at its own sample rate, under a
+        new name in the Project's Audio folder, on every call (#111). */
+    juce::Result importAudio (const juce::File& file, juce::File& playable);
+
+    /** Points the clip at file: relative if it is inside the Project (recorded,
+        decoded, consolidated), so it follows the Audio folder through a Save As;
+        absolute otherwise, so a Save As into another folder cannot break it. */
+    void setClipSource (tracktion::AudioClipBase&, const juce::File& file) const;
 
     /** Where every facade starts its undo steps in the current Edit. */
     EngineUndo& getUndo() noexcept                  { return undo; }

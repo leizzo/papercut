@@ -9,6 +9,15 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+### Changed
+
+- A warped Audio Clip (a tempo-tagged loop, or one played faster or slower) stretches in real
+  time: a trim, split, Clip Loop or tempo change is heard at once and no longer renders a new
+  file or stops the transport.
+- Adding a FLAC, OGG or MP3 as a clip decodes it into the Project's `Audio` folder as a WAV, and
+  the clip plays that copy. Projects saved by 0.1.x that use such a file directly are not
+  migrated: they read it as it is, which can cost more CPU.
+
 ## [0.1.2] - 2026-09-30
 
 Mixer Bus Strips and release automation on top of **M1 — Core**.

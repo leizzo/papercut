@@ -413,26 +413,20 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         return clip != nullptr ? dynamic_cast<te::AudioTrack*> (clip->getTrack()) : nullptr;
     }
 
-    /** Puts the audio file on the track as a clip starting at start, inside the
-        caller's undo step. */
-    juce::Result placeAudioClip (te::AudioTrack& track, const juce::File& file, te::TimePosition start)
+    /** Puts the audio file on the track as a clip named name, starting at start,
+        inside the caller's undo step. */
+    juce::Result placeAudioClip (te::AudioTrack& track, const juce::File& file, const juce::String& name,
+                                 te::TimePosition start)
     {
         te::AudioFile audioFile (edit().engine, file);
-        auto clip = track.insertWaveClip (file.getFileNameWithoutExtension(), file,
+        auto clip = track.insertWaveClip (name, file,
                                           { { start, te::TimeDuration::fromSeconds (audioFile.getLength()) }, {} },
                                           false);
 
         if (clip == nullptr)
             return juce::Result::fail ("The engine refused the clip: " + file.getFullPathName());
 
-        // Absolute, so a Save As into another folder cannot break the reference.
-        clip->getSourceFileReference().setToFile (file, te::SourceFileReference::PathStyle::alwaysAbsolute, false);
-
-        // Tempo-tagged loops (e.g. ACID WAVs) play from a time-stretched proxy. The
-        // engine only starts rendering it when a playback graph is built, i.e. on
-        // Play, and stops the transport when it lands. Start it now so the clip is
-        // ready (waveform and audio) by the time the user presses Play.
-        clip->beginRenderingNewProxyIfNeeded();
+        projectManager.setClipSource (*clip, file);
         return juce::Result::ok();
     }
 
@@ -706,6 +700,11 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     if (track != nullptr && isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
+    juce::File playable;
+
+    if (auto r = impl->projectManager.importAudio (file, playable); r.failed())
+        return r;
+
     impl->undo().beginStep ("Insert Clip");
 
     if (track == nullptr)
@@ -728,7 +727,7 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     for (auto* c : track->getClips())
         start = std::max (start, c->getPosition().getEnd());
 
-    return impl->placeAudioClip (*track, file, start);
+    return impl->placeAudioClip (*track, playable, file.getFileNameWithoutExtension(), start);
 }
 
 juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const juce::String& trackId, double startSeconds)
@@ -741,11 +740,14 @@ juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const 
     if (isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
-    if (! te::AudioFile (impl->edit().engine, file).isValid())
-        return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
+    juce::File playable;
+
+    if (auto r = impl->projectManager.importAudio (file, playable); r.failed())
+        return r;
 
     impl->undo().beginStep ("Insert Clip");
-    return impl->placeAudioClip (*track, file, te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
+    return impl->placeAudioClip (*track, playable, file.getFileNameWithoutExtension(),
+                                 te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
 }
 
 juce::Result ApplicationModel::insertMidiClip()
@@ -1042,7 +1044,7 @@ juce::Result ApplicationModel::consolidateSelectedClips()
     for (auto* clip : selected)
         clip->removeFromParent();
 
-    if (auto r = impl->placeAudioClip (*track, file, range.getStart()); r.failed())
+    if (auto r = impl->placeAudioClip (*track, file, file.getFileNameWithoutExtension(), range.getStart()); r.failed())
         return r;
 
     return juce::Result::ok();

@@ -13,8 +13,8 @@ ClipComponent::ClipComponent (ApplicationModel& m, ThemeManager& tm, const ClipI
 
 void ClipComponent::setClip (const ClipInfo& info)
 {
-    // A time-stretched clip plays a proxy made for its timing: a trim or a tempo
-    // change can make a new one.
+    // A new file (a replaced sample, another take) needs a new waveform; a trim
+    // or a tempo change does not.
     const bool audioFileChanged = info.kind == TrackKind::audio
                                && (info.playbackFile != clip.playbackFile || waveform == nullptr);
 

@@ -7,7 +7,7 @@ A desktop DAW for electronic producers and mix engineers. This glossary pins the
 ### Documents & State
 
 **Project**:
-The folder the user saves and opens: the Edit, its recorded audio and its caches. A Project contains exactly one Edit.
+The folder the user saves and opens: the Edit, its recorded and imported audio, and its caches. A Project contains exactly one Edit.
 _Avoid_: Song, session (Session View is a different concept)
 
 **Edit**:
@@ -86,6 +86,10 @@ A track's In / Auto / Off setting that decides whether its Input is heard live.
 
 **Scale**:
 A root and mode set on a MIDI Clip. The Piano Roll highlights its notes; it does not constrain them.
+
+**Warp**:
+An Audio Clip's audio follows the Edit's tempo (and its Warp Markers) instead of playing at its recorded speed. A clip is *warped* or *unwarped*.
+_Avoid_: time-stretched clip, proxy (an engine detail)
 
 **Warp Marker**:
 A pin that ties a point in an Audio Clip's audio to a beat. The audio stretches between neighbouring Warp Markers.

@@ -21,6 +21,10 @@ EngineManager& getEngineManager();
 juce::File writeSineWav (const juce::File& file, double seconds, int numChannels = 2, double acidTempo = 0,
                          double toneSeconds = 0);
 
+/** Writes a 16-bit sine-wave FLAC file and returns it: a compressed file, as
+    a sample library's might be. */
+juce::File writeSineFlac (const juce::File& file, double seconds, int numChannels = 2);
+
 /** A fresh untitled Project in the app exactly as the app builds it, every
     Command registered, except that file choosers and messages are plain
     fields. The Theme is not loaded: call theme.load() before building views. */
