@@ -7,17 +7,6 @@ namespace resamper::test
 
 namespace
 {
-    /** A left-button mouse event on c at p, for a gesture that went down at downAt. */
-    juce::MouseEvent mouseEvent (juce::Component& c, juce::Point<int> p, juce::Point<int> downAt, bool dragged)
-    {
-        const auto now = juce::Time::getCurrentTime();
-        return { juce::Desktop::getInstance().getMainMouseSource(), p.toFloat(),
-                 juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier),
-                 juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation,
-                 juce::MouseInputSource::defaultRotation, juce::MouseInputSource::defaultTiltX,
-                 juce::MouseInputSource::defaultTiltY, &c, &c, now, downAt.toFloat(), now, 1, dragged };
-    }
-
     /** The ValueTag a drag on control shows, if one is showing. */
     juce::Component* visibleValueTag (juce::Component& control)
     {
