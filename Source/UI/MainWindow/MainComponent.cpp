@@ -76,6 +76,12 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         resized();
     };
 
+    // A device from the Browser: a native one takes focus, a plug-in opens its window (§6.2).
+    arrangement.onDeviceDropped = browser.onInsertDevice = [this] (const juce::String& trackId, const juce::String& path)
+    {
+        detailView.insertDevice (trackId, path);
+    };
+
     detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id)
     {
         // An open window comes forward; any other replaces it.

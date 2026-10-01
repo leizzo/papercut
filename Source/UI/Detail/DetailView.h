@@ -37,6 +37,11 @@ public:
     /** Shows this inspector in place of the clip panel and chain; nullptr restores them. */
     void setInspector (juce::Component*);
 
+    /** Adds a Browser device to the end of a track's device chain, wherever it
+        was dropped: a native device then shows on the track's chain and takes
+        keyboard focus on its first control, a plug-in opens its window. */
+    void insertDevice (const juce::String& trackId, const juce::String& path);
+
     /** Scrolls the device chain to its start (the mixer's Track chain link). */
     void revealDeviceChain();
 

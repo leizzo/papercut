@@ -20,6 +20,11 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
 {
     registry.add (cmd::pluginScan, { "Scan Plug-ins", [&rack] { return ! rack.isScanning(); } }, [&rack] { rack.startScan(); });
 
+    registry.add (cmd::pluginRetryScan, { "Retry Plug-in Scan" }, [&rack, &host] (const PluginPathArgs& a)
+    {
+        host.report (rack.retryScan (a.plugin));
+    });
+
     registry.add (cmd::pluginInsert, { "Insert Plug-in" }, [&rack, &host] (const PluginInsertArgs& a)
     {
         if (a.trackId.isEmpty() || a.plugin.isEmpty())

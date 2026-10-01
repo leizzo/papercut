@@ -19,6 +19,17 @@ namespace
     /** Hovering a sample this long starts its preview. */
     constexpr int hoverPreviewMs = 250;
 
+    /** A plug-in row's format badge (as on DeviceCard/Plugin) and a failed row's Retry. */
+    const TypeStyle badgeStyle { 7.5f, true, 600 }, noteStyle { 10.0f, false, 400 }, retryStyle { 10.5f, false, 600 };
+    constexpr int badgePadding = 4, badgeHeight = 11, retryWidth = 40, retryHeight = 18, rowGap = 6;
+
+    /** Where a failed plug-in's Retry sits in its row. */
+    juce::Rectangle<int> retryBounds (int width, int height)
+    {
+        return juce::Rectangle<int> (width, height).reduced (8, 0).removeFromRight (retryWidth)
+                                                   .withSizeKeepingCentre (retryWidth, retryHeight);
+    }
+
     Icon iconFor (LibraryCategory c)
     {
         switch (c)
@@ -55,7 +66,7 @@ Browser::Browser (CommandRegistry& c, PluginRack& r, ApplicationModel& m, ThemeM
     search.onTextChange = [this] { folder = juce::File(); refresh(); };
     search.onEscapeKey = [this] { search.clear(); refresh(); };
 
-    scan.setTooltip ("Scan for VST3 / AU plug-ins");
+    scan.setTooltip ("Scan for VST3 / AU plug-ins, in the background");
     scan.onClick = [this] { commands.invoke (cmd::pluginScan); };
 
     list.setRowHeight (itemRowHeight);
@@ -106,9 +117,16 @@ void Browser::open (int row)
         search.clear();
         refresh();
     }
-    else if (item.kind == LibraryItem::Kind::plugin)
+    else if (item.kind == LibraryItem::Kind::plugin && ! item.failedScan)
     {
-        if (auto trackId = model.getSelectedTrackId(); trackId.isNotEmpty())
+        const auto trackId = model.getSelectedTrackId();
+
+        if (trackId.isEmpty())
+            return;
+
+        if (onInsertDevice != nullptr)
+            onInsertDevice (trackId, item.pluginPath);
+        else
             commands.invoke (cmd::pluginInsert, { trackId, item.pluginPath });
     }
     else
@@ -298,8 +316,13 @@ void Browser::timerCallback()
         pendingPreview = juce::File();
     }
 
-    if (! rack.isScanning() && rack.getCatalogue().size() != catalogueSize && ! Library::isFileCategory (category))
+    // A finished scan can change rows without changing their number (a retry that worked).
+    const auto scanning = rack.isScanning();
+
+    if (! scanning && (wasScanning || rack.getCatalogue().size() != catalogueSize) && ! Library::isFileCategory (category))
         refresh();
+
+    wasScanning = scanning;
 
     startTimerHz (4);
 }
@@ -320,23 +343,75 @@ void Browser::paintListBoxItem (int row, juce::Graphics& g, int width, int heigh
     }
 
     auto content = area.reduced (8, 0);
+
+    // A plug-in has the plug icon and a format badge, so it reads apart from a native device (§6.2).
     const auto icon = item.kind == LibraryItem::Kind::folder ? Icon::folder
+                    : item.isPlugin()                        ? Icon::plug
                     : item.kind == LibraryItem::Kind::plugin ? (item.instrument ? Icon::music : Icon::layers)
                                                              : Icon::audioLines;
-    const auto iconColour = item.kind == LibraryItem::Kind::plugin ? theme.accentDim
+    const auto iconColour = item.failedScan                         ? theme.textDim
+                          : item.kind == LibraryItem::Kind::plugin ? theme.accentDim
                           : item.kind == LibraryItem::Kind::folder ? theme.textSecondary : theme.textDim;
     drawIcon (g, icon, content.removeFromLeft (14).toFloat().withSizeKeepingCentre (14.0f, 14.0f), iconColour);
     content.removeFromLeft (9);
 
-    g.setColour (item.kind == LibraryItem::Kind::audioFile ? theme.textSecondary : theme.textPrimary);
+    if (item.failedScan)
+    {
+        // Listed dim, with Retry: it can't be inserted (§21).
+        const auto retry = retryBounds (width, height);
+        g.setColour (theme.border);
+        g.drawRoundedRectangle (retry.toFloat().reduced (0.5f), theme.radiusSm, 1.0f);
+        drawStyledText (g, themeManager, "Retry", retryStyle, retry, juce::Justification::centred,
+                        row == hoveredRow ? theme.accent : theme.textSecondary);
+        content.setRight (retry.getX() - rowGap);
+
+        const auto note = juce::String ("Failed to scan");
+        const auto noteWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (noteStyle), note);
+        drawStyledText (g, themeManager, note, noteStyle, content.removeFromRight (noteWidth), juce::Justification::centredRight,
+                        theme.textDim);
+        content.removeFromRight (rowGap);
+    }
+    else if (item.isPlugin())
+    {
+        const auto badgeText = item.formatBadge();
+        const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 2 * badgePadding + 2;
+        const auto badge = content.removeFromRight (badgeWidth).withSizeKeepingCentre (badgeWidth, badgeHeight);
+        g.setColour (theme.border);
+        g.drawRoundedRectangle (badge.toFloat().reduced (0.5f), 3.0f, 1.0f);
+        drawNumber (g, themeManager, badgeText, badgeStyle, badge, juce::Justification::centred, theme.textSecondary);
+        content.removeFromRight (rowGap);
+    }
+
+    g.setColour (item.failedScan ? theme.textDim
+                                 : item.kind == LibraryItem::Kind::audioFile ? theme.textSecondary : theme.textPrimary);
     g.setFont (themeManager.font (TypeStyle { 12.0f, false, 400 }));
     g.drawText (item.name, content, juce::Justification::centredLeft, true);
 }
 
-void Browser::listBoxItemClicked (int row, const juce::MouseEvent&)
+juce::String Browser::getTooltipForRow (int row)
 {
-    if (juce::isPositiveAndBelow (row, (int) items.size()) && items[(size_t) row].kind == LibraryItem::Kind::folder)
+    if (! juce::isPositiveAndBelow (row, (int) items.size()))
+        return {};
+
+    const auto& item = items[(size_t) row];
+
+    if (item.failedScan)
+        return item.formatBadge() + " plug-in that failed to scan: it crashed or timed out. Retry scans it again.";
+
+    return item.isPlugin() ? item.formatBadge() + " plug-in" : juce::String();
+}
+
+void Browser::listBoxItemClicked (int row, const juce::MouseEvent& e)
+{
+    if (! juce::isPositiveAndBelow (row, (int) items.size()))
+        return;
+
+    const auto& item = items[(size_t) row];
+
+    if (item.kind == LibraryItem::Kind::folder)
         open (row);
+    else if (item.failedScan && retryBounds (list.getVisibleRowWidth(), list.getRowHeight()).contains (e.getPosition()))
+        commands.invoke (cmd::pluginRetryScan, { item.pluginPath });
 }
 
 void Browser::listBoxItemDoubleClicked (int row, const juce::MouseEvent&)
@@ -350,7 +425,7 @@ juce::var Browser::getDragSourceDescription (const juce::SparseSet<int>& rows)
         return {};
 
     auto& item = items[(size_t) rows[0]];
-    return item.kind == LibraryItem::Kind::folder ? juce::var() : dragDescription (item);
+    return item.kind == LibraryItem::Kind::folder || item.failedScan ? juce::var() : dragDescription (item);
 }
 
 } // namespace resamper
