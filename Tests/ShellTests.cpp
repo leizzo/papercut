@@ -86,10 +86,44 @@ static ShellTests shellTests;
 
 } // namespace resamper::test
 
+#include "UI/Arrangement/ArrangementView.h"
 #include "UI/State/ArrangementViewState.h"
 
 namespace resamper::test
 {
+
+namespace
+{
+    template <typename ComponentType>
+    std::vector<ComponentType*> findAll (juce::Component& root)
+    {
+        std::vector<ComponentType*> found;
+
+        for (auto* child : root.getChildren())
+        {
+            if (auto* c = dynamic_cast<ComponentType*> (child))
+                found.push_back (c);
+
+            for (auto* c : findAll<ComponentType> (*child))
+                found.push_back (c);
+        }
+
+        return found;
+    }
+
+    /** A left click at p in c, through c's peer as the OS delivers it. */
+    void clickThroughPeer (juce::Component& c, juce::Point<int> p)
+    {
+        auto* peer = c.getPeer();
+        const auto at = peer->getComponent().getLocalPoint (&c, p).toFloat();
+        auto time = juce::Time::currentTimeMillis();
+
+        for (const int mods : { (int) juce::ModifierKeys::leftButtonModifier, 0 })
+            peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, at, juce::ModifierKeys (mods),
+                                    juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation,
+                                    ++time);
+    }
+}
 
 /** Arrangement zoom, lane height and Follow (PRD §8.3), all UI State. */
 struct ArrangementViewTests : juce::UnitTest
@@ -143,6 +177,59 @@ struct ArrangementViewTests : juce::UnitTest
 
             expect (view.follow (10.5, 1000.0f));
             expect (view.timeToX (10.5) >= 0.0f && view.timeToX (10.5) < 200.0f);
+        }
+
+        beginTest ("Clicking a track header selects the track and leaves Record Arm unfocused (#91)");
+        {
+            Fixture f;
+            expect (f.theme.load().wasOk());
+            f.invoke (cmd::trackAdd);
+            f.invoke (cmd::trackAdd);
+            f.model.selectTrack (f.model.getTracks()[0].id);
+
+            UIStateStore store;
+            ShellState shell (store.getState ("shell"));
+            ArrangementView arrangement (f.model, f.commands, f.theme, store, shell);
+            // On top, so the OS delivers the clicks to it rather than to a window over it.
+            arrangement.setBounds (juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt()
+                                       .withSizeKeepingCentre (1000, 400));
+            arrangement.addToDesktop (juce::ComponentPeer::windowIsTemporary);
+            arrangement.setAlwaysOnTop (true);
+            arrangement.setVisible (true);
+            arrangement.toFront (false);
+            expect (dispatchUntil ([&] { return arrangement.contains (arrangement.getLocalBounds().getCentre()); }),
+                    "the window never came on screen");
+            juce::Component::unfocusAllComponents();
+
+            auto headers = findAll<TrackHeader> (arrangement);
+            expectEquals ((int) headers.size(), 2);
+            const auto isFirst = headers[0]->getTrack().id == f.model.getTracks()[0].id;
+            auto& first = *headers[isFirst ? 0 : 1];
+            auto& second = *headers[isFirst ? 1 : 0];
+
+            const auto expectNoButtonFocused = [&] (const juce::String& where)
+            {
+                for (auto* button : findAll<TrackButton> (arrangement))
+                    expect (! button->hasKeyboardFocus (false), "a click on " + where + " focused a header button");
+
+                juce::Component::unfocusAllComponents();
+            };
+
+            // The name, right of the colour dot.
+            clickThroughPeer (second, { 60, 18 });
+            expect (! f.model.getTracks()[0].selected && f.model.getTracks()[1].selected, "the clicked track is not selected");
+            expectNoButtonFocused ("a header");
+
+            // An empty lane, right of the first header.
+            clickThroughPeer (first, { first.getWidth() + 300, 30 });
+            expect (f.model.getTracks()[0].selected && ! f.model.getTracks()[1].selected, "the lane's track is not selected");
+            expectNoButtonFocused ("a lane");
+
+            // The empty list under the headers.
+            clickThroughPeer (second, { 60, second.getHeight() + 40 });
+            expectNoButtonFocused ("the list under the headers");
+
+            arrangement.removeFromDesktop();
         }
     }
 };

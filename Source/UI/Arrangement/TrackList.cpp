@@ -8,6 +8,8 @@ namespace resamper
 TrackList::TrackList (CommandRegistry& c, ThemeManager& tm, ArrangementViewState& v)
     : commands (c), themeManager (tm), view (v)
 {
+    // A click selects a row. Taking focus would hand it to the first header's Arm.
+    setMouseClickGrabsKeyboardFocus (false);
 }
 
 void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::StringArray& audioInputs,
@@ -34,6 +36,7 @@ void TrackList::setTracks (const std::vector<TrackInfo>& newTracks, const juce::
                 view.setAutomationShown (id, ! view.isAutomationShown (id));
                 setTracks (tracks, currentAudioInputs, currentMidiInputs);
             };
+            header->addMouseListener (this, false);   // its background clicks select, as ours do
             addAndMakeVisible (*header);
             kept[track.id] = std::move (header);
         }
@@ -70,7 +73,7 @@ void TrackList::paint (juce::Graphics& g)
 void TrackList::mouseDown (const juce::MouseEvent& e)
 {
     if (onRowClicked)
-        onRowClicked (view.yToRow (e.y, view.getLaneHeight (themeManager.getMetrics().trackHeight)), e.mods);
+        onRowClicked (view.yToRow (e.getEventRelativeTo (this).y, view.getLaneHeight (themeManager.getMetrics().trackHeight)), e.mods);
 }
 
 } // namespace resamper
