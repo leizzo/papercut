@@ -29,6 +29,9 @@ TrackHeader::TrackHeader (CommandRegistry& c, ThemeManager& tm, const TrackInfo&
     for (auto* b : { &arm, &solo, &mute, &automation })
         addAndMakeVisible (b);
 
+    // A click selects the track. Taking focus would hand it to the first button (Arm).
+    setMouseClickGrabsKeyboardFocus (false);
+
     setTrack (info, inputList, false);
 }
 

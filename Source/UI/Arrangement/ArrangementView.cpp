@@ -23,6 +23,10 @@ ArrangementView::ArrangementView (ApplicationModel& m, CommandRegistry& c, Theme
 {
     setComponentID (componentId);
 
+    // A click on a lane or the timeline would otherwise pass focus up to here,
+    // which hands it to the first header's Arm.
+    setMouseClickGrabsKeyboardFocus (false);
+
     for (auto* child : std::initializer_list<juce::Component*> { &timeline, &trackList, &lanes, &playhead })
         addAndMakeVisible (child);
 
