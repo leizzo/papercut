@@ -13,7 +13,7 @@
 A dark, dense, keyboard-friendly desktop DAW for electronic producers and mix engineers.
 
 > **Status: alpha.** Resamper is in early development. The current release is
-> [v0.1.2 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.2), published as an alpha
+> [v0.1.3 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.3), published as an alpha
 > pre-release. Expect missing features, rough edges and project-format changes — don't trust it with
 > your only copy of a song yet.
 
@@ -27,7 +27,7 @@ signal path you can always see.
 
 > These images come from the product design ([`design/design.pen`](design/design.pen)) and show
 > where Resamper is heading. Several features in them belong to later milestones — see the
-> [roadmap](#roadmap) for what's in v0.1.2 today.
+> [roadmap](#roadmap) for what's in v0.1.3 today.
 
 ### A console, not a list
 
@@ -41,7 +41,7 @@ signal path you can always see.
 
 <img src="docs/images/workflow.png" alt="Scale-aware piano roll, audio clip envelopes with their own loop, folders and bus channels, and arrangement automation." width="100%">
 
-## What you can do today (v0.1.2)
+## What you can do today (v0.1.3)
 
 - **Arrange** — audio and MIDI tracks, clips you can move, resize, split, duplicate, loop-extend and
   consolidate; zoom, lane height and Follow.
@@ -124,7 +124,7 @@ Elektronik müzik prodüktörleri ve miks mühendisleri için koyu temalı, yoğ
 masaüstü DAW.
 
 > **Durum: alfa.** Resamper erken geliştirme aşamasında. Güncel sürüm
-> [v0.1.2 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.2), alfa ön sürümü olarak
+> [v0.1.3 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.3), alfa ön sürümü olarak
 > yayımlandı. Eksik özellikler, pürüzler ve proje formatında değişiklikler olabilir — şarkınızın tek
 > kopyasını henüz ona emanet etmeyin.
 
@@ -138,7 +138,7 @@ bir sinyal yolu.
 
 > Bu görseller ürün tasarımından ([`design/design.pen`](design/design.pen)) alınmıştır ve
 > Resamper'ın nereye gittiğini gösterir. İçlerindeki bazı özellikler sonraki kilometre taşlarına
-> aittir — v0.1.2'de bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
+> aittir — v0.1.3'te bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
 
 ### Liste değil, konsol
 
@@ -152,7 +152,7 @@ bir sinyal yolu.
 
 <img src="docs/images/workflow.png" alt="Gam destekli piano roll, kendi döngüsüne sahip ses klibi zarfları, klasörler ve bus kanalları, arrangement otomasyonu." width="100%">
 
-## Bugün neler yapabilirsiniz (v0.1.2)
+## Bugün neler yapabilirsiniz (v0.1.3)
 
 - **Aranje** — ses ve MIDI kanalları; taşıyabildiğiniz, boyutlandırabildiğiniz, bölebildiğiniz,
   çoğaltabildiğiniz, döngüyle uzatabildiğiniz ve birleştirebildiğiniz klipler; zoom, kanal yüksekliği

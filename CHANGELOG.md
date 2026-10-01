@@ -9,6 +9,10 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-01
+
+Arrangement and control fixes on top of **M1 — Core**.
+
 ### Changed
 
 - A warped Audio Clip (a tempo-tagged loop, or one played faster or slower) stretches in real
@@ -17,6 +21,19 @@ release is published on GitHub as an alpha pre-release.
 - Adding a FLAC, OGG or MP3 as a clip decodes it into the Project's `Audio` folder as a WAV, and
   the clip plays that copy. Projects saved by 0.1.x that use such a file directly are not
   migrated: they read it as it is, which can cost more CPU.
+- Waveforms are read on a normal-priority thread, so an Audio Clip's waveform appears sooner.
+
+### Fixed
+
+- An Audio Clip's waveform no longer hangs on "Preparing audio", stays put when the clip is split or
+  moved (to the same or another track), and is not left generating when its file can't be read.
+- A clip's title no longer glitches or follows the Playhead during playback.
+- Clicking a track header selects the track instead of focusing its Record Arm button, and the
+  header's menu can't act on a track that was deleted while it was open.
+- A Knob's focus ring is no longer clipped, and the value tag of a Knob or Fader sits beside the
+  control instead of following the pointer.
+- Clicking a Mixer fader away from its cap jumps the cap to that dB, in one undo step with any drag
+  that follows.
 
 ## [0.1.2] - 2026-09-30
 
@@ -104,7 +121,8 @@ basic Mixer, and the Resamper design system.
 - Silent tempo-tagged loops with no waveform.
 - M1 review findings and design parity in lanes, devices and the mixer.
 
-[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/leizzo/resamper/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/leizzo/resamper/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/leizzo/resamper/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leizzo/resamper/releases/tag/v0.1.0
