@@ -8,7 +8,7 @@ namespace resamper
 
 namespace
 {
-    constexpr int padding = 10, buttonHeight = 22, rowHeight = 16, rowGap = 3, cpuPollMs = 500;
+    constexpr int padding = 10, missingBadgeWidth = 48, buttonHeight = 22, rowHeight = 16, rowGap = 3, cpuPollMs = 500;
 
     const juce::String middleDot (juce::CharPointer_UTF8 ("\xc2\xb7"));
 }
@@ -96,7 +96,8 @@ void PluginDeviceCard::setState (const PluginInfo& info, DeviceSize)
     plugin = info;
     setTitle (plugin.name);
     // Never colour-only (§18): the vendor and the format are always said.
-    setDescription (plugin.manufacturer + " " + middleDot + " " + formatBadge() + " plug-in" + (plugin.missing ? ", missing" : ""));
+    const auto vendor = plugin.manufacturer.isNotEmpty() ? plugin.manufacturer : juce::String ("Unknown vendor");
+    setDescription (vendor + " " + middleDot + " " + formatBadge() + " plug-in" + (plugin.missing ? ", missing" : ""));
     setAlpha (plugin.enabled ? 1.0f : 0.5f);
     power.setToggleState (plugin.enabled, juce::dontSendNotification);
 
@@ -130,19 +131,9 @@ void PluginDeviceCard::rebuildPins()
 
         for (auto* p : pinned)
         {
-            ContinuousValue::Spec spec;
-            spec.minimum = p->minimum;
-            spec.maximum = p->maximum;
-            spec.defaultValue = p->defaultValue;
-            spec.format.format = [this, id = p->id] (double v) { return rack.getParameterText (plugin.id, id, (float) v); };
-            spec.format.parse = ValueFormat::number (3).parse;
-
-            auto row = std::make_unique<PinnedParameter> (themeManager, spec, p->name);
+            auto row = std::make_unique<PinnedParameter> (themeManager, specFor (*p), p->name);
             row->parameterId = p->id;
-            row->onChange = [this, id = p->id] (double v, bool continues)
-            {
-                commands.invoke (cmd::pluginSetParameter, { plugin.id, id, (float) v, continues });
-            };
+            row->onChange = setterFor (p->id);
             addAndMakeVisible (*row);
             pins.push_back (std::move (row));
         }
@@ -174,7 +165,7 @@ void PluginDeviceCard::resized()
     if (plugin.missing)
     {
         // The Missing badge sits left of Locate and Replace.
-        buttons.removeFromLeft (52);
+        buttons.removeFromLeft (missingBadgeWidth + 4);
         replace.setBounds (buttons.removeFromRight (64));
         buttons.removeFromRight (4);
         locate.setBounds (buttons.removeFromRight (60));
@@ -236,14 +227,14 @@ void PluginDeviceCard::paint (juce::Graphics& g)
     auto text = title.withSizeKeepingCentre (title.getWidth(), 26);
     drawStyledText (g, themeManager, plugin.name, TypeStyle { theme.label.size, false, 700 }, text.removeFromTop (14),
                     juce::Justification::centredLeft, theme.textPrimary);
-    drawStyledText (g, themeManager, plugin.manufacturer, TypeStyle { theme.micro.size, false, 400 }, text,
+    drawStyledText (g, themeManager, plugin.manufacturer.isNotEmpty() ? plugin.manufacturer : juce::String ("Unknown vendor"), TypeStyle { theme.micro.size, false, 400 }, text,
                     juce::Justification::centredLeft, theme.textDim);
 
     auto body = getLocalBounds().withTrimmedTop (titleHeight).withTrimmedBottom (footerHeight).reduced (padding, 8);
 
     if (plugin.missing)
     {
-        auto missing = body.removeFromTop (buttonHeight).removeFromLeft (48).withSizeKeepingCentre (48, 14);
+        auto missing = body.removeFromTop (buttonHeight).removeFromLeft (missingBadgeWidth).withSizeKeepingCentre (missingBadgeWidth, 14);
         g.setColour (theme.rec.withAlpha (0.2f));
         g.fillRoundedRectangle (missing.toFloat(), theme.radiusSm);
         drawStyledText (g, themeManager, "Missing", theme.micro, missing, juce::Justification::centred, theme.rec);

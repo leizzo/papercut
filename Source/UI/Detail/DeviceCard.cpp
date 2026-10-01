@@ -3,6 +3,7 @@
 #include "PluginDeviceCard.h"
 #include "Commands/CommandRegistry.h"
 #include "Commands/PluginCommands.h"
+#include "UI/Controls/ValueFormat.h"
 
 namespace resamper
 {
@@ -25,6 +26,25 @@ DeviceCard::DeviceCard (CommandRegistry& c, PluginRack& r, ThemeManager& tm, con
 void DeviceCard::toggleBypass()
 {
     commands.invoke (cmd::pluginSetBypassed, { trackId, plugin.id, plugin.enabled });
+}
+
+ContinuousValue::Spec DeviceCard::specFor (const PluginParameter& p)
+{
+    ContinuousValue::Spec spec;
+    spec.minimum = p.minimum;
+    spec.maximum = p.maximum;
+    spec.defaultValue = p.defaultValue;
+    spec.format.format = [this, id = p.id] (double v) { return rack.getParameterText (plugin.id, id, (float) v); };
+    spec.format.parse = ValueFormat::number (3).parse;
+    return spec;
+}
+
+std::function<void (double, bool)> DeviceCard::setterFor (const juce::String& parameterId)
+{
+    return [this, parameterId] (double v, bool continues)
+    {
+        commands.invoke (cmd::pluginSetParameter, { plugin.id, parameterId, (float) v, continues });
+    };
 }
 
 void DeviceCard::showMenu()

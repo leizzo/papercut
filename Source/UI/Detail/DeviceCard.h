@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/PluginRack.h"
+#include "UI/Controls/ContinuousValue.h"
 #include "UI/Controls/Controls.h"
 
 #include <functional>
@@ -16,6 +17,12 @@ class CommandRegistry;
     card that never scrolls, or every parameter docked across the detail view.
     A plug-in card has one size. */
 enum class DeviceSize { folded, compact, expanded };
+
+/** target, or back to compact when already there: what a fold or expand toggle does. */
+inline DeviceSize toggledSize (DeviceSize current, DeviceSize target)
+{
+    return current == target ? DeviceSize::compact : target;
+}
 
 /** One device of a track's device chain (PRD §9.2). A chain mixes two
     contracts, told apart at a glance: a NativeDeviceCard for a built-in, a
@@ -68,6 +75,12 @@ protected:
 
     void toggleBypass();
     void showMenu();
+
+    /** A control's range and text for one of the plug-in's parameters, shown as the plug-in shows it. */
+    ContinuousValue::Spec specFor (const PluginParameter&);
+
+    /** Sets a parameter through plugin.setParameter: a control's onChange. */
+    std::function<void (double, bool)> setterFor (const juce::String& parameterId);
 };
 
 /** A device's power button, on while the device is enabled: a dark disc with

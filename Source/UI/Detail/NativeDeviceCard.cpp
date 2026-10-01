@@ -14,11 +14,11 @@ namespace
     /** Mix, Wet / Dry and Out belong in the Output zone, after the divider. */
     bool isOutputParameter (const juce::String& name)
     {
-        for (auto* word : { "mix", "wet", "dry", "output" })
+        for (auto* word : { "mix", "wet", "dry" })
             if (name.containsIgnoreCase (word))
                 return true;
 
-        return false;
+        return name.startsWithIgnoreCase ("out");
     }
 
     int zoneWidth (int columns)
@@ -62,8 +62,8 @@ NativeDeviceCard::NativeDeviceCard (CommandRegistry& c, PluginRack& r, ThemeMana
     mods.setEnabled (false);
 
     power.onClick = [this] { toggleBypass(); };
-    fold.onClick = [this] { if (onSizeChange) onSizeChange (size == DeviceSize::folded ? DeviceSize::compact : DeviceSize::folded); };
-    expand.onClick = [this] { if (onSizeChange) onSizeChange (size == DeviceSize::expanded ? DeviceSize::compact : DeviceSize::expanded); };
+    fold.onClick = [this] { if (onSizeChange) onSizeChange (toggledSize (size, DeviceSize::folded)); };
+    expand.onClick = [this] { if (onSizeChange) onSizeChange (toggledSize (size, DeviceSize::expanded)); };
     options.onClick = [this] { showMenu(); };
 
     for (auto* b : std::initializer_list<juce::Component*> { &power, &preset, &ab, &mods, &fold, &expand, &options })
@@ -86,21 +86,11 @@ void NativeDeviceCard::rebuild (const std::vector<PluginParameter>& list)
 
         for (auto& p : list)
         {
-            ContinuousValue::Spec spec;
-            spec.minimum = p.minimum;
-            spec.maximum = p.maximum;
-            spec.defaultValue = p.defaultValue;
-            spec.format.format = [this, id = p.id] (double v) { return rack.getParameterText (plugin.id, id, (float) v); };
-            spec.format.parse = ValueFormat::number (3).parse;
-
-            auto knob = std::make_unique<Knob> (themeManager, spec, p.name);
+            auto knob = std::make_unique<Knob> (themeManager, specFor (p), p.name);
             knob->setComponentID (p.id);
             knob->setDialSize (dialSize);
             knob->setTooltip (p.name);
-            knob->onChange = [this, id = p.id] (double v, bool continues)
-            {
-                commands.invoke (cmd::pluginSetParameter, { plugin.id, id, (float) v, continues });
-            };
+            knob->onChange = setterFor (p.id);
             addChildComponent (*knob);
             parameters.push_back ({ p.id, isOutputParameter (p.name), std::move (knob) });
         }
@@ -199,8 +189,8 @@ juce::Rectangle<int> NativeDeviceCard::getTitleBar() const
 void NativeDeviceCard::addMenuItems (juce::PopupMenu& menu)
 {
     auto resize = [this] (DeviceSize s) { return [this, s] { if (onSizeChange) onSizeChange (s); }; };
-    menu.addItem ("Fold", true, size == DeviceSize::folded, resize (size == DeviceSize::folded ? DeviceSize::compact : DeviceSize::folded));
-    menu.addItem ("Expand", true, size == DeviceSize::expanded, resize (size == DeviceSize::expanded ? DeviceSize::compact : DeviceSize::expanded));
+    menu.addItem ("Fold", true, size == DeviceSize::folded, resize (toggledSize (size, DeviceSize::folded)));
+    menu.addItem ("Expand", true, size == DeviceSize::expanded, resize (toggledSize (size, DeviceSize::expanded)));
     menu.addSeparator();
 }
 
