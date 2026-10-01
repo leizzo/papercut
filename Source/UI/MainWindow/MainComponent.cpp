@@ -285,6 +285,13 @@ void MainComponent::mouseDown (const juce::MouseEvent& e)
 
 void MainComponent::modelChanged()
 {
+    // A window never outlives its plug-in (deleted, its insert undone, its track or Project gone).
+    if (pluginEditor != nullptr && ! app.plugins.contains (pluginEditor->getPluginId()))
+    {
+        pluginEditor.reset();
+        detailView.setOpenEditor ({});
+    }
+
     updateStatusBar();
     commandManager.commandStatusChanged();   // undo/redo enablement
 }

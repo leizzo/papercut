@@ -5,6 +5,7 @@
 #include "UI/Browser/Library.h"
 #include "UI/Detail/DetailView.h"
 #include "UI/Detail/PluginDeviceCard.h"
+#include "UI/MainWindow/MainComponent.h"
 #include "UI/State/ShellState.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -126,6 +127,18 @@ namespace
         }
 
         return nullptr;
+    }
+
+    /** The plug-in windows on screen. */
+    int visiblePluginWindows()
+    {
+        int count = 0;
+
+        for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i)
+            if (auto* c = juce::Desktop::getInstance().getComponent (i); c->getComponentID() == "PluginEditorWindow" && c->isVisible())
+                ++count;
+
+        return count;
     }
 
     void click (juce::Component* c)
@@ -449,6 +462,44 @@ struct DeviceCardTests : juce::UnitTest
             expect (! card->isLearningPins());
             touch (4);
             expectEquals (f.plugins.getChain (f.trackId(), PluginChain::device).back().pinnedParameters.size(), 3);
+        }
+
+        beginTest ("Deleting a plug-in closes its window");
+        {
+            Cards f;
+            const auto id = f.insert (reverb);
+            juce::ApplicationCommandManager commandManager;
+            MainComponent main (f.app, commandManager);
+            main.setSize (1400, 900);
+
+            auto* detail = findType<DetailView> (main);
+            expect (detail != nullptr && detail->onOpenEditor != nullptr);
+
+            if (detail == nullptr || detail->onOpenEditor == nullptr)
+                return;
+
+            detail->onOpenEditor (id);
+            expectEquals (visiblePluginWindows(), 1);
+
+            f.invoke (cmd::pluginRemove, { f.trackId(), id });
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+            expect (f.plugins.getChain (f.trackId(), PluginChain::device).empty());
+            expectEquals (visiblePluginWindows(), 0, "the deleted plug-in's window stayed open");
+
+            // Any other way the plug-in goes: its insert undone, its track deleted.
+            const auto again = f.insert (reverb);
+            detail->onOpenEditor (again);
+            expectEquals (visiblePluginWindows(), 1);
+            f.invoke (cmd::editUndo);
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);   // the model notifies asynchronously
+            expect (! f.plugins.contains (again));
+            expectEquals (visiblePluginWindows(), 0, "undoing the insert left its window open");
+
+            const auto onTrack = f.insert (reverb);
+            detail->onOpenEditor (onTrack);
+            f.invoke (cmd::trackRemove);
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+            expectEquals (visiblePluginWindows(), 0, "deleting the track left its plug-in's window open");
         }
 
         beginTest ("A missing plug-in offers Locate and Replace, never its window");

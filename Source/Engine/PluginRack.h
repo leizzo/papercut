@@ -119,6 +119,9 @@ public:
         level meter, aux sends or aux returns. */
     std::vector<PluginInfo> getChain (const juce::String& trackId, PluginChain) const;
 
+    /** Whether the Edit still holds the plug-in (on any track's chain). */
+    bool contains (const juce::String& pluginId) const;
+
     /** A plug-in's parameters, in its own order. Empty for an unknown id. */
     std::vector<PluginParameter> getParameters (const juce::String& pluginId) const;
 

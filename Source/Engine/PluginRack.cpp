@@ -720,6 +720,11 @@ namespace
     };
 }
 
+bool PluginRack::contains (const juce::String& pluginId) const
+{
+    return findPlugin (projectManager.getEdit(), pluginId) != nullptr;
+}
+
 std::vector<PluginParameter> PluginRack::getParameters (const juce::String& pluginId) const
 {
     std::vector<PluginParameter> result;
