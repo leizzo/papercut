@@ -299,4 +299,5 @@ DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; 
 
 Resamper's own code is [MIT](LICENSE). The pinned dependencies keep their own licenses: JUCE (AGPLv3 or
 commercial), Tracktion Engine (GPLv3 or commercial) and GIN (BSD-3-Clause). A distributed Resamper
-binary must also satisfy those terms.
+binary must also satisfy those terms. The embedded [lucide](https://lucide.dev) icons are ISC / MIT
+(`Source/UI/Controls/Lucide-LICENSE.txt`).

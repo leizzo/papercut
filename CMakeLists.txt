@@ -247,6 +247,7 @@ target_sources(ResamperTests PRIVATE
     Tests/AutomationTests.cpp
     Tests/ShaperTests.cpp
     Tests/ThemeTests.cpp
+    Tests/IconTests.cpp
     Tests/ControlTests.cpp
     Tests/ControlViewTests.cpp
     Tests/DeviceChainTests.cpp
