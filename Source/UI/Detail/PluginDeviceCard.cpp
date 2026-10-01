@@ -41,9 +41,9 @@ public:
 
         const auto bar = r.withTrimmedRight (valueWidth + 6).toFloat().withSizeKeepingCentre ((float) r.getWidth() - valueWidth - 6, 4.0f);
         g.setColour (theme.bgSlot);
-        g.fillRoundedRectangle (bar, 2.0f);
+        g.fillRoundedRectangle (bar, theme.radiusXs);
         g.setColour (isMouseOverOrDragging() ? theme.accentHover : theme.accent);
-        g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * (float) getModel().getProportion()), 2.0f);
+        g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * (float) getModel().getProportion()), theme.radiusXs);
     }
 
 protected:
@@ -225,7 +225,7 @@ void PluginDeviceCard::paint (juce::Graphics& g)
     title.removeFromLeft (6);
 
     const auto badgeText = formatBadge();
-    const auto badgeStyle = TypeStyle { 8.0f, true, 600 };
+    const auto badgeStyle = TypeStyle { theme.micro.size, true, 600 };
     const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 10;
     auto badge = title.removeFromRight (badgeWidth).withSizeKeepingCentre (badgeWidth, 14);
     g.setColour (theme.border);
@@ -234,9 +234,9 @@ void PluginDeviceCard::paint (juce::Graphics& g)
     title.removeFromRight (4);
 
     auto text = title.withSizeKeepingCentre (title.getWidth(), 26);
-    drawStyledText (g, themeManager, plugin.name, TypeStyle { 10.5f, false, 700 }, text.removeFromTop (14),
+    drawStyledText (g, themeManager, plugin.name, TypeStyle { theme.label.size, false, 700 }, text.removeFromTop (14),
                     juce::Justification::centredLeft, theme.textPrimary);
-    drawStyledText (g, themeManager, plugin.manufacturer, TypeStyle { 8.5f, false, 400 }, text,
+    drawStyledText (g, themeManager, plugin.manufacturer, TypeStyle { theme.micro.size, false, 400 }, text,
                     juce::Justification::centredLeft, theme.textDim);
 
     auto body = getLocalBounds().withTrimmedTop (titleHeight).withTrimmedBottom (footerHeight).reduced (padding, 8);
