@@ -31,9 +31,10 @@ namespace
     constexpr int toneInk = 1500, silenceInk = 1000;
 
     /** The first track's first clip, which each test adds from an audio file. */
-    tracktion::WaveAudioClip& firstClip (Fixture& f)
+    tracktion::WaveAudioClip* firstClip (Fixture& f)
     {
-        return *dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);
+        auto* track = tracktion::getAudioTracks (f.projects.getEdit())[0];
+        return track != nullptr ? dynamic_cast<tracktion::WaveAudioClip*> (track->getClips()[0]) : nullptr;
     }
 }
 
@@ -52,7 +53,7 @@ struct WaveformTests : juce::UnitTest
             f.invoke (cmd::clipAdd);
 
             const auto clip = f.model.getTracks()[0].clips[0];
-            expect (! firstClip (f).getAutoTempo());
+            expect (firstClip (f) != nullptr && ! firstClip (f)->getAutoTempo());
             expect (clip.playbackFile == f.audioFileToChoose);
 
             juce::Component repaintTarget;
@@ -73,8 +74,8 @@ struct WaveformTests : juce::UnitTest
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 30.0, 2, 100.0);
             f.invoke (cmd::clipAdd);
 
-            expect (firstClip (f).getAutoTempo());
-            expect (! firstClip (f).canUseProxy());
+            expect (firstClip (f) != nullptr && firstClip (f)->getAutoTempo());
+            expect (firstClip (f) != nullptr && ! firstClip (f)->canUseProxy());
 
             const auto clip = f.model.getTracks()[0].clips[0];
             expect (clip.playbackFile == f.audioFileToChoose);
