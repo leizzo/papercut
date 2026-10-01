@@ -117,14 +117,18 @@ void TrackHeader::mouseDown (const juce::MouseEvent& e)
 
 void TrackHeader::showMenu()
 {
+    // The menu outlives a click, and the header may be rebuilt before an item is
+    // picked: the items hold the registry (the app's) and the track id, not this.
     auto& theme = themeManager.getTheme();
+    auto& registry = commands;
+    const auto id = track.id;
     juce::PopupMenu colours;
 
     for (int i = 0; i < ApplicationModel::trackPaletteSize; ++i)
         colours.addItem (juce::PopupMenu::Item (paletteNames[i])
                              .setColour (theme.trackPalette[(size_t) i])
                              .setTicked (i == track.colourIndex)
-                             .setAction ([this, i] { commands.invoke (cmd::trackSetColour, { track.id, i }); }));
+                             .setAction ([&registry, id, i] { registry.invoke (cmd::trackSetColour, { id, i }); }));
 
     juce::PopupMenu menu;
     menu.addSubMenu ("Colour", colours);
@@ -133,17 +137,22 @@ void TrackHeader::showMenu()
     {
         juce::PopupMenu inputMenu;
         inputMenu.addItem ("No Input", true, track.input.isEmpty(),
-                           [this] { commands.invoke (cmd::trackSetInput, { track.id, {} }); });
+                           [&registry, id] { registry.invoke (cmd::trackSetInput, { id, {} }); });
 
         for (auto& input : inputs)
             inputMenu.addItem (input, true, input == track.input,
-                               [this, input] { commands.invoke (cmd::trackSetInput, { track.id, input }); });
+                               [&registry, id, input] { registry.invoke (cmd::trackSetInput, { id, input }); });
 
         menu.addSubMenu ("Input", inputMenu);
     }
 
     menu.addSeparator();
-    menu.addItem ("Show Automation", true, automationShown, [this] { if (onToggleAutomation) onToggleAutomation(); });
+    menu.addItem ("Show Automation", true, automationShown,
+                  [safeThis = juce::Component::SafePointer<TrackHeader> (this)]
+                  {
+                      if (safeThis != nullptr && safeThis->onToggleAutomation)
+                          safeThis->onToggleAutomation();
+                  });
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
