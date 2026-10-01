@@ -416,8 +416,13 @@ void Knob::paint (juce::Graphics& g)
 
     if (automated)
     {
+        // `Knob/Automated`: a 6 px rec dot ringed in the panel colour, in the dial's top-right corner (24, 0 of 30).
+        const auto size = dial.getWidth() * 0.2f;
+        const auto dot = juce::Rectangle<float> (dial.getRight() - size, dial.getY(), size, size);
         g.setColour (theme.rec);
-        g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre (dial.getTopRight().translated (-1.0f, 1.0f)));
+        g.fillEllipse (dot);
+        g.setColour (theme.bgPanel);
+        g.drawEllipse (dot, 1.0f);
     }
 
     auto text = getReadoutBounds();

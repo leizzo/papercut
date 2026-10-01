@@ -795,6 +795,49 @@ juce::Result PluginRack::setPinned (const juce::String& pluginId, const juce::St
     return juce::Result::ok();
 }
 
+namespace
+{
+    struct ParameterTouchWatch : PluginRack::TouchWatch,
+                                 private te::AutomatableParameter::Listener
+    {
+        ParameterTouchWatch (te::Plugin& plugin, std::function<void (const juce::String&)> callback)
+            : onTouch (std::move (callback))
+        {
+            for (auto* parameter : plugin.getAutomatableParameters())
+            {
+                parameter->addListener (this);
+                parameters.push_back (parameter);
+            }
+        }
+
+        ~ParameterTouchWatch() override
+        {
+            for (auto& parameter : parameters)
+                parameter->removeListener (this);
+        }
+
+        void curveHasChanged (te::AutomatableParameter&) override {}
+
+        void parameterChangeGestureBegin (te::AutomatableParameter& parameter) override
+        {
+            if (onTouch)
+                onTouch (parameter.paramID);
+        }
+
+        std::function<void (const juce::String&)> onTouch;
+        std::vector<te::AutomatableParameter::Ptr> parameters;
+    };
+}
+
+std::unique_ptr<PluginRack::TouchWatch> PluginRack::watchTouches (const juce::String& pluginId,
+                                                                  std::function<void (const juce::String&)> onTouch)
+{
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+        return std::make_unique<ParameterTouchWatch> (*plugin, std::move (onTouch));
+
+    return {};
+}
+
 double PluginRack::getCpuLoad (const juce::String& pluginId) const
 {
     if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))

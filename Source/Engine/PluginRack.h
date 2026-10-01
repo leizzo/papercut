@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -133,6 +134,18 @@ public:
         unpins it. At most maxPinnedParameters; a built-in edits every parameter
         on its card, so it pins none. Saved with the project; one undo step. */
     juce::Result setPinned (const juce::String& pluginId, const juce::String& parameterId, bool pinned);
+
+    /** Watches a plug-in while alive; see watchTouches. */
+    struct TouchWatch
+    {
+        virtual ~TouchWatch() = default;
+    };
+
+    /** Calls onTouch with a parameter's id each time the user takes hold of it
+        in the plug-in's own window (its change gesture begins): how a card
+        learns what to pin. Empty for an unknown plug-in. */
+    std::unique_ptr<TouchWatch> watchTouches (const juce::String& pluginId,
+                                              std::function<void (const juce::String& parameterId)> onTouch);
 
     /** The share of the audio callback the plug-in last took, 0..1. */
     double getCpuLoad (const juce::String& pluginId) const;

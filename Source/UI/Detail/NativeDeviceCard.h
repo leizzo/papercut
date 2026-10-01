@@ -13,11 +13,14 @@ namespace resamper
 
     One 28 px `DeviceHeader` in the device colour, in the same order on every
     device: power, name, preset, A/B, Mods (its count), fold, expand, options.
+    Geometry and colours follow the design's `DeviceHeader`, `Device/Folded`
+    and `Knob/Automated` exactly.
     The body runs its zones left to right, Controls then Output: Mix and Out
     are always last, behind a divider. A knob with automation shows a red dot.
 
-    Folded is a 28 px strip with the power, the name running down it and the
-    Mods count. Compact (the default) shows the first controls and the outputs
+    Folded (`Device/Folded`) is a 28 px strip: a stripe of the device colour,
+    the power, the name running down it and the Mods indicator; clicking the
+    strip unfolds it. Compact (the default) shows the first controls and the outputs
     and never scrolls. Expanded docks across the detail view and shows every
     parameter. A device's colour comes from its type, so the same device looks
     the same on every track.
@@ -37,6 +40,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseUp (const juce::MouseEvent&) override;
 
 private:
     struct Parameter
@@ -58,6 +62,10 @@ private:
     void addMenuItems (juce::PopupMenu&) override;
 
     void rebuild (const std::vector<PluginParameter>&);
+    int minHeaderWidth() const;
+
+    /** Where the name is drawn: in the header, or down a folded strip. */
+    juce::Rectangle<int> nameArea() const;
 
     /** The knobs this size shows, Controls first, then Output. */
     std::vector<Parameter*> shownParameters (bool output);

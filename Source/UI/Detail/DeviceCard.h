@@ -83,37 +83,50 @@ protected:
     std::function<void (double, bool)> setterFor (const juce::String& parameterId);
 };
 
-/** A device's power button, on while the device is enabled: a dark disc with
-    a dot in the device colour (native), or an accent ring and dot (plug-in). */
+/** A device's power button, on while the device is enabled (PRD §9.2.3):
+    a 14 px disc in text-on-accent with a 5 px dot in the device colour (a
+    native header), the same inverted (a folded device), or an accent ring
+    with a 4 px dot (a plug-in). */
 class DevicePowerButton : public ThemedButton
 {
 public:
-    enum class Style { native, plugin };
+    enum class Style { native, folded, plugin };
 
     DevicePowerButton (ThemeManager&, Style);
 
-    /** The native dot's colour. */
-    void setDotColour (juce::Colour);
+    void setStyle (Style);
+
+    /** The device colour: a native dot, a folded disc. */
+    void setDeviceColour (juce::Colour);
 
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
 
 private:
     Style style;
-    juce::Colour dot;
+    juce::Colour deviceColour;
 };
 
-/** A button in a native device's coloured header: an icon or a short label in
-    text-on-accent, with a darker wash on hover. */
+/** A part of a native device's `DeviceHeader` (PRD §9.2.1a), drawn in
+    text-on-accent over the device colour: an 11 px icon, the preset pill
+    (name and chevron), the A/B segment, the Mods pill (spline and count), or,
+    on a folded device, the Mods indicator alone. */
 class DeviceHeaderButton : public ThemedButton
 {
 public:
-    DeviceHeaderButton (ThemeManager&, const juce::String& name, std::optional<Icon>, const juce::String& text = {});
+    enum class Kind { icon, preset, abCompare, mods, foldedMods };
 
+    DeviceHeaderButton (ThemeManager&, const juce::String& name, Kind, std::optional<Icon> = {});
+
+    void setKind (Kind k)   { kind = k; repaint(); }
     void setIcon (Icon i)   { icon = i; repaint(); }
+
+    /** The width the design gives it at this text. */
+    int getIdealWidth() const;
 
     void paintButton (juce::Graphics&, bool highlighted, bool down) override;
 
 private:
+    Kind kind;
     std::optional<Icon> icon;
 };
 

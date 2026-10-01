@@ -7,6 +7,8 @@ namespace resamper
 
 namespace
 {
+    constexpr int foregroundPollMs = 250;
+
     class EmptyPluginEditor : public juce::Component
     {
     public:
@@ -56,6 +58,8 @@ PluginEditorWindow::PluginEditorWindow (PluginRack& rack, ThemeManager& theme, c
     setContentOwned (content.release(), true);
     centreWithSize (getWidth(), getHeight());
     themeManager.addListener (this);
+    timerCallback();
+    startTimer (foregroundPollMs);
     setVisible (true);
 }
 
@@ -71,6 +75,11 @@ void PluginEditorWindow::closeButtonPressed()
 
     if (onClose)
         onClose();
+}
+
+void PluginEditorWindow::timerCallback()
+{
+    setAlwaysOnTop (juce::Process::isForegroundProcess());
 }
 
 void PluginEditorWindow::themeChanged()

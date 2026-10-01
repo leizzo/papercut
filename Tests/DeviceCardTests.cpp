@@ -4,6 +4,7 @@
 #include "Commands/TrackCommands.h"
 #include "UI/Browser/Library.h"
 #include "UI/Detail/DetailView.h"
+#include "UI/Detail/PluginDeviceCard.h"
 #include "UI/State/ShellState.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -273,8 +274,13 @@ struct DeviceCardTests : juce::UnitTest
             card = findOne (*view, "DeviceCard/Native");
             expectEquals (card->getWidth(), 28);
             expect (findOne (*card, "mods") != nullptr && findOne (*card, "mods")->isVisible(), "the folded strip shows Mods");
+            expect (! findOne (*card, "fold")->isVisible() && ! findOne (*card, "preset")->isVisible());
 
-            click (findOne (*card, "fold"));
+            // Clicking the strip unfolds it.
+            card->mouseUp (mouseEvent (*card, { 14, 100 }, { 14, 100 }, false));
+            card = findOne (*view, "DeviceCard/Native");
+            expectEquals (card->getWidth(), compactWidth);
+
             click (findOne (*card, "expand"));
             card = findOne (*view, "DeviceCard/Native");
             expect (card->getWidth() > compactWidth);
@@ -367,6 +373,82 @@ struct DeviceCardTests : juce::UnitTest
 
             card->mouseDoubleClick (mouseEvent (*card, { 60, 10 }, { 60, 10 }, false));
             expectEquals (opened.size(), 2);
+        }
+
+        beginTest ("The pin button learns: each parameter touched in the plug-in's window is pinned, up to 4");
+        {
+            Cards f;
+            ScannedPlugin scanned (f);
+            const auto id = f.insert (pinboard);
+            auto view = f.view();
+            juce::StringArray opened;
+            view->onOpenEditor = [&] (const juce::String& plugin) { opened.add (plugin); };
+
+            auto* card = dynamic_cast<PluginDeviceCard*> (findOne (*view, "DeviceCard/Plugin"));
+            auto* instance = [&]() -> juce::AudioPluginInstance*
+            {
+                for (auto* plugin : te::getAllPlugins (f.projects.getEdit(), false))
+                    if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin))
+                        return external->getAudioPluginInstance();
+
+                return nullptr;
+            }();
+            expect (card != nullptr && instance != nullptr);
+
+            if (card == nullptr || instance == nullptr)
+                return;
+
+            auto touch = [&] (int index)
+            {
+                auto* parameter = instance->getParameters()[index];
+                parameter->beginChangeGesture();
+                parameter->endChangeGesture();
+                juce::MessageManager::getInstance()->runDispatchLoopUntil (50);   // the pin lands after the touch
+            };
+
+            auto pinnedNames = [&]
+            {
+                juce::StringArray names;
+                const auto parameters = f.plugins.getParameters (id);
+                const auto chain = f.plugins.getChain (f.trackId(), PluginChain::device);
+
+                for (auto& pin : chain.back().pinnedParameters)
+                    for (auto& p : parameters)
+                        if (p.id == pin)
+                            names.add (p.name);
+
+                return names.joinIntoString (",");
+            };
+
+            touch (0);
+            expectEquals (pinnedNames(), juce::String(), "a touch pinned without learning");
+
+            click (findOne (*card, "pinLearn"));
+            expect (card->isLearningPins());
+            expectEquals (opened.joinIntoString (","), id, "learning opens the window to touch in");
+
+            touch (3);
+            touch (1);
+            touch (3);
+            expectEquals (pinnedNames(), juce::String ("Param 4,Param 2"));
+
+            touch (5);
+            touch (0);
+            expectEquals (pinnedNames(), juce::String ("Param 4,Param 2,Param 6,Param 1"));
+            card = dynamic_cast<PluginDeviceCard*> (findOne (*view, "DeviceCard/Plugin"));
+            expect (card != nullptr && ! card->isLearningPins(), "learning goes on past 4 pins");
+
+            touch (2);
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+
+            // Clicking the pin again stops learning.
+            f.invoke (cmd::pluginSetPinned, { id, f.plugins.getChain (f.trackId(), PluginChain::device).back().pinnedParameters[0], false });
+            click (findOne (*card, "pinLearn"));
+            expect (card->isLearningPins());
+            click (findOne (*card, "pinLearn"));
+            expect (! card->isLearningPins());
+            touch (4);
+            expectEquals (f.plugins.getChain (f.trackId(), PluginChain::device).back().pinnedParameters.size(), 3);
         }
 
         beginTest ("A missing plug-in offers Locate and Replace, never its window");

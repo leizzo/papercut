@@ -24,7 +24,9 @@ namespace
         return value == "folded" ? DeviceSize::folded : value == "expanded" ? DeviceSize::expanded : DeviceSize::compact;
     }
 
-    /** The end of the chain (§6.3): where a device or plug-in can go. Paints only; the chain takes the drop. */
+    /** The end of the chain (§6.3), drawn to the design's Drop Zone: a bordered
+        150 px column, a square-dashed icon, "Drop device" over "or plug-in here".
+        Paints only; the chain takes the drop. */
     struct DropZone : juce::Component
     {
         explicit DropZone (ThemeManager& tm) : themeManager (tm)
@@ -36,16 +38,19 @@ namespace
         void paint (juce::Graphics& g) override
         {
             auto& theme = themeManager.getTheme();
-            juce::Path outline, dashed;
-            outline.addRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), theme.radiusXl);
-            const float dashes[] = { 4.0f, 3.0f };
-            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
             g.setColour (highlighted ? theme.accentDim : theme.border);
-            g.fillPath (dashed);
-            drawIcon (g, Icon::plus, getLocalBounds().toFloat().withSizeKeepingCentre (14.0f, 14.0f).translated (0.0f, -12.0f),
-                      theme.textDim);
-            drawStyledText (g, themeManager, "Drop device or plug-in here", theme.micro,
-                            getLocalBounds().withSizeKeepingCentre (getWidth() - 16, 14).translated (0, 8),
+            g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (0.5f), theme.radiusXl, 1.0f);
+
+            // 18 px icon, 6, a 12 px line, 6, an 11 px line: centred as a group.
+            constexpr int iconSize = 18, gap = 6, firstLine = 12, secondLine = 11;
+            auto column = getLocalBounds().withSizeKeepingCentre (getWidth(), iconSize + gap + firstLine + gap + secondLine);
+            drawIcon (g, Icon::squareDashed, column.removeFromTop (iconSize).toFloat().withSizeKeepingCentre ((float) iconSize, (float) iconSize),
+                      highlighted ? theme.accent : theme.textDim);
+            column.removeFromTop (gap);
+            drawStyledText (g, themeManager, "Drop device", TypeStyle { 10.0f, false, 600 }, column.removeFromTop (firstLine),
+                            juce::Justification::centred, theme.textSecondary);
+            column.removeFromTop (gap);
+            drawStyledText (g, themeManager, "or plug-in here", TypeStyle { 9.0f, false, 400 }, column.removeFromTop (secondLine),
                             juce::Justification::centred, theme.textDim);
         }
 

@@ -7,9 +7,18 @@ namespace resamper
 
 namespace
 {
-    constexpr int knobWidth = 48, knobGap = 10, bodyPadding = 14, dialSize = 34, knobHeight = dialSize + 4 + 2 * 13;
-    constexpr int headerPadding = 6, headerGap = 2, iconButton = 20, presetWidth = 52, abWidth = 28, modsWidth = 44,
-                  minNameWidth = 60;
+    // Design: DeviceCard/Native body (padding 14 / 16, gap 14) and `Knob` (a 30 px dial, 44 wide).
+    constexpr int knobWidth = 44, knobGap = 14, bodyPaddingX = 16, bodyPaddingY = 14, dialSize = 30,
+                  knobHeight = dialSize + 4 + 2 * 13;
+
+    // Design: DeviceHeader (padding 0 6 0 8, gap 6, title 11 / 700, parts 18 high).
+    constexpr int headerLeft = 8, headerRight = 6, headerGap = 6, powerSize = 14, partHeight = 18, minNameWidth = 48,
+                  minPresetWidth = 56;
+    const TypeStyle titleStyle { 11.0f, false, 700 };
+
+    // Design: Device/Folded (padding 6 0, gap 8: a 3 px stripe, power, a 100 px name, the Mods indicator).
+    constexpr int foldedPadding = 6, foldedGap = 8, stripeHeight = 3, foldedNameHeight = 100, foldedModsSize = 10;
+    const TypeStyle foldedNameStyle { 10.0f, false, 700 };
 
     /** Mix, Wet / Dry and Out belong in the Output zone, after the divider. */
     bool isOutputParameter (const juce::String& name)
@@ -26,12 +35,6 @@ namespace
         return columns > 0 ? columns * knobWidth + (columns - 1) * knobGap : 0;
     }
 
-    int minHeaderWidth()
-    {
-        return 2 * headerPadding + iconButton + minNameWidth + presetWidth + abWidth + modsWidth + 3 * iconButton
-             + 7 * headerGap;
-    }
-
     const char* modsTooltip = "Modulators: the Mods Drawer is coming";
 }
 
@@ -39,12 +42,12 @@ NativeDeviceCard::NativeDeviceCard (CommandRegistry& c, PluginRack& r, ThemeMana
                                     const PluginInfo& info)
     : DeviceCard (c, r, tm, track, info),
       power (tm, DevicePowerButton::Style::native),
-      preset (tm, "Preset: presets are coming with the preset browser", {}, "Default"),
-      ab (tm, "A/B compare is coming", {}, "A/B"),
-      mods (tm, modsTooltip, {}, "Mods 0"),
-      fold (tm, "Fold", Icon::chevronLeft),
-      expand (tm, "Expand", Icon::maximize2),
-      options (tm, "Options", Icon::ellipsis)
+      preset (tm, "Preset: presets are coming with the preset browser", DeviceHeaderButton::Kind::preset),
+      ab (tm, "A/B compare is coming", DeviceHeaderButton::Kind::abCompare),
+      mods (tm, modsTooltip, DeviceHeaderButton::Kind::mods),
+      fold (tm, "Fold", DeviceHeaderButton::Kind::icon, Icon::foldVertical),
+      expand (tm, "Expand", DeviceHeaderButton::Kind::icon, Icon::maximize2),
+      options (tm, "Options", DeviceHeaderButton::Kind::icon, Icon::ellipsis)
 {
     setComponentID ("DeviceCard/Native");
     setDescription ("Native device");
@@ -55,6 +58,9 @@ NativeDeviceCard::NativeDeviceCard (CommandRegistry& c, PluginRack& r, ThemeMana
     fold.setComponentID ("fold");
     expand.setComponentID ("expand");
     options.setComponentID ("options");
+
+    preset.setButtonText ("Default");
+    mods.setButtonText ("0");
 
     // Until they land, these show their state but can't be used.
     preset.setEnabled (false);
@@ -123,13 +129,13 @@ void NativeDeviceCard::setState (const PluginInfo& info, DeviceSize newSize)
     setTitle (plugin.name);
     setAlpha (plugin.enabled ? 1.0f : 0.5f);
 
+    const auto folded = size == DeviceSize::folded;
     power.setToggleState (plugin.enabled, juce::dontSendNotification);
-    power.setDotColour (colour);
-    fold.setIcon (size == DeviceSize::folded ? Icon::chevronRight : Icon::chevronLeft);
-    fold.setTooltip (size == DeviceSize::folded ? "Unfold" : "Fold");
+    power.setDeviceColour (colour);
+    power.setStyle (folded ? DevicePowerButton::Style::folded : DevicePowerButton::Style::native);
+    mods.setKind (folded ? DeviceHeaderButton::Kind::foldedMods : DeviceHeaderButton::Kind::mods);
     expand.setIcon (size == DeviceSize::expanded ? Icon::minimize2 : Icon::maximize2);
     expand.setTooltip (size == DeviceSize::expanded ? "Compact" : "Expand");
-    mods.setButtonText (size == DeviceSize::folded ? "0" : "Mods 0");
 
     rebuild (rack.getParameters (plugin.id));
     repaint();
@@ -152,6 +158,12 @@ std::vector<NativeDeviceCard::Parameter*> NativeDeviceCard::shownParameters (boo
     return shown;
 }
 
+int NativeDeviceCard::minHeaderWidth() const
+{
+    const auto parts = ab.getIdealWidth() + mods.getIdealWidth() + 3 * fold.getIdealWidth();
+    return headerLeft + powerSize + minNameWidth + minPresetWidth + parts + 7 * headerGap + headerRight;
+}
+
 int NativeDeviceCard::getPreferredWidth (int dockedWidth) const
 {
     if (size == DeviceSize::folded)
@@ -166,7 +178,7 @@ int NativeDeviceCard::getPreferredWidth (int dockedWidth) const
         controls = juce::jmin (controls, maxCompactControls);
 
     const auto divider = controls > 0 && outputs > 0 ? 2 * knobGap + 1 : 0;
-    const auto body = 2 * bodyPadding + zoneWidth (columns (controls)) + divider + zoneWidth (columns (outputs));
+    const auto body = 2 * bodyPaddingX + zoneWidth (columns (controls)) + divider + zoneWidth (columns (outputs));
     return juce::jmax (minHeaderWidth(), body, size == DeviceSize::expanded ? dockedWidth : 0);
 }
 
@@ -194,53 +206,73 @@ void NativeDeviceCard::addMenuItems (juce::PopupMenu& menu)
     menu.addSeparator();
 }
 
+juce::Rectangle<int> NativeDeviceCard::nameArea() const
+{
+    if (size == DeviceSize::folded)
+        return { 0, power.getBottom() + foldedGap, getWidth(), foldedNameHeight };
+
+    const auto width = juce::GlyphArrangement::getStringWidthInt (themeManager.font (titleStyle), plugin.name);
+    const auto left = power.getRight() + headerGap;
+    return { left, 0, juce::jmax (0, juce::jmin (width, preset.getX() - headerGap - left)), headerHeight };
+}
+
 void NativeDeviceCard::resized()
 {
     const auto folded = size == DeviceSize::folded;
 
-    for (auto* b : std::initializer_list<juce::Component*> { &preset, &ab, &expand, &options })
+    for (auto* b : std::initializer_list<juce::Component*> { &preset, &ab, &fold, &expand, &options })
         b->setVisible (! folded);
-
-    if (folded)
-    {
-        // A strip: power, unfold, the name down the middle, the Mods count at the foot.
-        auto strip = getLocalBounds();
-        power.setBounds (strip.removeFromTop (headerHeight));
-        fold.setBounds (strip.removeFromTop (iconButton).reduced (4, 0));
-        mods.setBounds (strip.removeFromBottom (iconButton + 4).reduced (4, 2));
-
-        for (auto& p : parameters)
-            p.knob->setVisible (false);
-
-        dividerX = -1;
-        return;
-    }
-
-    auto header = getLocalBounds().removeFromTop (headerHeight).reduced (headerPadding, 4);
-    power.setBounds (header.removeFromLeft (iconButton));
-    header.removeFromLeft (headerGap);
-
-    for (auto* b : { &options, &expand, &fold })
-    {
-        b->setBounds (header.removeFromRight (iconButton));
-        header.removeFromRight (headerGap);
-    }
-
-    mods.setBounds (header.removeFromRight (modsWidth));
-    header.removeFromRight (headerGap);
-    ab.setBounds (header.removeFromRight (abWidth));
-    header.removeFromRight (headerGap);
-    preset.setBounds (header.removeFromRight (presetWidth));
 
     for (auto& p : parameters)
         p.knob->setVisible (false);
 
+    dividerX = -1;
+
+    if (folded)
+    {
+        // Device/Folded: stripe, power, name, Mods, top to bottom from the 6 px padding.
+        auto column = getLocalBounds().reduced (0, foldedPadding);
+        column.removeFromTop (stripeHeight + foldedGap);
+        power.setBounds (column.removeFromTop (powerSize).withSizeKeepingCentre (powerSize + 4, powerSize));
+        column.removeFromTop (foldedGap + foldedNameHeight + foldedGap);
+        mods.setBounds (column.removeFromTop (foldedModsSize + 4).withSizeKeepingCentre (foldedModsSize + 4, foldedModsSize + 4));
+        return;
+    }
+
+    // DeviceHeader, left to right: power, name, preset (takes what's left), A/B, Mods, fold, expand, options.
+    auto header = getLocalBounds().removeFromTop (headerHeight).withTrimmedLeft (headerLeft).withTrimmedRight (headerRight);
+    auto place = [&] (juce::Component& c, int width, bool fromRight)
+    {
+        auto slot = fromRight ? header.removeFromRight (width) : header.removeFromLeft (width);
+        c.setBounds (slot.withSizeKeepingCentre (width, partHeight));
+        fromRight ? header.removeFromRight (headerGap) : header.removeFromLeft (headerGap);
+    };
+
+    // An icon's 11 px glyph sits in a 15 px button: the gap between buttons shrinks to keep the design's 6 px between glyphs.
+    const auto iconSlack = fold.getIdealWidth() - 11;
+
+    for (auto* b : { &options, &expand, &fold })
+    {
+        b->setBounds (header.removeFromRight (b->getIdealWidth()).withSizeKeepingCentre (b->getIdealWidth(), partHeight));
+        header.removeFromRight (headerGap - iconSlack);
+    }
+
+    header.removeFromRight (iconSlack);
+    place (mods, mods.getIdealWidth(), true);
+    place (ab, ab.getIdealWidth(), true);
+    place (power, powerSize, false);
+
+    const auto nameWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (titleStyle), plugin.name);
+    header.removeFromLeft (juce::jmin (nameWidth, juce::jmax (minNameWidth, header.getWidth() - minPresetWidth - headerGap)));
+    header.removeFromLeft (headerGap);
+    preset.setBounds (header.withSizeKeepingCentre (header.getWidth(), partHeight));
+
     // Zones: Controls, then the divider and Output.
-    auto body = getLocalBounds().withTrimmedTop (headerHeight).reduced (bodyPadding, 0);
+    auto body = getLocalBounds().withTrimmedTop (headerHeight).reduced (bodyPaddingX, 0);
     const auto rows = size == DeviceSize::expanded ? 2 : 1;
     const auto top = headerHeight + (getHeight() - headerHeight - rows * knobHeight) / 2;
 
-    auto place = [&] (const std::vector<Parameter*>& zone)
+    auto placeZone = [&] (const std::vector<Parameter*>& zone)
     {
         const auto cols = columns ((int) zone.size());
 
@@ -255,8 +287,7 @@ void NativeDeviceCard::resized()
     };
 
     const auto controls = shownParameters (false), outputs = shownParameters (true);
-    place (controls);
-    dividerX = -1;
+    placeZone (controls);
 
     if (! outputs.empty())
     {
@@ -266,7 +297,7 @@ void NativeDeviceCard::resized()
         if (! controls.empty())
             dividerX = body.getX() - knobGap - 1;
 
-        place (outputs);
+        placeZone (outputs);
     }
 }
 
@@ -280,42 +311,52 @@ void NativeDeviceCard::paint (juce::Graphics& g)
     g.setColour (theme.bgTrack);
     g.fillRoundedRectangle (bounds, radius);
 
-    // The header (the whole strip when folded) in the device colour.
     {
         juce::Graphics::ScopedSaveState save (g);
         juce::Path clip;
         clip.addRoundedRectangle (bounds, radius);
         g.reduceClipRegion (clip);
         g.setColour (colour);
-        g.fillRect (getTitleBar());
+
+        // Folded: a stripe of the device colour; otherwise the header filled with it.
+        if (folded)
+            g.fillRect (0, foldedPadding, getWidth(), stripeHeight);
+        else
+            g.fillRect (getLocalBounds().removeFromTop (headerHeight));
     }
 
-    g.setColour (theme.textOnAccent);
-    g.setFont (themeManager.font (TypeStyle { theme.label.size, false, 700 }));
+    const auto name = nameArea();
 
     if (folded)
     {
-        // The name runs down the strip.
+        // The name runs down the strip, top to bottom.
         juce::Graphics::ScopedSaveState save (g);
-        const auto area = getLocalBounds().withTrimmedTop (headerHeight + iconButton + 4).withTrimmedBottom (iconButton + 8);
-        g.addTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::halfPi, (float) area.getCentreX(),
-                                                         (float) area.getCentreY()));
-        g.drawText (plugin.name, area.withSizeKeepingCentre (area.getHeight(), area.getWidth()), juce::Justification::centredLeft, true);
+        g.addTransform (juce::AffineTransform::rotation (juce::MathConstants<float>::halfPi, (float) name.getCentreX(),
+                                                         (float) name.getCentreY()));
+        drawStyledText (g, themeManager, plugin.name, foldedNameStyle, name.withSizeKeepingCentre (name.getHeight(), name.getWidth()),
+                        juce::Justification::centredLeft, theme.textPrimary);
     }
     else
     {
-        const auto name = juce::Rectangle<int>::leftTopRightBottom (power.getRight() + 6, 0, preset.getX() - 4, headerHeight);
-        g.drawText (plugin.name, name, juce::Justification::centredLeft, true);
+        drawStyledText (g, themeManager, plugin.name, titleStyle, name, juce::Justification::centredLeft, theme.textOnAccent);
     }
 
     if (dividerX >= 0)
     {
         g.setColour (theme.borderSoft);
-        g.fillRect (dividerX, headerHeight + bodyPadding, 1, getHeight() - headerHeight - 2 * bodyPadding);
+        g.fillRect (dividerX, headerHeight + bodyPaddingY, 1, getHeight() - headerHeight - 2 * bodyPaddingY);
     }
 
     g.setColour (theme.border);
     g.drawRoundedRectangle (bounds.reduced (0.5f), radius, 1.0f);
+}
+
+void NativeDeviceCard::mouseUp (const juce::MouseEvent& e)
+{
+    // Clicking a folded strip unfolds it.
+    if (size == DeviceSize::folded && ! e.mods.isPopupMenu()
+        && ! e.mouseWasDraggedSinceMouseDown() && onSizeChange)
+        onSizeChange (DeviceSize::compact);
 }
 
 } // namespace resamper
