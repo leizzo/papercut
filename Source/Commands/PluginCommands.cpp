@@ -72,6 +72,11 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     {
         host.report (rack.replace (a.trackId, a.pluginId, a.plugin));
     });
+
+    registry.add (cmd::pluginSetPinned, { "Pin Parameter" }, [&rack, &host] (const PluginPinArgs& a)
+    {
+        host.report (rack.setPinned (a.pluginId, a.parameterId, a.pinned));
+    });
 }
 
 } // namespace resamper

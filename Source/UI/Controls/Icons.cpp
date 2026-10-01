@@ -38,6 +38,16 @@ namespace
             case Icon::file:          return { "M6 3 H14 L19 8 V21 H6 Z M14 3 V8 H19", false };
             case Icon::gripVertical:  return { "M9 6 V6.1 M15 6 V6.1 M9 12 V12.1 M15 12 V12.1 M9 18 V18.1 M15 18 V18.1", false };
             case Icon::gitMerge:      return { "M18 15 A3 3 0 1 1 17.99 15 Z M6 3 A3 3 0 1 1 5.99 3 Z M6 21 V9 A9 9 0 0 0 15 18", false };
+            case Icon::plug:          return { "M12 22 V17 M9 8 V2 M15 8 V2 M18 8 V13 A4 4 0 0 1 14 17 H10 A4 4 0 0 1 6 13 V8 Z", false };
+            case Icon::shieldCheck:   return { "M20 13 C20 18 16.5 20.5 12.3 22 C12.1 22.1 11.9 22.1 11.7 22 C7.5 20.5 4 18 4 13 V6 "
+                                               "C4 5.4 4.4 5 5 5 C7 5 9.5 3.8 11.2 2.3 C11.7 1.9 12.3 1.9 12.8 2.3 C14.5 3.8 17 5 19 5 "
+                                               "C19.6 5 20 5.4 20 6 Z M9 12 L11 14 L15 10", false };
+            case Icon::ellipsis:      return { "M5 12 V12.1 M12 12 V12.1 M19 12 V12.1", false };
+            case Icon::maximize2:     return { "M15 3 H21 V9 M9 21 H3 V15 M21 3 L14 10 M3 21 L10 14", false };
+            case Icon::minimize2:     return { "M4 14 H10 V20 M20 10 H14 V4 M14 10 L21 3 M3 21 L10 14", false };
+            case Icon::chevronLeft:   return { "M15 18 L9 12 L15 6", false };
+            case Icon::appWindow:     return { "M4 4 H20 A2 2 0 0 1 22 6 V18 A2 2 0 0 1 20 20 H4 A2 2 0 0 1 2 18 V6 A2 2 0 0 1 4 4 Z "
+                                               "M2 8 H22 M6 4 V8 M10 4 V8", false };
         }
 
         return { "", false };

@@ -13,8 +13,10 @@ class CommandRegistry;
     panel (230) and the track's device chain, a horizontal row of DeviceCards.
     Its top edge drags its height (120–420, kept in the shell's UI State).
 
-    Browser devices dropped on the chain go to its end; a card dragged by its
-    title bar moves within it. The whole content can be swapped for another
+    The chain ends in a drop zone. Browser devices dropped on the chain go to
+    its end: a native device then takes keyboard focus, a plug-in opens its
+    window. A card dragged by its title bar moves within it. Each native
+    device's size (folded, compact, expanded) is kept in the UI State. The whole content can be swapped for another
     inspector (the Automation and Folder / Bus inspectors, later). */
 class DetailView : public juce::Component,
                    private ApplicationModel::Listener
@@ -24,6 +26,9 @@ public:
     ~DetailView() override;
 
     std::function<void (const juce::String& pluginId)> onOpenEditor;
+
+    /** The plug-in whose window is open (empty: none); its card says so. */
+    void setOpenEditor (const juce::String& pluginId);
 
     /** Shows this inspector in place of the clip panel and chain; nullptr restores them. */
     void setInspector (juce::Component*);
@@ -52,6 +57,7 @@ private:
     std::unique_ptr<Chain> chain;
     juce::Viewport chainView;
     juce::Component* inspector = nullptr;
+    juce::String openEditorId;
     int heightAtDragStart = 0;
 
     void refresh();

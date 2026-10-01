@@ -10,7 +10,8 @@ enum class Icon
 {
     play, stop, record, skipBack, spline, rotateCcw, metronome, follow,
     chevronDown, chevronRight, layers, arrowUpRight, arrowDown, power, search,
-    folder, plus, x, audioLines, music, file, gripVertical, gitMerge
+    folder, plus, x, audioLines, music, file, gripVertical, gitMerge,
+    plug, shieldCheck, ellipsis, maximize2, minimize2, chevronLeft, appWindow
 };
 
 /** Draws the icon centred in area, stroked (or filled, for solid glyphs) in colour. */

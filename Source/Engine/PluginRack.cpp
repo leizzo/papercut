@@ -15,6 +15,14 @@ namespace
     const juce::Identifier chainProperty { "resamperChain" };
     const juce::String mixerChainValue { "mixer" };
 
+    /** On an external plug-in's state: its pinned parameter ids, one per line. */
+    const juce::Identifier pinsProperty { "resamperPins" };
+
+    juce::StringArray pinsOf (const te::Plugin& plugin)
+    {
+        return juce::StringArray::fromLines (plugin.state[pinsProperty].toString());
+    }
+
     PluginChain chainOf (const te::Plugin& plugin)
     {
         return plugin.state[chainProperty].toString() == mixerChainValue ? PluginChain::mixer : PluginChain::device;
@@ -120,7 +128,10 @@ namespace
                                                                      : external->desc.createIdentifierString();
             info.category = external->desc.category;
             info.instrument = external->desc.isInstrument;
+            info.version = external->desc.version;
             info.external = true;
+            info.pinnedParameters = pinsOf (plugin);
+            info.pinnedParameters.removeEmptyStrings();
         }
         else
         {
@@ -132,6 +143,7 @@ namespace
         info.chain = chainOf (plugin);
         info.enabled = plugin.isEnabled();
         info.missing = plugin.isMissing();
+        info.latencySamples = juce::roundToInt (plugin.getLatencySeconds() * plugin.engine.getDeviceManager().getSampleRate());
         return info;
     }
 
@@ -403,6 +415,25 @@ void PluginRack::runScan()
 
     manager.knownPluginList.scanFinished();
     publishExternalSnapshot();
+
+    // The destructor waits for this thread, so the reference is made while the rack is alive.
+    juce::MessageManager::callAsync ([rack = juce::WeakReference<PluginRack> (this)]
+    {
+        if (rack != nullptr)
+            rack->reloadMissing();
+    });
+}
+
+void PluginRack::reloadMissing()
+{
+    auto& edit = projectManager.getEdit();
+    auto& known = edit.engine.getPluginManager().knownPluginList;
+
+    for (auto* plugin : te::getAllPlugins (edit, false))
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin); external != nullptr && external->isMissing())
+            if (known.getTypeForIdentifierString (external->desc.createIdentifierString()) != nullptr
+                || known.getTypeForFile (external->desc.fileOrIdentifier) != nullptr)
+                external->forceFullReinitialise();
 }
 
 juce::StringArray PluginRack::getHostedFormats() const
@@ -699,7 +730,8 @@ std::vector<PluginParameter> PluginRack::getParameters (const juce::String& plug
         {
             const auto range = parameter->getValueRange();
             result.push_back ({ parameter->paramID, parameter->getParameterName(), range.getStart(), range.getEnd(),
-                                parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()) });
+                                parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()),
+                                parameter->hasAutomationPoints() });
         }
     }
 
@@ -731,6 +763,44 @@ bool PluginRack::setParameter (const juce::String& pluginId, const juce::String&
 
     projectManager.getUndo().beginGestureStep ("Change " + parameter->getParameterName(), pluginId + ":" + parameterId, continuesGesture);
     return edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameterId, parameter->getCurrentValue(), clamped));
+}
+
+juce::Result PluginRack::setPinned (const juce::String& pluginId, const juce::String& parameterId, bool pinned)
+{
+    auto& edit = projectManager.getEdit();
+    auto plugin = findPlugin (edit, pluginId);
+
+    if (plugin == nullptr || findParameter (*plugin, parameterId) == nullptr)
+        return juce::Result::fail ("No such plug-in parameter");
+
+    if (dynamic_cast<te::ExternalPlugin*> (plugin.get()) == nullptr)
+        return juce::Result::fail ("Only a plug-in pins parameters; a native device shows them all");
+
+    auto pins = pinsOf (*plugin);
+    pins.removeEmptyStrings();
+
+    if (pins.contains (parameterId) == pinned)
+        return juce::Result::ok();
+
+    if (pinned && pins.size() >= maxPinnedParameters)
+        return juce::Result::fail ("A plug-in card pins at most " + juce::String (maxPinnedParameters) + " parameters");
+
+    if (pinned)
+        pins.add (parameterId);
+    else
+        pins.removeString (parameterId);
+
+    projectManager.getUndo().beginStep (pinned ? "Pin Parameter" : "Unpin Parameter");
+    plugin->state.setProperty (pinsProperty, pins.joinIntoString ("\n"), &edit.getUndoManager());
+    return juce::Result::ok();
+}
+
+double PluginRack::getCpuLoad (const juce::String& pluginId) const
+{
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+        return plugin->getCpuUsage();
+
+    return 0;
 }
 
 std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& pluginId)

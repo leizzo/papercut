@@ -2,6 +2,7 @@
 #include "Commands/CommandRegistry.h"
 #include "Commands/PluginCommands.h"
 #include "UI/Browser/Library.h"
+#include "UI/Controls/ValueFormat.h"
 
 #include <map>
 
@@ -12,7 +13,45 @@ namespace
 {
     constexpr int clipPanelWidth = 230, resizeEdge = 4, chainPadding = 14, cardGap = 10;
 
-    juce::Identifier collapsedKey (const juce::String& pluginId)   { return "collapsed_" + pluginId; }
+    constexpr int dropZoneWidth = 150;
+
+    /** A native device's size in the UI State: "folded" or "expanded"; absent is compact. */
+    juce::Identifier sizeKey (const juce::String& pluginId)   { return "size_" + pluginId; }
+
+    DeviceSize sizeIn (const juce::ValueTree& state, const juce::String& pluginId)
+    {
+        const auto value = state[sizeKey (pluginId)].toString();
+        return value == "folded" ? DeviceSize::folded : value == "expanded" ? DeviceSize::expanded : DeviceSize::compact;
+    }
+
+    /** The end of the chain (§6.3): where a device or plug-in can go. Paints only; the chain takes the drop. */
+    struct DropZone : juce::Component
+    {
+        explicit DropZone (ThemeManager& tm) : themeManager (tm)
+        {
+            setComponentID ("dropZone");
+            setInterceptsMouseClicks (false, false);
+        }
+
+        void paint (juce::Graphics& g) override
+        {
+            auto& theme = themeManager.getTheme();
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), theme.radiusXl);
+            const float dashes[] = { 4.0f, 3.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (highlighted ? theme.accentDim : theme.border);
+            g.fillPath (dashed);
+            drawIcon (g, Icon::plus, getLocalBounds().toFloat().withSizeKeepingCentre (14.0f, 14.0f).translated (0.0f, -12.0f),
+                      theme.textDim);
+            drawStyledText (g, themeManager, "Drop device or plug-in here", theme.micro,
+                            getLocalBounds().withSizeKeepingCentre (getWidth() - 16, 14).translated (0, 8),
+                            juce::Justification::centred, theme.textDim);
+        }
+
+        ThemeManager& themeManager;
+        bool highlighted = false;
+    };
 
     juce::String barsText (const ApplicationModel& model, double startSeconds, double lengthSeconds)
     {
@@ -94,11 +133,24 @@ struct DetailView::ClipPanel : juce::Component
 struct DetailView::Chain : juce::Component,
                            juce::DragAndDropTarget
 {
-    Chain (DetailView& o) : owner (o) {}
+    Chain (DetailView& o) : dropZone (o.themeManager), owner (o)
+    {
+        addChildComponent (dropZone);
+    }
 
     juce::String trackId;
     std::vector<std::unique_ptr<DeviceCard>> cards;
+    DropZone dropZone;
     int dropIndex = -1;
+
+    DeviceCard* findCard (const juce::String& pluginId) const
+    {
+        for (auto& card : cards)
+            if (card->getPlugin().id == pluginId)
+                return card.get();
+
+        return nullptr;
+    }
 
     void setChain (const juce::String& track, const std::vector<PluginInfo>& plugins)
     {
@@ -125,11 +177,14 @@ struct DetailView::Chain : juce::Component,
                     continue;
                 }
 
-                auto card = std::make_unique<DeviceCard> (owner.commands, owner.rack, owner.themeManager, track, plugin);
-                card->onToggleCollapsed = [this, id = plugin.id]
+                auto card = DeviceCard::create (owner.commands, owner.rack, owner.themeManager, track, plugin);
+                card->onSizeChange = [this, id = plugin.id] (DeviceSize size)
                 {
-                    const auto key = collapsedKey (id);
-                    owner.state.setProperty (key, ! (bool) owner.state.getProperty (key, false), nullptr);
+                    if (size == DeviceSize::compact)
+                        owner.state.removeProperty (sizeKey (id), nullptr);
+                    else
+                        owner.state.setProperty (sizeKey (id), size == DeviceSize::folded ? "folded" : "expanded", nullptr);
+
                     owner.refresh();
                 };
                 card->onOpenEditor = [this, id = plugin.id] { if (owner.onOpenEditor) owner.onOpenEditor (id); };
@@ -139,7 +194,12 @@ struct DetailView::Chain : juce::Component,
         }
 
         for (size_t i = 0; i < plugins.size(); ++i)
-            cards[i]->setState (plugins[i], owner.state.getProperty (collapsedKey (plugins[i].id), false));
+        {
+            cards[i]->setState (plugins[i], sizeIn (owner.state, plugins[i].id));
+            cards[i]->setWindowOpen (plugins[i].id == owner.openEditorId);
+        }
+
+        dropZone.setVisible (trackId.isNotEmpty());
 
         layout();
     }
@@ -147,24 +207,19 @@ struct DetailView::Chain : juce::Component,
     void layout()
     {
         auto x = chainPadding;
-        const auto height = juce::jmax (0, getParentHeight() - 2 * chainPadding);
+        const auto height = juce::jmin (DeviceCard::height, juce::jmax (0, getParentHeight() - 2 * chainPadding));
+        const auto docked = juce::jmax (0, getParentWidth() - 2 * chainPadding);
 
         for (auto& card : cards)
         {
-            card->setBounds (x, chainPadding, card->getPreferredWidth(), juce::jmin (164, height));
+            card->setBounds (x, chainPadding, card->getPreferredWidth (docked), height);
             x += card->getWidth() + cardGap;
         }
 
+        dropZone.setBounds (x, chainPadding, dropZoneWidth, height);
+        x += dropZoneWidth;
+
         setSize (juce::jmax (getParentWidth(), x + chainPadding), juce::jmax (0, getParentHeight()));
-    }
-
-    void paint (juce::Graphics& g) override
-    {
-        auto& theme = owner.themeManager.getTheme();
-
-        if (trackId.isNotEmpty() && cards.empty())
-            drawStyledText (g, owner.themeManager, "Drop devices here from the Browser", theme.body,
-                            getLocalBounds().reduced (chainPadding), juce::Justification::centredLeft, theme.textDim);
     }
 
     void paintOverChildren (juce::Graphics& g) override
@@ -198,16 +253,24 @@ struct DetailView::Chain : juce::Component,
     void itemDragMove (const SourceDetails& d) override
     {
         dropIndex = indexAt (d.localPosition.x);
+        dropZone.highlighted = dropIndex == (int) cards.size();
+        dropZone.repaint();
         const auto inView = owner.chainView.getLocalPoint (this, d.localPosition);
         owner.chainView.autoScroll (inView.x, inView.y, 30, 16);
         repaint();
     }
-    void itemDragExit (const SourceDetails&) override     { dropIndex = -1; repaint(); }
+    void itemDragExit (const SourceDetails&) override
+    {
+        dropIndex = -1;
+        dropZone.highlighted = false;
+        repaint();
+    }
 
     void itemDropped (const SourceDetails& d) override
     {
         const auto index = indexAt (d.localPosition.x);
         dropIndex = -1;
+        dropZone.highlighted = false;
         repaint();
 
         if (auto moved = d.description["deviceCard"].toString(); moved.isNotEmpty())
@@ -228,7 +291,37 @@ struct DetailView::Chain : juce::Component,
         }
 
         if (auto item = itemFromDrag (d.description))
-            owner.commands.invoke (cmd::pluginInsert, { trackId, item->pluginPath, PluginChain::device });
+            insertDropped (item->pluginPath);
+    }
+
+    /** Adds a dropped device at the end; a native one takes focus, a plug-in opens its window (§9.2.3). */
+    void insertDropped (const juce::String& path)
+    {
+        const auto track = trackId;
+        const auto before = owner.rack.getChain (track, PluginChain::device);
+
+        if (! owner.commands.invoke (cmd::pluginInsert, { track, path, PluginChain::device }))
+            return;
+
+        const auto after = owner.rack.getChain (track, PluginChain::device);
+
+        if (after.size() <= before.size())
+            return;
+
+        const auto& added = after.back();
+
+        if (added.external)
+        {
+            if (owner.onOpenEditor)
+                owner.onOpenEditor (added.id);
+
+            return;
+        }
+
+        owner.refresh();
+
+        if (auto* card = findCard (added.id))
+            card->focusFirstControl();
     }
 
     DetailView& owner;
@@ -268,6 +361,14 @@ void DetailView::setInspector (juce::Component* c)
     clipPanel->setVisible (inspector == nullptr);
     chainView.setVisible (inspector == nullptr);
     resized();
+}
+
+void DetailView::setOpenEditor (const juce::String& pluginId)
+{
+    openEditorId = pluginId;
+
+    for (auto& card : chain->cards)
+        card->setWindowOpen (card->getPlugin().id == openEditorId);
 }
 
 void DetailView::revealDeviceChain()

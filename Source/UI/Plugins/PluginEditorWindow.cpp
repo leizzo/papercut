@@ -35,16 +35,16 @@ namespace
     }
 }
 
-PluginEditorWindow::PluginEditorWindow (PluginRack& rack, ThemeManager& theme, const juce::String& pluginId)
+PluginEditorWindow::PluginEditorWindow (PluginRack& rack, ThemeManager& theme, const juce::String& id)
     : juce::DocumentWindow ("Plug-in", theme.getTheme().background, juce::DocumentWindow::closeButton),
-      themeManager (theme)
+      themeManager (theme), pluginId (id)
 {
     setComponentID ("PluginEditorWindow");
     setLookAndFeel (&themeManager.getLookAndFeel());
     setTitleBarHeight (themeManager.getMetrics().trackControlHeight);
     setResizable (true, false);
 
-    auto content = rack.createEditor (pluginId);
+    auto content = rack.createEditor (id);
     const auto fallback = editorSize (themeManager);
 
     if (content == nullptr)
@@ -68,6 +68,9 @@ PluginEditorWindow::~PluginEditorWindow()
 void PluginEditorWindow::closeButtonPressed()
 {
     setVisible (false);
+
+    if (onClose)
+        onClose();
 }
 
 void PluginEditorWindow::themeChanged()

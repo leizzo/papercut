@@ -10,7 +10,8 @@ namespace resamper
 class PluginRack;
 
 /** A DocumentWindow hosting PluginRack::createEditor(). Shows an empty state
-    when the plug-in has no editor. Closing the window hides it; the owner deletes it. */
+    when the plug-in has no editor. Closing the window hides it and calls
+    onClose; the owner deletes it. */
 class PluginEditorWindow : public juce::DocumentWindow,
                            private ThemeManager::Listener
 {
@@ -18,10 +19,15 @@ public:
     PluginEditorWindow (PluginRack&, ThemeManager&, const juce::String& pluginId);
     ~PluginEditorWindow() override;
 
+    const juce::String& getPluginId() const noexcept   { return pluginId; }
+
+    std::function<void()> onClose;
+
     void closeButtonPressed() override;
 
 private:
     ThemeManager& themeManager;
+    juce::String pluginId;
 
     void themeChanged() override;
 

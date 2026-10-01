@@ -65,6 +65,14 @@ struct PluginReplaceArgs
     juce::String plugin;
 };
 
+/** Pins a plug-in parameter to its card, or unpins it. */
+struct PluginPinArgs
+{
+    juce::String pluginId;
+    juce::String parameterId;
+    bool pinned = true;
+};
+
 namespace cmd
 {
     inline constexpr CommandRef<> pluginScan { "plugin.scan" };
@@ -76,6 +84,7 @@ namespace cmd
     inline constexpr CommandRef<PluginCopyArgs> pluginCopyInsert { "plugin.copyInsert" };
     inline constexpr CommandRef<PluginParameterArgs> pluginSetParameter { "plugin.setParameter" };
     inline constexpr CommandRef<PluginReplaceArgs> pluginReplace { "plugin.replace" };
+    inline constexpr CommandRef<PluginPinArgs> pluginSetPinned { "plugin.setPinned" };
 }
 
 /** Registers the plug-in Commands above. */
