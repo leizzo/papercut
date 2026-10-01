@@ -137,19 +137,19 @@ struct ClipViewTests : juce::UnitTest
             expectGreaterThan (differingPixels (paintClip (unnamed), paintClip (named), visibleStart), 0);
         }
 
-        // Unwarped, and time-stretched (an ACID loop): a split gives both halves a new
-        // proxy. A move keeps the clip and its file, so its waveform too.
-        for (const bool timeStretched : { false, true })
+        // Unwarped, and warped (an ACID loop): both halves of a split, and a moved
+        // clip, play the clip's own file, so their waveforms come from the cache.
+        for (const bool warped : { false, true })
         {
             for (const bool split : { true, false })
             {
                 beginTest (juce::String (split ? "Splitting" : "Moving") + " an audio clip draws its waveform in the first paint (#89)"
-                           + (timeStretched ? ", time-stretched" : ""));
+                           + (warped ? ", warped" : ""));
 
                 Fixture f;
                 expect (f.theme.load().wasOk());
                 f.invoke (cmd::trackAdd);
-                f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 10.0, 2, timeStretched ? 100.0 : 0.0);
+                f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 10.0, 2, warped ? 100.0 : 0.0);
                 f.invoke (cmd::clipAdd);
 
                 UIStateStore store;
@@ -159,8 +159,8 @@ struct ClipViewTests : juce::UnitTest
                 lanes.setSize (1000, 200);
                 lanes.setTracks (f.model.getTracks());
 
-                // Its waveform drawn from the file it plays (a proxy, once rendered), every
-                // peak read. A thumbnail yet to attach its reader reports fully loaded too.
+                // Its waveform drawn from the file it plays, every peak read. A
+                // thumbnail yet to attach its reader reports fully loaded too.
                 const auto clip = f.model.getTracks()[0].clips[0];
                 auto& engine = f.projects.getEdit().engine;
                 expect (dispatchUntil ([&] { return clip.playbackFile.existsAsFile()
@@ -185,9 +185,8 @@ struct ClipViewTests : juce::UnitTest
                 expectEquals ((int) clips.size(), split ? 2 : 1);
 
                 // Playing the same file, every waveform has its peaks whole from the
-                // cache rather than reading them again (a new proxy has to render).
-                if (! timeStretched)
-                    expect (te::SmartThumbnail::areThumbnailsFullyLoaded (engine), "a waveform is reading its file again");
+                // cache rather than reading them again.
+                expect (te::SmartThumbnail::areThumbnailsFullyLoaded (engine), "a waveform is reading its file again");
 
                 for (auto& c : clips)
                     expectGreaterThan (waveformInk (*findClip (lanes, c.id), f.theme), minWaveformInk,
@@ -196,19 +195,19 @@ struct ClipViewTests : juce::UnitTest
         }
 
         // The drag previews the clip where it would land, then the Command moves it:
-        // neither makes a new waveform, time-stretched or not (#90).
-        for (const bool timeStretched : { false, true })
+        // neither makes a new waveform, warped or not (#90).
+        for (const bool warped : { false, true })
         {
             for (const bool toOtherTrack : { false, true })
             {
                 beginTest (juce::String ("Dragging an audio clip") + (toOtherTrack ? " to another track" : "")
-                           + " keeps its waveform (#90)" + (timeStretched ? ", time-stretched" : ""));
+                           + " keeps its waveform (#90)" + (warped ? ", warped" : ""));
 
                 Fixture f;
                 expect (f.theme.load().wasOk());
                 f.invoke (cmd::trackAdd);
                 f.invoke (cmd::trackAdd);
-                f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 10.0, 2, timeStretched ? 100.0 : 0.0);
+                f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 10.0, 2, warped ? 100.0 : 0.0);
                 f.invoke (cmd::clipAdd);
 
                 UIStateStore store;
@@ -255,8 +254,7 @@ struct ClipViewTests : juce::UnitTest
                 expect (findClip (lanes, clip.id) == component, "the moved clip has a new component");
                 expect (component->getWaveform() == waveform, "the moved clip has a new waveform");
 
-                // Unlike a split, a move keeps a time-stretched clip's proxy: its hash
-                // leaves out the clip's start. So nothing reads its file again.
+                // Nothing reads the clip's file again.
                 expect (te::SmartThumbnail::areThumbnailsFullyLoaded (engine), "a waveform is reading its file again");
                 expectGreaterThan (waveformInk (*component, f.theme), minWaveformInk);
             }

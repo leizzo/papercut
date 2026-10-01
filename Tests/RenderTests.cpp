@@ -52,11 +52,9 @@ struct RenderTests : juce::UnitTest
             expectGreaterThan (renderPeak (f), 0.1f);
         }
 
-        beginTest ("A tempo-tagged (ACID) loop gets its time-stretched audio and renders non-silent");
+        beginTest ("A warped (ACID) loop renders non-silent from its own file, with no proxy (#111)");
         {
-            // Such loops play from a time-stretched proxy. Without a time-stretcher
-            // compiled in, or if nothing starts rendering it, the clip is silent and
-            // has no waveform (and an offline render waits for it forever).
+            // Warped in real time: nothing to wait for, before or after a trim.
             Fixture f;
             f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 2.0, 2, 172.0);
@@ -64,19 +62,15 @@ struct RenderTests : juce::UnitTest
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
 
             auto* clip = dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);
-            expect (clip != nullptr && clip->usesTimeStretchedProxy());
+            expect (clip != nullptr && clip->getAutoTempo());
+            expect (clip != nullptr && ! clip->canUseProxy());
+            expect (f.model.getTracks()[0].clips[0].playbackFile == f.audioFileToChoose);
+            expectGreaterThan (renderPeak (f), 0.1f);
 
-            juce::Component repaintTarget;
-            auto waveform = f.model.createWaveform (f.model.getTracks()[0].clips[0].id, repaintTarget);
-
-            for (int i = 0; i < 300 && (waveform->isGenerating() || ! clip->getPlaybackFile().getFile().existsAsFile()); ++i)
-                juce::MessageManager::getInstance()->runDispatchLoopUntil (100);
-
-            const auto proxy = clip->getPlaybackFile().getFile();
-            expect (proxy.getSize() > 44, "time-stretched audio was never produced: " + proxy.getFullPathName());
-
-            if (proxy.getSize() > 44)   // an empty proxy would make the render below never finish
-                expectGreaterThan (renderPeak (f), 0.1f);
+            const auto added = f.model.getTracks()[0].clips[0];
+            f.invoke (cmd::clipResize, { added.id, added.startSeconds + 0.25, added.startSeconds + added.lengthSeconds });
+            expect (f.model.getTracks()[0].clips[0].playbackFile == f.audioFileToChoose);
+            expectGreaterThan (renderPeak (f), 0.1f);
         }
     }
 };

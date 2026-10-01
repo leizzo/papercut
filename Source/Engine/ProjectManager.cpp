@@ -25,6 +25,10 @@ namespace
         te::Edit::Options options { engine, state, id };
         options.editFileRetriever = [editFile] { return editFile; };
 
+        // Warped clips stretch in real time. A proxy is rendered for a clip's exact
+        // timing, so every trim or tempo change re-rendered it (#111, ADR 0001).
+        options.role = te::Edit::proxiesDisabled;
+
         // The engine's default adds an audio track to every Edit, including loaded
         // ones. A New Project is an empty Edit, and a loaded Edit keeps what it had.
         options.numAudioTracks = 0;
@@ -155,6 +159,63 @@ juce::Result ProjectManager::writeProject (const juce::File& folder, const juce:
         return juce::Result::fail ("Could not write " + juce::String (projectFileName));
 
     return juce::Result::ok();
+}
+
+juce::Result ProjectManager::importAudio (const juce::File& file, juce::File& playable)
+{
+    auto& engine = engineManager.getEngine();
+    te::AudioFile audioFile (engine, file);
+
+    if (! audioFile.isValid())
+        return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
+
+    // The engine reads WAV and AIFF directly; anything else it would decode into
+    // a proxy, which an Edit without proxies never makes.
+    if (! audioFile.getInfo().needsCachedProxy)
+    {
+        playable = file;
+        return juce::Result::ok();
+    }
+
+    std::unique_ptr<juce::AudioFormatReader> reader (te::AudioFileUtils::createReaderFor (engine, file));
+
+    if (reader == nullptr)
+        return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
+
+    const auto folder = getAudioFolder (projectFolder);
+
+    if (auto r = folder.createDirectory(); r.failed())
+        return r;
+
+    const auto decoded = folder.getChildFile (file.getFileNameWithoutExtension() + ".wav").getNonexistentSibling (false);
+    std::unique_ptr<juce::OutputStream> out (decoded.createOutputStream().release());
+    juce::WavAudioFormat wav;
+
+    auto writer = out != nullptr ? wav.createWriterFor (out, juce::AudioFormatWriterOptions()
+                                                                 .withSampleRate (reader->sampleRate)
+                                                                 .withNumChannels ((int) reader->numChannels)
+                                                                 .withBitsPerSample (32)
+                                                                 .withSampleFormat (juce::AudioFormatWriterOptions::SampleFormat::floatingPoint))
+                                 : nullptr;
+
+    const auto written = writer != nullptr && writer->writeFromAudioReader (*reader, 0, -1);
+    writer.reset();   // finishes the file's header
+
+    if (! written)
+    {
+        decoded.deleteFile();
+        return juce::Result::fail ("Could not decode " + file.getFullPathName() + " into " + decoded.getFullPathName());
+    }
+
+    playable = decoded;
+    return juce::Result::ok();
+}
+
+void ProjectManager::setClipSource (te::AudioClipBase& clip, const juce::File& file) const
+{
+    using Style = te::SourceFileReference::PathStyle;
+    clip.getSourceFileReference().setToFile (file, file.isAChildOf (projectFolder) ? Style::alwaysRelative : Style::alwaysAbsolute,
+                                             false);
 }
 
 juce::Result ProjectManager::save (const juce::var& uiState)

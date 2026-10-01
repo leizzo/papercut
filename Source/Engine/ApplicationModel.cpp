@@ -425,14 +425,7 @@ struct ApplicationModel::Impl : private juce::ValueTree::Listener,
         if (clip == nullptr)
             return juce::Result::fail ("The engine refused the clip: " + file.getFullPathName());
 
-        // Absolute, so a Save As into another folder cannot break the reference.
-        clip->getSourceFileReference().setToFile (file, te::SourceFileReference::PathStyle::alwaysAbsolute, false);
-
-        // Tempo-tagged loops (e.g. ACID WAVs) play from a time-stretched proxy. The
-        // engine only starts rendering it when a playback graph is built, i.e. on
-        // Play, and stops the transport when it lands. Start it now so the clip is
-        // ready (waveform and audio) by the time the user presses Play.
-        clip->beginRenderingNewProxyIfNeeded();
+        projectManager.setClipSource (*clip, file);
         return juce::Result::ok();
     }
 
@@ -706,6 +699,11 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     if (track != nullptr && isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
+    juce::File playable;
+
+    if (auto r = impl->projectManager.importAudio (file, playable); r.failed())
+        return r;
+
     impl->undo().beginStep ("Insert Clip");
 
     if (track == nullptr)
@@ -728,7 +726,7 @@ juce::Result ApplicationModel::insertAudioClip (const juce::File& file)
     for (auto* c : track->getClips())
         start = std::max (start, c->getPosition().getEnd());
 
-    return impl->placeAudioClip (*track, file, start);
+    return impl->placeAudioClip (*track, playable, start);
 }
 
 juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const juce::String& trackId, double startSeconds)
@@ -741,11 +739,13 @@ juce::Result ApplicationModel::insertAudioClipAt (const juce::File& file, const 
     if (isMidi (*track))
         return juce::Result::fail ("Audio clips go on audio tracks");
 
-    if (! te::AudioFile (impl->edit().engine, file).isValid())
-        return juce::Result::fail ("Not a readable audio file: " + file.getFullPathName());
+    juce::File playable;
+
+    if (auto r = impl->projectManager.importAudio (file, playable); r.failed())
+        return r;
 
     impl->undo().beginStep ("Insert Clip");
-    return impl->placeAudioClip (*track, file, te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
+    return impl->placeAudioClip (*track, playable, te::TimePosition::fromSeconds (std::max (0.0, startSeconds)));
 }
 
 juce::Result ApplicationModel::insertMidiClip()

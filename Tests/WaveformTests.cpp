@@ -31,10 +31,9 @@ namespace
     constexpr int toneInk = 1500, silenceInk = 1000;
 
     /** The first track's first clip, which each test adds from an audio file. */
-    bool usesTimeStretchedProxy (Fixture& f)
+    tracktion::WaveAudioClip& firstClip (Fixture& f)
     {
-        auto* clip = dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);
-        return clip != nullptr && clip->usesTimeStretchedProxy();
+        return *dynamic_cast<tracktion::WaveAudioClip*> (tracktion::getAudioTracks (f.projects.getEdit())[0]->getClips()[0]);
     }
 }
 
@@ -53,7 +52,7 @@ struct WaveformTests : juce::UnitTest
             f.invoke (cmd::clipAdd);
 
             const auto clip = f.model.getTracks()[0].clips[0];
-            expect (! usesTimeStretchedProxy (f));
+            expect (! firstClip (f).getAutoTempo());
             expect (clip.playbackFile == f.audioFileToChoose);
 
             juce::Component repaintTarget;
@@ -66,43 +65,33 @@ struct WaveformTests : juce::UnitTest
             expectGreaterThan (inkedPixels (*waveform, 0.0, clip.lengthSeconds, clip.sourceOffsetSeconds), toneInk);
         }
 
-        beginTest ("A time-stretched clip draws its source while its proxy renders");
+        beginTest ("A warped clip plays its own file, with no proxy, and draws it stretched over the clip (#111)");
         {
+            // A 30 s loop at 100 BPM, in a 120 BPM Edit: it plays in 25 s.
             Fixture f;
             f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 30.0, 2, 100.0);
             f.invoke (cmd::clipAdd);
 
-            expect (usesTimeStretchedProxy (f));
+            expect (firstClip (f).getAutoTempo());
+            expect (! firstClip (f).canUseProxy());
 
             const auto clip = f.model.getTracks()[0].clips[0];
-            const auto proxy = clip.playbackFile;
-            expect (proxy != f.audioFileToChoose);
-
-            // Nothing has dispatched since the clip was added, so its proxy job hasn't started.
-            auto& engine = f.projects.getEdit().engine;
-            expect (! engine.getAudioFileManager().proxyGenerator.isProxyBeingGenerated (tracktion::AudioFile (engine, proxy)));
+            expect (clip.playbackFile == f.audioFileToChoose);
+            expectWithinAbsoluteError (clip.lengthSeconds, 25.0, 0.01);
 
             juce::Component repaintTarget;
             auto waveform = f.model.createWaveform (clip.id, repaintTarget);
-            expect (waveform->isGenerating(), "reported ready before the proxy job started");
-
-            // The source's peaks take a fraction of the proxy's render; they load
-            // from the start, so that's where to look.
-            expect (dispatchUntil ([&] { return waveform->hasDrawableAudio(); }));
-            expect (! proxy.existsAsFile(), "the proxy was ready before the source was drawn");
-            expect (waveform->isGenerating());
-            expectGreaterThan (inkedPixels (*waveform, 0.0, 0.5, clip.sourceOffsetSeconds), toneInk);
-
             expect (dispatchUntil ([&] { return ! waveform->isGenerating(); }));
-            expect (proxy.existsAsFile());
             expectGreaterThan (inkedPixels (*waveform, 0.0, clip.lengthSeconds, clip.sourceOffsetSeconds), toneInk);
+            expectGreaterThan (inkedPixels (*waveform, 24.5, 25.0, clip.sourceOffsetSeconds), toneInk, "the clip's end");
         }
 
-        beginTest ("A time-stretched clip trimmed at its start draws the audio it plays, from its source and its proxy");
+        beginTest ("A warped clip's waveform follows a trim and a tempo change, without a new waveform (#111)");
         {
-            // A tone, then silence: the clip's first moments are tone only if the
-            // trim is honoured once, not twice (the proxy starts at the clip's start).
+            // The loop's first 1 s is a tone: 1.667 beats at its 100 BPM. Trimmed by
+            // 0.5 s (1 beat) at 120 BPM, the clip opens with 0.667 beats of tone:
+            // 0.333 s at 120 BPM, 0.667 s at 60 BPM.
             Fixture f;
             f.invoke (cmd::trackAdd);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("loop.wav"), 30.0, 2, 100.0, 1.0);
@@ -112,25 +101,19 @@ struct WaveformTests : juce::UnitTest
             f.invoke (cmd::clipResize, { added.id, added.startSeconds + 0.5, added.startSeconds + added.lengthSeconds });
 
             const auto clip = f.model.getTracks()[0].clips[0];
-            expectGreaterThan (clip.sourceOffsetSeconds, 0.0);
-            expect (usesTimeStretchedProxy (f));
+            expect (clip.playbackFile == f.audioFileToChoose);
 
             juce::Component repaintTarget;
             auto waveform = f.model.createWaveform (clip.id, repaintTarget);
-
-            auto expectToneThenSilence = [&] (const juce::String& from)
-            {
-                expectGreaterThan (inkedPixels (*waveform, 0.0, 0.2, clip.sourceOffsetSeconds), toneInk, from + ": tone at the clip's start");
-                expectLessThan (inkedPixels (*waveform, 2.0, 2.2, clip.sourceOffsetSeconds), silenceInk, from + ": silence later");
-            };
-
-            // As above, the source's first peaks come long before the proxy.
-            expect (dispatchUntil ([&] { return waveform->hasDrawableAudio(); }));
-            expect (! clip.playbackFile.existsAsFile(), "the proxy was ready before the source was drawn");
-            expectToneThenSilence ("source");
-
             expect (dispatchUntil ([&] { return ! waveform->isGenerating(); }));
-            expectToneThenSilence ("proxy");
+
+            expectGreaterThan (inkedPixels (*waveform, 0.0, 0.2, clip.sourceOffsetSeconds), toneInk, "tone at the clip's start");
+            expectLessThan (inkedPixels (*waveform, 0.45, 0.6, clip.sourceOffsetSeconds), silenceInk, "silence at 120 BPM");
+
+            expect (f.invoke (cmd::transportSetTempo, { 60.0 }));
+            const auto slower = f.model.getTracks()[0].clips[0];
+            expect (slower.playbackFile == clip.playbackFile);
+            expectGreaterThan (inkedPixels (*waveform, 0.45, 0.6, slower.sourceOffsetSeconds), toneInk, "tone at 60 BPM");
         }
 
         beginTest ("A clip whose file has gone is not left generating");

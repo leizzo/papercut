@@ -45,7 +45,7 @@ struct ClipInfo
     double loopLengthSeconds = 0;     ///< the repeating part, when looping
     bool reversed = false;            ///< an audio clip playing backwards
     int colourIndex = -1;             ///< into the track palette; -1: the track's colour
-    juce::File playbackFile;          ///< what an audio clip plays: its file, or a proxy rendered from it for this clip's timing
+    juce::File playbackFile;          ///< the file an audio clip plays
 };
 
 /** Read-only snapshot of a track, for views. */
