@@ -41,6 +41,7 @@ add_library(resamper_engine STATIC
     Source/Engine/ClipWaveform.cpp
     Source/Engine/Production.cpp
     Source/Engine/PluginRack.cpp
+    Source/Engine/PluginHosting.cpp
     Source/Engine/PluginSandbox.cpp
     Source/Engine/PluginScanner.cpp
     Source/Engine/SandboxDock.cpp

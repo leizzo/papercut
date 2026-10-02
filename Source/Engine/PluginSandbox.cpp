@@ -5,6 +5,7 @@
 #include <atomic>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <new>
 #include <thread>
 #include <utility>
@@ -1649,13 +1650,6 @@ namespace
 PluginSandbox::PluginSandbox()
 {
    #if RESAMPER_SANDBOX
-    // What a sandbox host knows: the default formats (runHost adds its extra ones).
-    juce::AudioPluginFormatManager defaults;
-    juce::addDefaultFormatsToManager (defaults);
-
-    for (auto* format : defaults.getFormats())
-        hostedFormats.addIfNotAlreadyThere (format->getName());
-
     // A loader mostly waits on its host: a project's plug-ins load side by side.
     loaders = std::make_unique<juce::ThreadPool> (juce::ThreadPoolOptions{}.withThreadName ("Sandbox Loader")
                                                                             .withNumberOfThreads (maxLoaders));
@@ -1708,23 +1702,25 @@ int PluginSandbox::runHost (int argc, const char* const* argv, std::vector<std::
    #endif
 }
 
-void PluginSandbox::addHostedFormat (const juce::String& formatName)
+bool PluginSandbox::isAvailable()
 {
+    return RESAMPER_SANDBOX != 0;
+}
+
+juce::StringArray PluginSandbox::getDefaultFormatNames()
+{
+    juce::StringArray names;
+
    #if RESAMPER_SANDBOX
-    hostedFormats.addIfNotAlreadyThere (formatName);
-   #else
-    juce::ignoreUnused (formatName);
+    // What a sandbox host knows: the default formats (runHost adds its extra ones).
+    juce::AudioPluginFormatManager defaults;
+    juce::addDefaultFormatsToManager (defaults);
+
+    for (auto* format : defaults.getFormats())
+        names.addIfNotAlreadyThere (format->getName());
    #endif
-}
 
-void PluginSandbox::removeHostedFormat (const juce::String& formatName)
-{
-    hostedFormats.removeString (formatName);
-}
-
-bool PluginSandbox::canHost (const juce::PluginDescription& desc) const
-{
-    return hostedFormats.contains (desc.pluginFormatName);
+    return names;
 }
 
 bool PluginSandbox::loadInBackground (const juce::PluginDescription& desc, const juce::String& pluginId, double sampleRate,
@@ -1928,39 +1924,6 @@ juce::Rectangle<int> PluginSandbox::getOwnEditorScreenBounds (juce::AudioProcess
     juce::ignoreUnused (processor);
    #endif
     return {};
-}
-
-void PluginSandbox::willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed)
-{
-    constexpr size_t maxRemembered = 64;
-    const std::scoped_lock lock (loadingLock);
-
-    loading.erase (std::remove_if (loading.begin(), loading.end(), [&] (const Loading& l) { return l.identifier == identifier; }),
-                   loading.end());
-
-    // A load the engine took elsewhere (asynchronously) never comes back for its entry.
-    if (loading.size() >= maxRemembered)
-        loading.erase (loading.begin());
-
-    loading.push_back ({ identifier, pluginId, sandboxed });
-}
-
-bool PluginSandbox::takeLoading (const juce::String& identifier, juce::String& pluginId, bool& sandboxed)
-{
-    const std::scoped_lock lock (loadingLock);
-
-    for (auto it = loading.begin(); it != loading.end(); ++it)
-    {
-        if (it->identifier == identifier)
-        {
-            pluginId = it->pluginId;
-            sandboxed = it->sandboxed;
-            loading.erase (it);
-            return true;
-        }
-    }
-
-    return false;
 }
 
 void PluginSandbox::addListener (Listener* l)      { listeners.add (l); }

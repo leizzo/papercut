@@ -7,6 +7,7 @@
 #include "Commands/ProductionCommands.h"
 #include "Commands/ProjectCommands.h"
 #include "Commands/TrackCommands.h"
+#include "Engine/PluginHosting.h"
 #include "Engine/PluginSandbox.h"
 #include "UI/MainWindow/MainComponent.h"
 
@@ -30,7 +31,7 @@ struct PluginSandboxTests : juce::UnitTest
             : known (f.projects.getEdit().engine.getPluginManager().knownPluginList)
         {
             TestPluginFormat::registerWith (f.projects.getEdit().engine.getPluginManager().pluginFormatManager);
-            f.app.engine.getPluginSandbox().addHostedFormat (TestPluginFormat::formatName);
+            f.app.engine.getPluginHosting().addHostedFormat (TestPluginFormat::formatName);
 
             file = folder().getChildFile (fileName + TestPluginFormat::fileExtension);
             file.replaceWithText (text);
@@ -263,8 +264,8 @@ struct PluginSandboxTests : juce::UnitTest
 
             f.invoke (cmd::editUndo);
             expect (! f.plugins.contains (id));
-            auto& sandbox = f.app.engine.getPluginSandbox();
-            expect (dispatchUntil ([&] { return ! sandbox.isLoading (id); }), "the load never ended");
+            auto& hosting = f.app.engine.getPluginHosting();
+            expect (dispatchUntil ([&] { return ! hosting.isLoading (id); }), "the load never ended");
 
             f.invoke (cmd::editRedo);
             expect (f.plugins.contains (id) && loaded (f, id));

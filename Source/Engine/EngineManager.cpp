@@ -1,5 +1,5 @@
 #include "EngineManager.h"
-#include "PluginSandbox.h"
+#include "PluginHostingImpl.h"
 #include "NativeDevicePlugins.h"
 #include "ProjectManager.h"
 
@@ -12,68 +12,6 @@ namespace resamper
 
 namespace
 {
-    /** Whether the engine creates this plug-in asynchronously (AUv3), past the
-        createPluginInstance hook, where no sandboxed stand-in can take its place. */
-    bool createsAsynchronously (te::Engine& engine, const juce::PluginDescription& desc)
-    {
-        for (auto* format : engine.getPluginManager().pluginFormatManager.getFormats())
-            if (format->getName() == desc.pluginFormatName && format->fileMightContainThisPluginType (desc.fileOrIdentifier)
-                && format->requiresUnblockedMessageThreadDuringCreation (desc))
-                return true;
-
-        return false;
-    }
-
-    /** Whether the plug-in runs in its sandbox: one the sandbox can host, not set to run
-        in-process, and not one the engine creates asynchronously. */
-    bool runsSandboxed (PluginSandbox& sandbox, te::ExternalPlugin& plugin)
-    {
-        return ! (bool) plugin.state[PluginSandbox::inProcessProperty] && sandbox.canHost (plugin.desc)
-            && ! createsAsynchronously (plugin.engine, plugin.desc);
-    }
-
-    /** Creates the plug-in's instance anew, now, from the state saved on it; its old one goes first. */
-    void createAgain (te::ExternalPlugin& plugin)
-    {
-        const auto hadInstance = plugin.getAudioPluginInstance() != nullptr;
-
-        // Processing off deletes the instance; neither change is an undo step.
-        if (hadInstance)
-        {
-            plugin.state.setProperty (te::IDs::process, false, nullptr);
-            plugin.processingChanged();
-        }
-
-        // The engine still counts a deleted instance as prepared, and would then read
-        // the new one without checking it could be created. Initialised with none, it doesn't.
-        auto& devices = plugin.engine.getDeviceManager();
-        plugin.initialise ({ {}, devices.getSampleRate(), devices.getBlockSize() });
-
-        if (hadInstance)
-        {
-            plugin.state.setProperty (te::IDs::process, true, nullptr);
-            plugin.processingChanged();
-        }
-        else
-        {
-            plugin.forceFullReinitialise();
-        }
-    }
-
-    /** Has the sandbox load the plug-in in the background, unless it has: true then.
-        Once it has, the plug-in is created again with it (if it still runs sandboxed). */
-    bool loadInSandbox (PluginSandbox& sandbox, te::ExternalPlugin& plugin)
-    {
-        auto& devices = plugin.engine.getDeviceManager();
-
-        return sandbox.loadInBackground (plugin.desc, plugin.itemID.toString(), devices.getSampleRate(),
-                                         devices.getBlockSize(), [&sandbox, ref = te::makeSafeRef (plugin)]
-        {
-            if (ref != nullptr && runsSandboxed (sandbox, *ref))
-                createAgain (*ref);
-        });
-    }
-
     /** On the audio device, beside the engine: each block it has finished, the sandbox hears. */
     class BlockClock final : public juce::AudioIODeviceCallback
     {
@@ -96,7 +34,7 @@ namespace
     class ResamperEngineBehaviour : public te::EngineBehaviour
     {
     public:
-        ResamperEngineBehaviour (EngineManager::AudioDevice d, PluginSandbox& s) : audioDevice (d), sandbox (s) {}
+        ResamperEngineBehaviour (EngineManager::AudioDevice d, PluginHosting& h) : audioDevice (d), hosting (h) {}
 
         bool autoInitialiseDeviceManager() override    { return audioDevice == EngineManager::AudioDevice::initialise; }
         bool shouldOpenAudioInputByDefault() override   { return true; }
@@ -112,27 +50,17 @@ namespace
                     return file;
         }
 
-        /** Called just before a plug-in of an Edit is created: tells the sandbox which
-            instance it is, and whether it runs sandboxed (see createPluginInstance below).
-            A sandboxed one isn't created until its host has loaded it in the background:
-            till then it has no instance (it is loading), and the message thread goes on. */
+        /** Called just before a plug-in of an Edit is created: Plug-in Hosting decides where
+            it runs. A sandboxed one isn't created until its host has loaded it in the
+            background: till then it has no instance (it is loading), and the message thread goes on. */
         bool shouldLoadPlugin (te::ExternalPlugin& plugin) override
         {
-            if (! te::EngineBehaviour::shouldLoadPlugin (plugin))
-                return false;
-
-            const auto sandboxed = runsSandboxed (sandbox, plugin);
-
-            if (sandboxed && ! loadInSandbox (sandbox, plugin))
-                return false;
-
-            sandbox.willLoad (plugin.desc.createIdentifierString(), plugin.itemID.toString(), sandboxed);
-            return true;
+            return te::EngineBehaviour::shouldLoadPlugin (plugin) && hosting.getImpl().shouldLoad (plugin);
         }
 
     private:
         EngineManager::AudioDevice audioDevice;
-        PluginSandbox& sandbox;
+        PluginHosting& hosting;
     };
 
     /** Runs engine background tasks (e.g. offline renders) to completion without
@@ -165,26 +93,13 @@ namespace
 
 EngineManager::EngineManager (const juce::String& applicationName, AudioDevice audioDevice)
     : thumbnailPriority (std::make_unique<NormalPriority>()),
-      sandbox (std::make_unique<PluginSandbox>()),
+      hosting (std::make_unique<PluginHosting>()),
       blockClock (std::make_unique<BlockClock>()),
       engine (std::make_unique<te::Engine> (applicationName,
                                             std::make_unique<ResamperUIBehaviour>(),
-                                            std::make_unique<ResamperEngineBehaviour> (audioDevice, *sandbox)))
+                                            std::make_unique<ResamperEngineBehaviour> (audioDevice, *hosting)))
 {
-    // A plug-in of an Edit runs in its sandbox when shouldLoadPlugin said so (its
-    // host has loaded it by now); anything else, as the engine would.
-    auto& plugins = engine->getPluginManager();
-    plugins.createPluginInstance = [&s = *sandbox, inProcess = plugins.createPluginInstance]
-                                   (const juce::PluginDescription& desc, double rate, int blockSize, juce::String& error)
-    {
-        juce::String pluginId;
-        bool sandboxed = false;
-
-        if (s.takeLoading (desc.createIdentifierString(), pluginId, sandboxed) && sandboxed)
-            return s.createInstance (desc, pluginId, error);
-
-        return inProcess (desc, rate, blockSize, error);
-    };
+    hosting->getImpl().attachTo (*engine);
 
     // JUCE runs the shared thumbnail thread at low priority, which on macOS
     // (utility QoS) reads waveforms about 3x slower than normal (#87).
@@ -206,17 +121,9 @@ te::Engine& EngineManager::getEngine() const noexcept
     return *engine;
 }
 
-PluginSandbox& EngineManager::getPluginSandbox() const noexcept
+PluginHosting& EngineManager::getPluginHosting() const noexcept
 {
-    return *sandbox;
-}
-
-void EngineManager::recreatePlugin (te::ExternalPlugin& plugin)
-{
-    if (runsSandboxed (*sandbox, plugin) && ! loadInSandbox (*sandbox, plugin))
-        return;
-
-    createAgain (plugin);
+    return *hosting;
 }
 
 juce::String EngineManager::describeActiveAudioDevice() const

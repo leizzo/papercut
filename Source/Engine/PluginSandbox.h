@@ -4,7 +4,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <vector>
 
 namespace resamper
@@ -36,23 +35,18 @@ namespace resamper
       answered synchronously with a timeout.
 
     Loading never holds up the message thread (§19: a plug-in's window shows
-    within 300 ms of its insert). The engine asks loadInBackground before it
-    creates a sandboxed plug-in: a host starts and loads it on a loader thread
-    while the plug-in has no instance yet (it is "loading"), and once it has,
-    the engine creates the plug-in again and createInstance hands the loaded
-    host over at once.
+    within 300 ms of its insert). Plug-in Hosting asks loadInBackground before
+    the engine creates a sandboxed plug-in: a host starts and loads it on a
+    loader thread while the plug-in has no instance yet (it is "loading"), and
+    once it has, the plug-in is created again and createInstance hands the
+    loaded host over at once.
 
     The plug-in's own UI runs in the host process too, in a panel the host
     lays over the stand-in's editor (sandboxdock): the plug-in window shows
     it in its vendor area as if it were in-process. The stand-in's editor
     tells the host where it is on screen, and the two keep the UI's size.
 
-    Which plug-ins: those of a format the host process knows (the default
-    formats, plus any added with addHostedFormat), unless the instance runs
-    in-process (inProcessProperty on its state). A format that needs the
-    message thread free while it creates a plug-in (AUv3) is hosted
-    in-process by the engine, and so is anything the engine creates without
-    loading it into an Edit (scans, ARA factories).
+    Which plug-ins run here is Plug-in Hosting's decision (PluginHosting).
 */
 class PluginSandbox
 {
@@ -62,9 +56,6 @@ public:
 
     /** The first argument of a sandbox host's command line starts with "--" hostId ":". */
     static constexpr const char* hostId = "resamperSandbox";
-
-    /** On a plug-in's state: true while the instance runs in-process (Run in-process). Saved with the project. */
-    static constexpr const char* inProcessProperty = "resamperInProcess";
 
     /** A sandbox host that hasn't loaded its plug-in after this long has failed (PRD §19: 10 s). */
     static constexpr int loadTimeoutMs = 10000;
@@ -78,16 +69,12 @@ public:
     static int runHost (int argc, const char* const* argv,
                         std::vector<std::unique_ptr<juce::AudioPluginFormat>> extraFormats = {});
 
-    /** Lets plug-ins of a format the host process knows besides the defaults
-        (a format added through runHost's extraFormats) run sandboxed. */
-    void addHostedFormat (const juce::String& formatName);
+    /** Whether plug-ins can run sandboxed on this platform. */
+    static bool isAvailable();
 
-    /** Plug-ins of the format run in-process from now on (for tests whose double
-        creates a format's plug-ins itself, through the engine's creation hook). */
-    void removeHostedFormat (const juce::String& formatName);
-
-    /** Whether a plug-in of this description can run sandboxed. */
-    bool canHost (const juce::PluginDescription&) const;
+    /** The formats a sandbox host knows without extraFormats (the defaults); none if
+        plug-ins can't run sandboxed on this platform. */
+    static juce::StringArray getDefaultFormatNames();
 
     /** Has a sandbox host of its own load the plug-in on a loader thread, unless
         one already is (at most loadTimeoutMs). False while it loads; true once
@@ -135,17 +122,6 @@ public:
     static void pressKeyInOwnEditor (juce::AudioProcessor*, const juce::KeyPress&);
 
     //==============================================================================
-    // Which instance the engine is about to create (set by the engine
-    // behaviour, which is told before each plug-in of an Edit loads).
-
-    /** The plug-in with this identifier (PluginDescription::createIdentifierString)
-        that loads next is pluginId, sandboxed or not. */
-    void willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed);
-
-    /** Takes what willLoad said about the plug-in with this identifier; false if nothing. */
-    bool takeLoading (const juce::String& identifier, juce::String& pluginId, bool& sandboxed);
-
-    //==============================================================================
     struct Listener
     {
         virtual ~Listener() = default;
@@ -164,15 +140,6 @@ private:
     class Instance;
     struct Load;
 
-    struct Loading
-    {
-        juce::String identifier, pluginId;
-        bool sandboxed = true;
-    };
-
-    juce::StringArray hostedFormats;
-    std::mutex loadingLock;
-    std::vector<Loading> loading;
     std::map<juce::String, std::shared_ptr<Load>> loads;   ///< by plug-in id; on the message thread
     std::unique_ptr<juce::ThreadPool> loaders;
     juce::ListenerList<Listener> listeners;

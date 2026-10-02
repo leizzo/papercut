@@ -1,5 +1,5 @@
 {
-  "version": "2.19",
+  "version": "2.20",
   "children": [
     {
       "type": "frame",
@@ -150415,7 +150415,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "marketing/screens/arrangement.png",
-                "mode": "fill"
+                "mode": "cover"
               }
             }
           ]
@@ -152750,7 +152750,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "marketing/screens/mixer.png",
-                "mode": "fill"
+                "mode": "cover"
               }
             }
           ]
@@ -154139,7 +154139,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "marketing/screens/plugins.png",
-                "mode": "fill"
+                "mode": "cover"
               }
             }
           ]
@@ -155495,7 +155495,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "marketing/screens/piano-roll.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "cornerRadius": [
                     10,
@@ -155605,7 +155605,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "marketing/screens/audio-clip-automation.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "cornerRadius": [
                     10,
@@ -155724,7 +155724,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "marketing/screens/mixer-folders.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "cornerRadius": [
                     10,
@@ -155834,7 +155834,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "marketing/screens/automation.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "cornerRadius": [
                     10,
@@ -156067,7 +156067,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "marketing/screens/session.png",
-                "mode": "fill"
+                "mode": "cover"
               }
             }
           ]
@@ -181901,7 +181901,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "Screenshot%202026-09-29%20at%2014.23.21.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": "fill_container",
                   "height": "fill_container"
