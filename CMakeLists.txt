@@ -41,6 +41,8 @@ add_library(resamper_engine STATIC
     Source/Engine/ClipWaveform.cpp
     Source/Engine/Production.cpp
     Source/Engine/PluginRack.cpp
+    Source/Engine/NativeDevicePlugins.cpp
+    Source/Engine/NativeDevices.cpp
     Source/Engine/Mixer.cpp
     Source/Engine/Session.cpp
     Source/Engine/Automation.cpp
@@ -163,6 +165,9 @@ add_library(resamper_ui STATIC
     Source/UI/Browser/Browser.cpp
     Source/UI/Detail/DeviceCard.cpp
     Source/UI/Detail/NativeDeviceCard.cpp
+    Source/UI/Detail/DeviceBody.cpp
+    Source/UI/Detail/EqEightDevice.cpp
+    Source/UI/Detail/CompressorDevice.cpp
     Source/UI/Detail/PluginDeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
     Source/UI/MainWindow/FloatingWindow.cpp
@@ -251,6 +256,7 @@ target_sources(ResamperTests PRIVATE
     Tests/ControlViewTests.cpp
     Tests/DeviceChainTests.cpp
     Tests/DeviceCardTests.cpp
+    Tests/NativeDeviceTests.cpp
     Tests/EngineUndoTests.cpp
     Tests/ShellTests.cpp
     Tests/BrowserTests.cpp
