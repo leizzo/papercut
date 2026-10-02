@@ -9,6 +9,16 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-02
+
+Release fix on top of **M1.1 — Devices & Plug-ins**. v0.2.0 was tagged but never published: its
+release build failed on a timing assertion in the tests.
+
+### Fixed
+
+- The test that a slow plug-in loads in the background bounds the insert by the plug-in's load time
+  instead of a fixed 300 ms, which a CI runner can exceed (#138).
+
 ## [0.2.0] - 2026-10-02
 
 Milestone **M1.1 — Devices & Plug-ins**: native devices v2, plug-in hosting in a sandbox, plug-in
@@ -171,7 +181,8 @@ basic Mixer, and the Resamper design system.
 - Silent tempo-tagged loops with no waveform.
 - M1 review findings and design parity in lanes, devices and the mixer.
 
-[Unreleased]: https://github.com/leizzo/resamper/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/leizzo/resamper/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/leizzo/resamper/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/leizzo/resamper/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/leizzo/resamper/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/leizzo/resamper/compare/v0.1.1...v0.1.2
