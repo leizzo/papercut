@@ -1,6 +1,8 @@
 #include "TestFixture.h"
+#include "Commands/EditCommands.h"
 #include "Commands/MixerCommands.h"
 #include "Commands/PluginCommands.h"
+#include "Commands/TrackCommands.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -40,6 +42,25 @@ struct EngineUndoTests : juce::UnitTest
 
     void runTest() override
     {
+        beginTest ("An undo straight after a new track keeps Redo: the engine's track sort is no step (#133)");
+        {
+            Fixture f;
+            f.invoke (cmd::trackAdd);
+            const auto trackId = f.model.getTracks()[0].id;
+            f.invoke (cmd::pluginInsert, { trackId, te::ReverbPlugin::xmlTypeName });
+
+            auto& undo = f.projects.getEdit().getUndoManager();
+            const auto history = undo.getUndoDescriptions();
+
+            // The engine sorts the Edit's tracks after a new one, asynchronously: here, after the undo.
+            f.invoke (cmd::editUndo);
+            juce::MessageManager::getInstance()->runDispatchLoopUntil (100);
+            expect (undo.canRedo(), "a step after the undo cleared Redo: " + undo.getUndoDescriptions().joinIntoString (" | "));
+
+            f.invoke (cmd::editRedo);
+            expect (undo.getUndoDescriptions() == history, undo.getUndoDescriptions().joinIntoString (" | "));
+        }
+
         beginTest ("A track volume drag never joins a plug-in step made during it");
         {
             UndoFixture f;

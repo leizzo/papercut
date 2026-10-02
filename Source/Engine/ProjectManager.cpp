@@ -41,6 +41,12 @@ namespace
         // SceneList, so undoing that step corrupts the Edit. Create it up front and
         // start the Project with an empty undo history.
         edit->getSceneList();
+
+        // SCENES lands after the tracks, where the engine's track sort (run after
+        // each new track, through the UndoManager) moves it from. Run later, that
+        // move joins whatever undo step is newest, or after an Undo starts one of
+        // its own and clears Redo (#133). Sorted here, outside undo, it never moves.
+        te::TrackList::sortTracksByType (edit->state, nullptr);
         edit->getUndoManager().clearUndoHistory();
 
         return edit;
