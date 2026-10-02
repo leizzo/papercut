@@ -19,7 +19,7 @@ enum class Icon
     play, pause, square, circleDot, skipBack, repeat, rotateCcw, timer, metronome, crosshair, audioLines,
     audioWaveform, activity, waves, spline, chartSpline, piano, music, music2, volume2, drum,
     // Navigation & disclosure
-    chevronDown, chevronRight, arrowDown, arrowLeft, arrowRight, arrowUpRight, arrowLeftRight, cornerDownRight,
+    chevronDown, chevronRight, chevronLeft, arrowDown, arrowLeft, arrowRight, arrowUpRight, arrowLeftRight, cornerDownRight,
     ellipsis, x, maximize, maximize2, minimize2, zoomIn, zoomOut,
     // Editing tools
     mousePointer2, textCursor, pencil, eraser, scissors, scissorsLineDashed, magnet, foldVertical, unfoldVertical,

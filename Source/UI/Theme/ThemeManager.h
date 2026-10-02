@@ -63,8 +63,8 @@ struct Theme
     // Radius scale (§15.3): meter, badge/pad/M-S-R, slot/select, strip/segmented, device/card, popover
     float radiusXs = 0, radiusSm = 0, radiusMd = 0, radiusLg = 0, radiusXl = 0, radius2xl = 0;
 
-    // Elevation (§15.3): L1 control, L2 popover. L0 is flat.
-    std::vector<Shadow> elevation1, elevation2;
+    // Elevation (§15.3): L1 control, L2 popover, L3 floating window. L0 is flat.
+    std::vector<Shadow> elevation1, elevation2, elevation3;
 
     float disabledOpacity = 1;
 
@@ -117,6 +117,10 @@ struct LayoutMetrics
     int velocityLaneHeight = 0;      ///< piano roll velocity lane
     int gridEighthPixels = 0;        ///< pixels per beat before the grid shows 1/8
     int gridSixteenthPixels = 0;     ///< pixels per beat before the grid shows 1/16
+    int pluginTitleBarHeight = 0;    ///< a plug-in window's title bar (§9.6)
+    int pluginToolbarHeight = 0;     ///< a plug-in window's host toolbar
+    int pluginFooterHeight = 0;      ///< a plug-in window's host footer
+    int windowCascade = 0;           ///< how far each further floating window steps down-right
 };
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys

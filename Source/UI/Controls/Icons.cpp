@@ -92,6 +92,8 @@ namespace
             R"(<path d="m6 9 6 6 6-6"/>)" },
         { Icon::chevronRight, "chevron-right",
             R"(<path d="m9 18 6-6-6-6"/>)" },
+        { Icon::chevronLeft, "chevron-left",
+            R"(<path d="m15 18-6-6 6-6"/>)" },
         { Icon::arrowDown, "arrow-down",
             R"(<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>)" },
         { Icon::arrowLeft, "arrow-left",

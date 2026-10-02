@@ -29,7 +29,8 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
       editorPlaceholder (app.theme, "The audio Editor arrives with M4. Double-click an audio clip then."),
       pianoRollPlaceholder (app.theme, "Select a MIDI clip, or double-click one, to edit its notes."),
       developerOverlay (app.theme),
-      toasts (app.theme)
+      toasts (app.theme),
+      pluginWindows (app.model, app.plugins, app.commands, app.theme, app.preferences)
 {
     // Every Command a layout or the menus may name must be registered before they build.
     registerPrimitives (factory, app.commands, app.theme);
@@ -40,6 +41,7 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
     registerArrangementZoomCommands();
     registerEscapeCommand();
     registerPianoRollCommands();
+    registerPluginWindowCommands();
 
     if (layoutSource.isDevMode())
         registerDeveloperOverlayCommand();
@@ -76,18 +78,30 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         resized();
     };
 
-    detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id)
-    {
-        // An open window comes forward; any other replaces it.
-        if (pluginEditor != nullptr && pluginEditor->getPluginId() == id && pluginEditor->isVisible())
-        {
-            pluginEditor->toFront (true);
-            return;
-        }
+    // A card or an insert slot opens its plug-in's window, or brings it forward.
+    detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id) { pluginWindows.open (id); };
 
-        pluginEditor = std::make_unique<PluginEditorWindow> (app.plugins, app.theme, id);
-        pluginEditor->onClose = [this] { detailView.setOpenEditor ({}); };
-        detailView.setOpenEditor (id);
+    pluginWindows.onOpenWindowsChanged = [this] { detailView.setOpenWindows (pluginWindows.getOpenPluginIds()); };
+    pluginWindows.showToast = [this] (const juce::String& message, std::vector<Toasts::Action> actions)
+    {
+        toasts.show (message, std::move (actions));
+    };
+
+    // A first window centres over the arrangement (the view in front, while that isn't it).
+    pluginWindows.getAnchorArea = [this]
+    {
+        for (auto* view : std::initializer_list<juce::Component*> { &arrangement, &sessionPlaceholder, &mixerView, &pianoRoll,
+                                                                    &pianoRollPlaceholder, &editorPlaceholder })
+            if (view->isShowing())
+                return view->getScreenBounds();
+
+        return isShowing() ? getScreenBounds() : juce::Rectangle<int>();
+    };
+
+    // The opening rule (§9.6) applies to every insert, whichever view it came from.
+    app.host.pluginAdded = [this] (const juce::String& trackId, const juce::String& pluginId)
+    {
+        pluginWindows.pluginAdded (trackId, pluginId);
     };
 
     for (auto* c : std::initializer_list<juce::Component*> { &topBar, &browser, &detailView,
@@ -113,10 +127,12 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
     app.theme.addListener (this);
     shell.getState().addListener (this);
     themeChanged();
+    pluginWindows.refresh();   // a project's open windows come back
 }
 
 MainComponent::~MainComponent()
 {
+    app.host.pluginAdded = nullptr;
     shell.getState().removeListener (this);
     app.theme.removeListener (this);
     app.model.removeListener (this);
@@ -149,6 +165,23 @@ void MainComponent::registerEscapeCommand()
         arrangement.cancelDrag();
         app.commands.invoke (cmd::editDeselectAll);
     });
+}
+
+void MainComponent::registerPluginWindowCommands()
+{
+    auto& prefs = app.preferences;
+
+    app.commands.add (cmd::pluginWindowToggleAll, { "Show / Hide Plug-in Windows" }, [this] { pluginWindows.toggleAll(); });
+    app.commands.add (cmd::pluginWindowCloseFocused, { "Close Plug-in Window" }, [this] { pluginWindows.closeFocused(); });
+
+    app.commands.add (cmd::pluginWindowToggleAutoOpen,
+                      { "Auto-open Plug-in Window on Insert", {}, [&prefs] { return prefs.getAutoOpenPluginWindows(); } },
+                      [&prefs] { prefs.setAutoOpenPluginWindows (! prefs.getAutoOpenPluginWindows()); });
+
+    app.commands.add (cmd::pluginWindowToggleSelectedTrackOnly,
+                      { "Show Plug-in Windows for Selected Track Only", {},
+                        [&prefs] { return prefs.getPluginWindowsForSelectedTrackOnly(); } },
+                      [&prefs] { prefs.setPluginWindowsForSelectedTrackOnly (! prefs.getPluginWindowsForSelectedTrackOnly()); });
 }
 
 void MainComponent::registerDeveloperOverlayCommand()
@@ -285,13 +318,6 @@ void MainComponent::mouseDown (const juce::MouseEvent& e)
 
 void MainComponent::modelChanged()
 {
-    // A window never outlives its plug-in (deleted, its insert undone, its track or Project gone).
-    if (pluginEditor != nullptr && ! app.plugins.contains (pluginEditor->getPluginId()))
-    {
-        pluginEditor.reset();
-        detailView.setOpenEditor ({});
-    }
-
     updateStatusBar();
     commandManager.commandStatusChanged();   // undo/redo enablement
 }

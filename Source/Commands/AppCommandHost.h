@@ -28,6 +28,9 @@ struct AppCommandHost
     /** A non-obvious outcome worth a toast (PRD §16.7); undoable offers Undo. */
     std::function<void (const juce::String& message, bool undoable)> notify;
 
+    /** A plug-in the user just added (insert or replace): where its window opens on insert (PRD §9.6). */
+    std::function<void (const juce::String& trackId, const juce::String& pluginId)> pluginAdded;
+
     /** Passes a failed Result's message to reportError; a success does nothing. */
     void report (const juce::Result& r) const
     {
