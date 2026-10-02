@@ -78,6 +78,13 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         resized();
     };
 
+    // A device from the Browser: a native one takes focus; a plug-in's window
+    // opens by the opening rule, through pluginAdded below (§6.2, §9.6).
+    arrangement.onDeviceDropped = browser.onInsertDevice = [this] (const juce::String& trackId, const juce::String& path)
+    {
+        detailView.insertDevice (trackId, path);
+    };
+
     // A card or an insert slot opens its plug-in's window, or brings it forward.
     detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id) { pluginWindows.open (id); };
 

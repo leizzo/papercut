@@ -124,9 +124,16 @@ struct PluginABArgs
     int slot = 0;
 };
 
+/** A catalogue plug-in, by its path (what plugin.insert takes). */
+struct PluginPathArgs
+{
+    juce::String plugin;
+};
+
 namespace cmd
 {
     inline constexpr CommandRef<> pluginScan { "plugin.scan" };
+    inline constexpr CommandRef<PluginPathArgs> pluginRetryScan { "plugin.retryScan" };   ///< one that failed to scan
     inline constexpr CommandRef<PluginInsertArgs> pluginInsert { "plugin.insert" };
     inline constexpr CommandRef<PluginArgs> pluginRemove { "plugin.remove" };
     inline constexpr CommandRef<PluginMoveArgs> pluginMove { "plugin.move" };

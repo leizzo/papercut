@@ -46,6 +46,68 @@ struct BrowserTests : juce::UnitTest
                 expect (! lists (effects, plumbing), plumbing);
         }
 
+        beginTest ("Plug-in rows carry their format badge; one that failed to scan is under Plug-Ins only and can't be dropped");
+        {
+            Fixture f;
+
+            auto plugin = [] (juce::String name, juce::String format, bool instrument, bool failed)
+            {
+                PluginInfo info;
+                info.name = name;
+                info.format = format;
+                info.path = "/plug-ins/" + name;
+                info.instrument = instrument;
+                info.external = true;
+                info.failedScan = failed;
+                return info;
+            };
+
+            Library library ([&]
+            {
+                juce::Array<PluginInfo> catalogue;
+                catalogue.add (plugin ("Prism EQ", "VST3", false, false));
+                catalogue.add (plugin ("Vintage Plate", "AudioUnit", false, false));
+                catalogue.add (plugin ("Broken Synth", "VST3", false, true));
+                return catalogue;
+            }, f.scratchDir());
+
+            const auto plugins = library.list (Category::plugins, {}, {});
+            expectEquals ((int) plugins.size(), 3);
+
+            for (const auto& item : plugins)
+                expect (item.isPlugin(), item.name);
+
+            expectEquals (plugins[0].name, juce::String ("Broken Synth"));
+            expect (plugins[0].failedScan);
+            expectEquals (plugins[1].formatBadge(), juce::String ("VST3"));
+            expectEquals (plugins[2].formatBadge(), juce::String ("AU"));
+
+            // Nobody knows what a failed plug-in is, so it is listed under Plug-Ins only.
+            const auto effects = library.list (Category::audioEffects, {}, {});
+            expect (! lists (effects, "/plug-ins/Broken Synth"));
+            expect (lists (effects, "/plug-ins/Prism EQ"));
+
+            // A native device has no badge.
+            Library native ([&rack = f.plugins] { return rack.getCatalogue(); }, f.scratchDir());
+
+            const auto natives = native.list (Category::audioEffects, {}, {});
+            const auto reverb = std::find_if (natives.begin(), natives.end(),
+                                              [] (const LibraryItem& i) { return i.pluginPath == te::ReverbPlugin::xmlTypeName; });
+            expect (reverb != natives.end() && ! reverb->isPlugin() && reverb->formatBadge().isEmpty());
+
+            // A drag keeps what the row is; a failed plug-in goes nowhere.
+            const auto failed = itemFromDrag (dragDescription (plugins[0]));
+            expect (failed.has_value() && failed->failedScan && failed->format == "VST3");
+            expect (! canDropOnTrack (plugins[0], TrackKind::audio));
+            expect (canDropOnTrack (plugins[1], TrackKind::audio));
+
+            f.invoke (cmd::trackAdd);
+            const auto trackId = f.model.getTracks()[0].id;
+            dropOnTrack (f.commands, plugins[0], trackId, 0.0);
+            expect (f.plugins.getChain (trackId, PluginChain::device).empty());
+            expect (f.errors.isEmpty());
+        }
+
         beginTest ("Search filters by name, ignoring case");
         {
             Fixture f;

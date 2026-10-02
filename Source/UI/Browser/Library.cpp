@@ -74,13 +74,16 @@ std::vector<LibraryItem> Library::list (LibraryCategory category, const juce::Fi
     {
         for (auto& info : catalogue())
         {
+            // What a plug-in that failed to scan is, nobody knows: it is listed under Plugins only.
             const auto wanted = category == LibraryCategory::plugins      ? info.external
+                              : info.failedScan                           ? false
                               : category == LibraryCategory::instruments  ? info.instrument
                               : category == LibraryCategory::midiEffects  ? info.midiEffect
                                                                           : ! info.instrument && ! info.midiEffect;
 
             if (wanted && matches (info.name, search))
-                items.push_back ({ LibraryItem::Kind::plugin, info.name, info.path, {}, info.instrument, info.midiEffect });
+                items.push_back ({ LibraryItem::Kind::plugin, info.name, info.path, {}, info.instrument, info.midiEffect,
+                                   info.external ? info.format : juce::String(), info.failedScan });
         }
 
         std::sort (items.begin(), items.end(), [] (auto& a, auto& b) { return a.name.compareIgnoreCase (b.name) < 0; });
@@ -129,6 +132,8 @@ juce::var dragDescription (const LibraryItem& item)
     d->setProperty ("file", item.file.getFullPathName());
     d->setProperty ("instrument", item.instrument);
     d->setProperty ("midiEffect", item.midiEffect);
+    d->setProperty ("format", item.format);
+    d->setProperty ("failedScan", item.failedScan);
     return d;
 }
 
@@ -146,16 +151,24 @@ std::optional<LibraryItem> itemFromDrag (const juce::var& description)
     item.file = juce::File (description["file"].toString());
     item.instrument = description["instrument"];
     item.midiEffect = description["midiEffect"];
+    item.format = description["format"].toString();
+    item.failedScan = description["failedScan"];
     return item;
 }
 
 bool canDropOnTrack (const LibraryItem& item, TrackKind kind)
 {
+    if (item.failedScan)
+        return false;
+
     return item.kind == LibraryItem::Kind::plugin || (item.kind == LibraryItem::Kind::audioFile && kind == TrackKind::audio);
 }
 
 void dropOnTrack (CommandRegistry& commands, const LibraryItem& item, const juce::String& trackId, double startSeconds)
 {
+    if (item.failedScan)
+        return;
+
     if (item.kind == LibraryItem::Kind::plugin)
         commands.invoke (cmd::pluginInsert, { trackId, item.pluginPath, PluginChain::device });
     else if (item.kind == LibraryItem::Kind::audioFile)

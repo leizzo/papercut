@@ -50,6 +50,10 @@ public:
     /** Double-click on a MIDI clip (Piano Roll) or an audio clip (Editor). */
     std::function<void (const juce::String& clipId)> onMidiClipOpened, onAudioClipOpened;
 
+    /** A Browser device dropped on a track (path: what plugin.insert takes).
+        Unset, it is inserted here and nothing more. */
+    std::function<void (const juce::String& trackId, const juce::String& path)> onDeviceDropped;
+
     void paint (juce::Graphics&) override;
     void resized() override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;

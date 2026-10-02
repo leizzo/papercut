@@ -1,6 +1,8 @@
 #include "App/ResamperApp.h"
+#include "Commands/PluginCommands.h"
 #include "Commands/ProductionCommands.h"
 #include "Engine/EngineManager.h"
+#include "Engine/PluginScanner.h"
 #include "UI/Layout/LayoutSource.h"
 #include "UI/MainWindow/MainWindow.h"
 #include "UI/Theme/ThemeManager.h"
@@ -67,6 +69,9 @@ public:
 
         offerRecovery();
         startTimer (Production::autosaveIntervalMs);
+
+        // In the background, each plug-in in its own worker: startup never waits (PRD §19).
+        app->commands.invoke (cmd::pluginScan);
     }
 
     void shutdown() override
@@ -196,4 +201,18 @@ private:
 
 } // namespace resamper
 
-START_JUCE_APPLICATION (resamper::ResamperApplication)
+// START_JUCE_APPLICATION, except that a plug-in scan worker (this executable,
+// run again by PluginScanner) scans and exits without starting the app.
+JUCE_CREATE_APPLICATION_DEFINE (resamper::ResamperApplication)
+
+int main (int argc, char* argv[])
+{
+    if (resamper::PluginScanner::isWorker (argc, argv))
+    {
+        juce::ScopedJuceInitialiser_GUI juceInit;
+        return resamper::PluginScanner::runWorker (argc, argv);
+    }
+
+    juce::JUCEApplicationBase::createInstance = &juce_CreateApplication;
+    return juce::JUCEApplicationBase::main (argc, (const char**) argv);
+}
