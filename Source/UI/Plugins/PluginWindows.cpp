@@ -4,6 +4,8 @@
 #include "Commands/PluginCommands.h"
 #include "Commands/TrackCommands.h"
 
+#include <algorithm>
+
 namespace resamper
 {
 
@@ -168,9 +170,24 @@ juce::Point<int> PluginWindows::placementFor (const PluginWindow& window, const 
     if (anchor.isEmpty() || (saved.placed && mainDisplay != nullptr))
         anchor = mainDisplay != nullptr ? mainDisplay->userBounds.toNearestInt() : juce::Rectangle<int> (0, 0, 1280, 800);
 
-    // The first window centres; each further one steps down-right.
-    const auto step = themeManager.getMetrics().windowCascade * (int) windows.size();
-    return anchor.getCentre() - juce::Point<int> (size.x / 2, size.y / 2) + juce::Point<int> (step, step);
+    // The first window centres; each further one steps down-right to the first spot no other window holds.
+    const auto step = themeManager.getMetrics().windowCascade;
+    auto position = anchor.getCentre() - juce::Point<int> (size.x / 2, size.y / 2);
+
+    for (size_t i = 0; i < windows.size(); ++i)
+    {
+        const auto taken = std::any_of (windows.begin(), windows.end(), [&] (auto& e)
+        {
+            return e.second.window.get() != &window && e.second.window->getFrameScreenBounds().getPosition() == position;
+        });
+
+        if (! taken)
+            break;
+
+        position += juce::Point<int> (step, step);
+    }
+
+    return position;
 }
 
 bool PluginWindows::isOnADisplay (juce::Rectangle<int> frame)

@@ -24,6 +24,9 @@ namespace
                     statsStyle { 9.0f, true, 400 }, footerStyle { 8.5f, true, 400 }, stateStyle { 11.0f, false, 400 },
                     stateDetailStyle { 9.5f, false, 400 };
 
+    /** The design's corner for the toolbar's framed controls (Bypass, the preset name, the A/B well). */
+    constexpr float controlRadius = 5.0f;
+
     const juce::String middleDot (juce::CharPointer_UTF8 ("\xc2\xb7"));
     const juce::String rightArrow (juce::CharPointer_UTF8 ("\xe2\x86\x92"));
 
@@ -111,7 +114,7 @@ public:
                 if (highlighted || down)
                 {
                     g.setColour (theme.bgHover);
-                    g.fillRoundedRectangle (bounds, 4.0f);
+                    g.fillRoundedRectangle (bounds, theme.radiusMd);
                 }
 
                 const auto colour = on && onColour ? *onColour : theme.textSecondary;
@@ -124,7 +127,7 @@ public:
                 // On: a 10 % accent wash, accent-dim border, accent power and label.
                 const auto frame = bounds.reduced (0.5f);
                 g.setColour (on ? theme.accent.withAlpha (0.1f) : highlighted || down ? theme.bgHover : theme.bgSlot);
-                g.fillRoundedRectangle (frame, 5.0f);
+                g.fillRoundedRectangle (frame, controlRadius);
                 g.setColour (on ? theme.accentDim : theme.border);
                 g.drawRoundedRectangle (frame, 5.0f, 1.0f);
                 auto content = getLocalBounds().reduced (7, 0);
@@ -139,7 +142,7 @@ public:
             case Kind::text:
             {
                 g.setColour (highlighted || down ? theme.bgHover : theme.bgSlot);
-                g.fillRoundedRectangle (bounds.reduced (0.5f), 5.0f);
+                g.fillRoundedRectangle (bounds.reduced (0.5f), controlRadius);
                 auto content = getLocalBounds().reduced (6, 0);
 
                 if (icon)
@@ -155,7 +158,7 @@ public:
                 if (on)
                 {
                     g.setColour (theme.accent);
-                    g.fillRoundedRectangle (bounds, 3.0f);
+                    g.fillRoundedRectangle (bounds, theme.radiusSm);
                 }
 
                 drawStyledText (g, themeManager, getButtonText(), slotStyle, getLocalBounds(), juce::Justification::centred,
@@ -164,7 +167,7 @@ public:
             }
         }
 
-        paintFocus (g, kind == Kind::slot ? 3.0f : 5.0f);
+        paintFocus (g, kind == Kind::slot ? theme.radiusSm : controlRadius);
     }
 
 private:
@@ -670,7 +673,7 @@ void PluginWindow::paint (juce::Graphics& g)
 
         // The A/B well.
         g.setColour (theme.bgSlot);
-        g.fillRoundedRectangle (slotA->getBounds().getUnion (slotB->getBounds()).expanded (2).toFloat(), 5.0f);
+        g.fillRoundedRectangle (slotA->getBounds().getUnion (slotB->getBounds()).expanded (2).toFloat(), controlRadius);
     }
 
     g.setColour (theme.border);
@@ -728,7 +731,7 @@ void PluginWindow::paint (juce::Graphics& g)
             const auto error = rack.getLoadError (plugin.id);
             drawStyledText (g, themeManager, plugin.name + " didn't load", stateStyle, area.removeFromTop (16),
                             juce::Justification::centred, theme.rec);
-            drawStyledText (g, themeManager, error.isNotEmpty() ? error : juce::String ("It took longer than 10 s to start."),
+            drawStyledText (g, themeManager, error.isNotEmpty() ? error : "It took longer than " + juce::String (loadTimeoutMs / 1000.0, 1) + " s to start.",
                             stateDetailStyle, area.removeFromTop (16), juce::Justification::centred, theme.textDim);
         }
     }

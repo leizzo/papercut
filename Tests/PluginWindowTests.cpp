@@ -136,17 +136,18 @@ struct PluginWindowTests : juce::UnitTest
         beginTest ("The toast's Undo takes the plug-in back out and closes its window, in one undo step");
         {
             Windows f;
+            auto& undo = f.projects.getEdit().getUndoManager();
+            const auto history = undo.getUndoDescriptions();
             const auto id = f.insert (pinboard);
             auto* toasts = f.toasts();
             const auto message = toasts != nullptr ? toasts->getMessages()[toasts->getMessages().size() - 1] : juce::String();
+            expect (dispatchUntil ([&] { return ! f.plugins.isLoading (id); }));
             expect (toasts != nullptr && toasts->runAction (message, "Undo"));
 
+            // It was the insert itself undone: the history is back where it was, the insert waiting to be redone.
             expect (! f.plugins.contains (id));
+            expect (undo.getUndoDescriptions() == history && undo.canRedo(), undo.getUndoDescriptions().joinIntoString (" | "));
             expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "the window outlived its plug-in");
-
-            // It was the insert undone: Redo brings the plug-in back.
-            f.invoke (cmd::editRedo);
-            expect (f.plugins.contains (id));
         }
 
         beginTest ("One window per instance; opening it again brings it forward");
@@ -178,6 +179,15 @@ struct PluginWindowTests : juce::UnitTest
             const auto step = f.theme.getMetrics().windowCascade;
             expect (second->getFrameScreenBounds().getPosition() - frame.getPosition() == juce::Point<int> (step, step),
                     (second->getFrameScreenBounds().getPosition() - frame.getPosition()).toString());
+
+            // A closed window frees its spot: the next one takes it rather than landing on another.
+            const auto firstSpot = frame.getPosition(), secondSpot = second->getFrameScreenBounds().getPosition();
+            f.windows().close (a);
+            auto* third = f.windows().getWindow (f.insert (pinboard));
+            expect (third != nullptr && third->getFrameScreenBounds().getPosition() == firstSpot);
+            auto* fourth = f.windows().getWindow (f.insert (pinboard));
+            expect (fourth != nullptr && fourth->getFrameScreenBounds().getPosition() == secondSpot + juce::Point<int> (step, step),
+                    "a new window landed on an open one");
         }
 
         beginTest ("The window draws the host chrome; the vendor UI shows at its native size, then scaled");
@@ -218,7 +228,8 @@ struct PluginWindowTests : juce::UnitTest
 
             // Bypass goes through the Command.
             click (findOne (*window, "bypass"));
-            expect (! f.plugins.getChain (f.trackId(), PluginChain::device).back().enabled);
+            expect (dispatchUntil ([&] { return ! f.plugins.getChain (f.trackId(), PluginChain::device).back().enabled; }),
+                    "Bypass didn't bypass the plug-in");
 
             window->setUiScale (200);
             expectEquals (window->getFrameScreenBounds().getHeight(), metrics.pluginTitleBarHeight + metrics.pluginToolbarHeight
