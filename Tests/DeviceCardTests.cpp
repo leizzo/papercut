@@ -752,8 +752,8 @@ struct DeviceCardTests : juce::UnitTest
             ScannedPlugin scanned (f);
             f.invoke (cmd::trackAdd);
             const auto other = f.model.getTracks()[1].id;
-            auto view = f.view();
             juce::StringArray opened;
+            auto view = f.view();
             view->onOpenEditor = [&] (const juce::String& plugin) { opened.add (plugin); };
 
             view->insertDevice (other, reverb);

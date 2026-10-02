@@ -19,14 +19,18 @@ namespace
     /** Hovering a sample this long starts its preview. */
     constexpr int hoverPreviewMs = 250;
 
-    /** A plug-in row's format badge (as on DeviceCard/Plugin) and a failed row's Retry. */
-    const TypeStyle badgeStyle { 7.5f, true, 600 }, noteStyle { 10.0f, false, 400 }, retryStyle { 10.5f, false, 600 };
-    constexpr int badgePadding = 4, badgeHeight = 11, retryWidth = 40, retryHeight = 18, rowGap = 6;
+    /** A list row: its text, icon and padding; a plug-in row's format badge (as
+        on DeviceCard/Plugin) and a failed row's Retry. */
+    const TypeStyle itemStyle { 12.0f, false, 400 }, badgeStyle { 7.5f, true, 600 }, noteStyle { 10.0f, false, 400 },
+                    retryStyle { 10.5f, false, 600 };
+    constexpr int rowPadding = 8, rowIconSize = 14, rowIconGap = 9, rowGap = 6;
+    constexpr int badgePadding = 4, badgeBorder = 2, badgeHeight = 11, retryWidth = 40, retryHeight = 18;
+    constexpr float rowRadius = 5.0f;
 
     /** Where a failed plug-in's Retry sits in its row. */
     juce::Rectangle<int> retryBounds (int width, int height)
     {
-        return juce::Rectangle<int> (width, height).reduced (8, 0).removeFromRight (retryWidth)
+        return juce::Rectangle<int> (width, height).reduced (rowPadding, 0).removeFromRight (retryWidth)
                                                    .withSizeKeepingCentre (retryWidth, retryHeight);
     }
 
@@ -339,10 +343,10 @@ void Browser::paintListBoxItem (int row, juce::Graphics& g, int width, int heigh
     if (selected || row == hoveredRow)
     {
         g.setColour (selected ? theme.bgElevated : theme.bgHover);
-        g.fillRoundedRectangle (area.toFloat(), 5.0f);
+        g.fillRoundedRectangle (area.toFloat(), rowRadius);
     }
 
-    auto content = area.reduced (8, 0);
+    auto content = area.reduced (rowPadding, 0);
 
     // A plug-in has the plug icon and a format badge, so it reads apart from a native device (§6.2).
     const auto icon = item.kind == LibraryItem::Kind::folder ? Icon::folder
@@ -352,8 +356,9 @@ void Browser::paintListBoxItem (int row, juce::Graphics& g, int width, int heigh
     const auto iconColour = item.failedScan                         ? theme.textDim
                           : item.kind == LibraryItem::Kind::plugin ? theme.accentDim
                           : item.kind == LibraryItem::Kind::folder ? theme.textSecondary : theme.textDim;
-    drawIcon (g, icon, content.removeFromLeft (14).toFloat().withSizeKeepingCentre (14.0f, 14.0f), iconColour);
-    content.removeFromLeft (9);
+    drawIcon (g, icon, content.removeFromLeft (rowIconSize).toFloat().withSizeKeepingCentre ((float) rowIconSize, (float) rowIconSize),
+              iconColour);
+    content.removeFromLeft (rowIconGap);
 
     if (item.failedScan)
     {
@@ -374,17 +379,17 @@ void Browser::paintListBoxItem (int row, juce::Graphics& g, int width, int heigh
     else if (item.isPlugin())
     {
         const auto badgeText = item.formatBadge();
-        const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 2 * badgePadding + 2;
+        const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 2 * badgePadding + badgeBorder;
         const auto badge = content.removeFromRight (badgeWidth).withSizeKeepingCentre (badgeWidth, badgeHeight);
         g.setColour (theme.border);
-        g.drawRoundedRectangle (badge.toFloat().reduced (0.5f), 3.0f, 1.0f);
+        g.drawRoundedRectangle (badge.toFloat().reduced (0.5f), theme.radiusSm, 1.0f);
         drawNumber (g, themeManager, badgeText, badgeStyle, badge, juce::Justification::centred, theme.textSecondary);
         content.removeFromRight (rowGap);
     }
 
     g.setColour (item.failedScan ? theme.textDim
                                  : item.kind == LibraryItem::Kind::audioFile ? theme.textSecondary : theme.textPrimary);
-    g.setFont (themeManager.font (TypeStyle { 12.0f, false, 400 }));
+    g.setFont (themeManager.font (itemStyle));
     g.drawText (item.name, content, juce::Justification::centredLeft, true);
 }
 

@@ -90,9 +90,10 @@ struct BrowserTests : juce::UnitTest
             // A native device has no badge.
             Library native ([&rack = f.plugins] { return rack.getCatalogue(); }, f.scratchDir());
 
-            for (const auto& item : native.list (Category::audioEffects, {}, {}))
-                if (item.pluginPath == te::ReverbPlugin::xmlTypeName)
-                    expect (! item.isPlugin() && item.formatBadge().isEmpty());
+            const auto natives = native.list (Category::audioEffects, {}, {});
+            const auto reverb = std::find_if (natives.begin(), natives.end(),
+                                              [] (const LibraryItem& i) { return i.pluginPath == te::ReverbPlugin::xmlTypeName; });
+            expect (reverb != natives.end() && ! reverb->isPlugin() && reverb->formatBadge().isEmpty());
 
             // A drag keeps what the row is; a failed plug-in goes nowhere.
             const auto failed = itemFromDrag (dragDescription (plugins[0]));
