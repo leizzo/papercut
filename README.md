@@ -101,11 +101,25 @@ build from source (see [For developers](#for-developers)).
 
 Found a bug or have an idea? [Open an issue](https://github.com/leizzo/resamper/issues).
 
-If Resamper is useful to you, you can [sponsor the project on GitHub](https://github.com/sponsors/leizzo) — monthly ($5 or $20) or one-time ($10 or $25).
+If Resamper is useful to you, you can [sponsor the project on GitHub](https://github.com/sponsors/leizzo).
+
+### 🍺 Beer
+
+$20 a month, or $25 once. Names land here, and once in the release notes.
+
+### ☕️ Coffee
+
+$5 a month, or $10 once. Names land here.
 
 ## License
 
-Resamper's source code is released under the [MIT License](LICENSE).
+Resamper's own source code is released under the [MIT License](LICENSE). That grant covers those files on their own.
+
+A build of the app also contains [JUCE](https://juce.com/legal/juce-8-licence/) (AGPLv3, or a commercial JUCE licence) and [Tracktion Engine](https://engine.tracktion.com/agreement) (GPLv3, or a commercial Tracktion licence). GIN is BSD-3-Clause. The MIT licence does not sublicense JUCE or Tracktion.
+
+You may run the app, including for paid work. You may also share and sell a build when that distribution stays under the AGPL and the GPL and the corresponding source is offered. A closed-source build needs your own JUCE licence and your own Tracktion Engine licence. Each is bought from that vendor, and one does not include the other. Both can be taken out before any sale.
+
+This is a summary of those texts, not legal advice. Citations are in [docs/research/juce-tracktion-licensing.md](docs/research/juce-tracktion-licensing.md).
 
 ---
 
@@ -188,6 +202,4 @@ DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; 
 
 ## License
 
-Resamper's own code is [MIT](LICENSE). The pinned dependencies keep their own licenses: JUCE (AGPLv3 or
-commercial), Tracktion Engine (GPLv3 or commercial) and GIN (BSD-3-Clause). A distributed Resamper
-binary must also satisfy those terms.
+Resamper's own code is [MIT](LICENSE). A binary also contains JUCE (AGPLv3 or a commercial JUCE licence) and Tracktion Engine (GPLv3 or a commercial Tracktion licence); GIN is BSD-3-Clause. What that means for distribution is in the public [License](#license) section, with citations in [docs/research/juce-tracktion-licensing.md](docs/research/juce-tracktion-licensing.md).
