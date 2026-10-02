@@ -1,10 +1,11 @@
 # Resamper
 
-**English** · [Türkçe](#türkçe)
+**English** · [Türkçe](README.tr.md)
 
 [![Release build](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/release.yml?label=release%20build)](https://github.com/leizzo/resamper/actions/workflows/release.yml)
 [![Commits](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/commits.yml?label=commits)](https://github.com/leizzo/resamper/actions/workflows/commits.yml)
 [![Version](https://img.shields.io/github/v/release/leizzo/resamper?include_prereleases&label=version)](https://github.com/leizzo/resamper/releases)
+[![Sponsors](https://img.shields.io/github/sponsors/leizzo?label=sponsors)](https://github.com/sponsors/leizzo)
 
 <p align="center">
   <img src="docs/images/hero.png" alt="Resamper — sound design in racks, mixing on a real console. The arrangement view with the sidechain source picker and the send editor." width="100%">
@@ -100,121 +101,25 @@ build from source (see [For developers](#for-developers)).
 
 Found a bug or have an idea? [Open an issue](https://github.com/leizzo/resamper/issues).
 
+If Resamper is useful to you, you can [sponsor the project on GitHub](https://github.com/sponsors/leizzo).
+
+### 🍺 Beer
+
+$20 a month, or $25 once. Names land here, and once in the release notes.
+
+### ☕️ Coffee
+
+$5 a month, or $10 once. Names land here.
+
 ## License
 
-Resamper's source code is released under the [MIT License](LICENSE).
+Resamper's own source code is released under the [MIT License](LICENSE). That grant covers those files on their own.
 
----
+A build of the app also contains [JUCE](https://juce.com/legal/juce-8-licence/) (AGPLv3, or a commercial JUCE licence) and [Tracktion Engine](https://engine.tracktion.com/agreement) (GPLv3, or a commercial Tracktion licence). GIN is BSD-3-Clause. The MIT licence does not sublicense JUCE or Tracktion.
 
-<a id="türkçe"></a>
+You may run the app, including for paid work. You may also share and sell a build when that distribution stays under the AGPL and the GPL and the corresponding source is offered. A closed-source build needs your own JUCE licence and your own Tracktion Engine licence. Each is bought from that vendor, and one does not include the other. Both can be taken out before any sale.
 
-# Resamper (Türkçe)
-
-[English](#resamper) · **Türkçe**
-
-[![Sürüm derlemesi](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/release.yml?label=s%C3%BCr%C3%BCm%20derlemesi)](https://github.com/leizzo/resamper/actions/workflows/release.yml)
-[![Commit mesajları](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/commits.yml?label=commit%20mesajlar%C4%B1)](https://github.com/leizzo/resamper/actions/workflows/commits.yml)
-[![Sürüm](https://img.shields.io/github/v/release/leizzo/resamper?include_prereleases&label=s%C3%BCr%C3%BCm)](https://github.com/leizzo/resamper/releases)
-
-<p align="center">
-  <img src="docs/images/hero.png" alt="Resamper — ses tasarımı rack'lerde, miks gerçek bir konsolda. Sidechain kaynak seçici ve send editörüyle arrangement görünümü." width="100%">
-</p>
-
-Elektronik müzik prodüktörleri ve miks mühendisleri için koyu temalı, yoğun ve klavye dostu bir
-masaüstü DAW.
-
-> **Durum: alfa.** Resamper erken geliştirme aşamasında. Güncel sürüm
-> [v0.1.3 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.3), alfa ön sürümü olarak
-> yayımlandı. Eksik özellikler, pürüzler ve proje formatında değişiklikler olabilir — şarkınızın tek
-> kopyasını henüz ona emanet etmeyin.
-
-## Resamper nedir?
-
-Resamper, fikirden yapıya, yapıdan mikse tek bir pencerede ilerlemenizi sağlar. Temel ilkesi:
-**ses tasarımı cihaz zincirinde, miks mikserde yapılır** — iki ayrı zincir ve her zaman görebildiğiniz
-bir sinyal yolu.
-
-## Tasarım önizlemesi
-
-> Bu görseller ürün tasarımından ([`design/design.pen`](design/design.pen)) alınmıştır ve
-> Resamper'ın nereye gittiğini gösterir. İçlerindeki bazı özellikler sonraki kilometre taşlarına
-> aittir — v0.1.3'te bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
-
-### Liste değil, konsol
-
-<img src="docs/images/mixer.png" alt="Resamper mikseri: rack zinciri bağlantısı, zincir sonrası mikser insert'leri, FX / PRE / POST send'ler, send pan ve faz, A–D return kanalları ve loudness ölçümlü master." width="100%">
-
-### Yerleşik cihazlar kartta. Eklentiler kendi penceresinde.
-
-<img src="docs/images/devices.png" alt="Kart üzerinde düzenlenen yerleşik EQ Eight ve Compressor, kendi penceresinde açılan üçüncü parti eklenti ve kick ile sidechain'lenen kompresör." width="100%">
-
-### İlk döngüden son bounce'a
-
-<img src="docs/images/workflow.png" alt="Gam destekli piano roll, kendi döngüsüne sahip ses klibi zarfları, klasörler ve bus kanalları, arrangement otomasyonu." width="100%">
-
-## Bugün neler yapabilirsiniz (v0.1.3)
-
-- **Aranje** — ses ve MIDI kanalları; taşıyabildiğiniz, boyutlandırabildiğiniz, bölebildiğiniz,
-  çoğaltabildiğiniz, döngüyle uzatabildiğiniz ve birleştirebildiğiniz klipler; zoom, kanal yüksekliği
-  ve Follow.
-- **Kayıt** — giriş seçimi, canlı dalga formu ve take'lerle ses kaydı; MIDI girişinden MIDI kaydı;
-  count-in (atlamak için Rec'e Shift ile tıklayın).
-- **MIDI düzenleme** — piano roll'da nota düzenleme ve quantize.
-- **Ses tasarımı** — detay görünümünde, her kanal için eklentili cihaz zinciri.
-- **Miks** — ses seviyesi, pan, mute, solo, stereo metreler; kanal başına bypass ve sıralama destekli
-  8 insert slotu; kendi insert'leri ve Send'leri olan Bus kanalları.
-- **Kütüphane** — arama, kategoriler, sample önizleme ve kanala sürükle-bırak içeren kütüphane tarayıcısı.
-- **Güvenlik** — otomatik kayıt ve çökme sonrası kurtarma.
-
-Tam liste için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
-
-## Yol haritası
-
-| Kilometre taşı | Getirdikleri |
-|---|---|
-| **M1 — Core** ✅ | Kabuk, transport, Arrangement, eklentili cihaz zinciri, temel Mixer, tasarım sistemi (v0.1.0) |
-| **M1.1 — Cihazlar ve Eklentiler** | Yerleşik cihazlar (EQ Eight, Compressor), çökme izolasyonlu VST3 / AU / CLAP desteği, eklenince açılan eklenti penceresi |
-| **M2 — Miks** | Pre-FX / Pre / Post send'ler, return kanalları, master loudness, klasörler ve bus'lar, sidechain girişleri |
-| **M3 — Otomasyon** | Arrangement otomasyon şeritleri, klip üzeri zarflar, Read / Touch / Latch / Write |
-| **M4 — Editörler** | Gam ve akor destekli, velocity şeritli piano roll; warp ve fade destekli ses editörü; klip zarfları |
-| **M5 — Rack'ler ve Session** | Instrument / Drum / Audio Effect rack'leri, makrolar, sahneli Session görünümü, crossfader |
-
-Hedef platformlar: macOS 13+ (Apple Silicon) ve Windows 11 x64. Alfa sürümü şu an macOS'ta derleniyor.
-
-## Başlarken
-
-[Releases](https://github.com/leizzo/resamper/releases) sayfasından `Resamper-<sürüm>-macOS.dmg`
-dosyasını (Apple Silicon) indirip açın ve Resamper'ı Applications'a sürükleyin. Ya da kaynaktan derleyin
-([Geliştiriciler için](#for-developers) bölümüne bakın).
-
-### Klavye kısayolları
-
-`Mod` = macOS'ta Cmd, Windows'ta Ctrl.
-
-| İşlem | Kısayol |
-|---|---|
-| Çal / Durdur · Seçimden çal | `Space` · `Shift+Space` |
-| Kayıt | `F9` (count-in ile; atlamak için Rec'e Shift ile tıklayın) |
-| Seçimi döngüye al · Başa dön | `Mod+L` · `Home` |
-| Metronom · Tap tempo | `C` · `T` |
-| Session ↔ Arrange · Mixer | `Tab` · `Mod+Alt+M` |
-| Detay görünümü · tarayıcıyı aç/kapa | `Mod+Alt+L` · `Mod+Alt+B` |
-| Geri al · Yinele | `Mod+Z` · `Mod+Shift+Z` |
-| Çoğalt · Böl · Birleştir | `Mod+D` · `Mod+E` · `Mod+J` |
-| Yeni ses · MIDI kanalı · return | `Mod+T` · `Mod+Shift+T` · `Mod+Alt+T` |
-| 1–8. kanalı sustur · Seçiliyi solo | `F1`–`F8` · `S` |
-| Yakınlaş / uzaklaş · seçime · şarkıya | `+` / `−` · `Z` · `Shift+Z` |
-| Piano roll: quantize · transpoze | `Q` · `↑↓` (yarım ses), `Shift+↑↓` (oktav) |
-| Yeni · Aç · Projeyi kaydet | `Mod+N` · `Mod+O` · `Mod+S` |
-| Miksi dışa aktar | `Mod+Shift+E` |
-
-## Geri bildirim
-
-Bir hata mı buldunuz ya da bir fikriniz mi var? [Issue açın](https://github.com/leizzo/resamper/issues).
-
-## Lisans
-
-Resamper'ın kaynak kodu [MIT Lisansı](LICENSE) ile yayımlanmıştır.
+This is a summary of those texts, not legal advice.
 
 ---
 
@@ -225,8 +130,7 @@ Resamper'ın kaynak kodu [MIT Lisansı](LICENSE) ile yayımlanmıştır.
 *Teknik bölüm, komut ve kod terimleri ortak olduğu için İngilizce tutulmuştur.*
 
 Resamper is built on [JUCE](https://juce.com) + [Tracktion Engine](https://github.com/Tracktion/tracktion_engine)
-+ [GIN](https://github.com/FigBug/Gin). [PRD.md](PRD.md) is the source of truth for product behaviour;
-[CONTEXT.md](CONTEXT.md) defines the domain language.
++ [GIN](https://github.com/FigBug/Gin). [CONTEXT.md](CONTEXT.md) defines the domain language.
 
 ## Dependencies (pinned git submodules)
 
@@ -297,7 +201,4 @@ DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; 
 
 ## License
 
-Resamper's own code is [MIT](LICENSE). The pinned dependencies keep their own licenses: JUCE (AGPLv3 or
-commercial), Tracktion Engine (GPLv3 or commercial) and GIN (BSD-3-Clause). A distributed Resamper
-binary must also satisfy those terms. The embedded [lucide](https://lucide.dev) icons are ISC / MIT
-(`Source/UI/Controls/Lucide-LICENSE.txt`).
+Resamper's own code is [MIT](LICENSE). A binary also contains JUCE (AGPLv3 or a commercial JUCE licence) and Tracktion Engine (GPLv3 or a commercial Tracktion licence); GIN is BSD-3-Clause. The embedded [lucide](https://lucide.dev) icons are ISC / MIT (`Source/UI/Controls/Lucide-LICENSE.txt`). What that means for distribution is in the public [License](#license) section.
