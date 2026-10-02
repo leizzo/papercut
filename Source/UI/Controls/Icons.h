@@ -1,11 +1,13 @@
 #pragma once
 
-#include "UI/Theme/ThemeManager.h"
+#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <optional>
 
 namespace resamper
 {
+
+struct Theme;
 
 /** The design's icons (PRD §15.8): lucide's own geometry, a 24 x 24 box drawn with 2 px strokes.
     Each is the lucide icon of the same name in camelCase (Icon::trash2 is "trash-2"); lucideName()
@@ -51,7 +53,7 @@ juce::Colour iconColour (const Theme&, IconRole);
 
 /** Draws the icon centred in area (its largest square), stroked in colour. The geometry is
     a vector path, so it is sharp at every UI scale; sizes by role are in Layout Metrics
-    (iconChip, iconControl, iconSection, iconToolbar). */
+    (icon-chip, icon-control, icon-section, icon-toolbar). */
 void drawIcon (juce::Graphics&, Icon, juce::Rectangle<float> area, juce::Colour);
 
 /** Draws the icon size px square, centred on centre: `<Icon name size color />`. */

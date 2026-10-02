@@ -1,5 +1,7 @@
 #include "Icons.h"
 
+#include "UI/Theme/ThemeManager.h"
+
 #include <array>
 
 namespace resamper
@@ -12,6 +14,10 @@ namespace
         paste its elements here under its lucide name and add the name to Icon.
 
         Lucide is ISC-licensed, some icons MIT (Feather); see Lucide-LICENSE.txt beside this file. */
+
+    /** The side of lucide's square viewBox. */
+    constexpr float viewBox = 24.0f;
+
     struct LucideIcon
     {
         Icon icon;
@@ -391,7 +397,7 @@ const juce::Path& iconPath (Icon icon)
 
 float iconStrokeWidth (float size, float physicalScale)
 {
-    const auto lucideWidth = size * 2.0f / 24.0f;
+    const auto lucideWidth = size * 2.0f / viewBox;
     return physicalScale > 0.0f ? juce::jmax (lucideWidth, 1.0f / physicalScale) : lucideWidth;
 }
 
@@ -408,7 +414,7 @@ void drawIcon (juce::Graphics& g, Icon icon, juce::Rectangle<float> area, juce::
     g.setColour (colour);
     g.strokePath (iconPath (icon),
                   juce::PathStrokeType (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
-                  juce::AffineTransform::scale (size / 24.0f).translated (box.getX(), box.getY()));
+                  juce::AffineTransform::scale (size / viewBox).translated (box.getX(), box.getY()));
 }
 
 void drawIcon (juce::Graphics& g, Icon icon, juce::Point<float> centre, float size, juce::Colour colour)

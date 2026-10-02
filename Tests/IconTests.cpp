@@ -80,6 +80,17 @@ struct IconTests : juce::UnitTest
             expect (! iconNamed ("not-an-icon").has_value());
         }
 
+        beginTest ("Every Icon has its lucide entry");
+        {
+            for (int i = 0; i <= (int) Icon::arrowRightToLine; ++i)
+            {
+                const auto name = lucideName ((Icon) i);
+                expect (name.isNotEmpty(), "no entry for Icon " + juce::String (i));
+                expect (iconNamed (name) == (Icon) i, name + " names another Icon");
+                expect (! iconPath ((Icon) i).isEmpty(), "empty: " + name);
+            }
+        }
+
         beginTest ("The phosphor transport and browser-category glyphs have lucide equivalents");
         {
             for (auto* name : { "play", "pause", "square", "circle-dot", "skip-back", "crosshair", "music", "piano",
@@ -101,7 +112,7 @@ struct IconTests : juce::UnitTest
             expectEquals (iconPath (Icon::cpu).getBounds().toString(), juce::Rectangle<float> (2.0f, 2.0f, 20.0f, 20.0f).toString());
         }
 
-        beginTest ("Sizes by role come from Layout Metrics: 10 chips, 12 controls, 14 sections, 16 transport");
+        beginTest ("Sizes by role come from Layout Metrics: 10 chips, 12 controls, 14 sections, 16 transport / toolbar");
         {
             LayoutSource source;
             ThemeManager themes { source, "themes/dark.json" };
