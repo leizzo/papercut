@@ -16,7 +16,19 @@ namespace
     constexpr int toolbarPadding = 10, footerPaddingLeft = 12, footerPaddingRight = 8, bypassWidth = 46, controlHeight = 22,
                   presetStepWidth = 18, presetNameWidth = 120, slotWidth = 22, slotHeight = 16, copyWidth = 66,
                   statsWidth = 92, sandboxWidth = 16, scaleWidth = 120, scaleHeight = 18, gripSize = 14,
-                  minFrameWidth = 540, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20;
+                  minFrameWidth = 540, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20, footerGap = 8,
+                  slotWellPadding = 2, slotsGap = 6;
+
+    // The format badge in the title: 12 px plug, the badge pads 0 5 inside a 1 px border and is 13 high.
+    constexpr int plugGlyph = 12, badgePadding = 5, badgeHeight = 13;
+
+    // The vendor area while loading or failed: a 60 px block lifted 10 px above centre; a 22 px row with
+    // an 18 px spinner (2 px stroke, three quarters of a turn, one turn a second), 8 px, then 16 px text
+    // lines. Retry and Run in-process sit 34 px below centre, 220 wide at most, 8 px apart.
+    constexpr int stateBlockHeight = 60, stateBlockLift = 10, spinnerRow = 22, spinnerSize = 18, stateGap = 8,
+                  stateLineHeight = 16, stateButtonsWidth = 220, stateButtonsOffset = 34, stateButtonsGap = 8,
+                  spinnerPeriodMs = 1000;
+    constexpr float spinnerStroke = 2.0f, spinnerSweep = 0.75f;
 
     const TypeStyle vendorStyle { 9.5f, false, 400 }, badgeStyle { 7.5f, true, 600 }, statsStyle { 9.0f, true, 400 },
                     footerStyle { 8.5f, true, 400 }, stateStyle { 11.0f, false, 400 }, stateDetailStyle { 9.5f, false, 400 };
@@ -379,9 +391,10 @@ void PluginWindow::resized()
         vendor->setTopLeftPosition (juce::roundToInt ((float) x / s), juce::roundToInt ((float) area.getY() / s));
     }
 
-    auto buttons = area.withSizeKeepingCentre (juce::jmin (area.getWidth(), 220), controlHeight).translated (0, 34);
-    retry->setBounds (buttons.removeFromLeft (buttons.getWidth() / 2 - 4));
-    runInProcess->setBounds (buttons.withTrimmedLeft (8));
+    auto buttons = area.withSizeKeepingCentre (juce::jmin (area.getWidth(), stateButtonsWidth), controlHeight)
+                       .translated (0, stateButtonsOffset);
+    retry->setBounds (buttons.removeFromLeft ((buttons.getWidth() - stateButtonsGap) / 2));
+    runInProcess->setBounds (buttons.withTrimmedLeft (stateButtonsGap));
 }
 
 void PluginWindow::layoutToolbar (juce::Rectangle<int> bar)
@@ -405,7 +418,7 @@ void PluginWindow::layoutToolbar (juce::Rectangle<int> bar)
 
     savePreset->setBounds (take (presetStepWidth));
 
-    auto slots = take (2 * slotWidth + 6, slotHeight + 4).reduced (2);
+    auto slots = take (2 * slotWidth + slotsGap, slotHeight + 2 * slotWellPadding).reduced (slotWellPadding);
     slotA->setBounds (slots.removeFromLeft (slotWidth));
     slotB->setBounds (slots.removeFromRight (slotWidth));
     copyAToB->setBounds (take (copyWidth));
@@ -424,11 +437,11 @@ void PluginWindow::layoutFooter (juce::Rectangle<int> bar)
     if (grip->isVisible())
     {
         grip->setBounds (bar.removeFromRight (gripSize).withSizeKeepingCentre (gripSize, gripSize));
-        bar.removeFromRight (8);
+        bar.removeFromRight (footerGap);
     }
 
     scale->setBounds (bar.removeFromRight (scaleWidth).withSizeKeepingCentre (scaleWidth, scaleHeight));
-    bar.removeFromRight (8);
+    bar.removeFromRight (footerGap);
     footerInfo->setBounds (bar);
 }
 
@@ -454,33 +467,35 @@ void PluginWindow::paintBody (juce::Graphics& g)
 
     // The A/B well.
     g.setColour (theme.bgSlot);
-    g.fillRoundedRectangle (slotA->getBounds().getUnion (slotB->getBounds()).expanded (2).toFloat(), controlRadius);
+    g.fillRoundedRectangle (slotA->getBounds().getUnion (slotB->getBounds()).expanded (slotWellPadding).toFloat(), controlRadius);
 
     // The vendor area while there is no vendor UI: loading (spinner + name) or failed.
     if (status != Status::ready)
     {
-        auto area = vendorArea().withSizeKeepingCentre (vendorArea().getWidth(), 60).translated (0, -10);
+        auto area = vendorArea().withSizeKeepingCentre (vendorArea().getWidth(), stateBlockHeight).translated (0, -stateBlockLift);
 
         if (status == Status::loading)
         {
-            const auto spinner = area.removeFromTop (22).toFloat().withSizeKeepingCentre (18.0f, 18.0f);
-            const auto angle = (float) (juce::Time::getMillisecondCounter() % 1000) / 1000.0f * juce::MathConstants<float>::twoPi;
+            const auto spinner = area.removeFromTop (spinnerRow).toFloat().withSizeKeepingCentre ((float) spinnerSize, (float) spinnerSize);
+            const auto radius = ((float) spinnerSize - spinnerStroke) / 2.0f;
+            const auto turn = (float) (juce::Time::getMillisecondCounter() % spinnerPeriodMs) / (float) spinnerPeriodMs;
+            const auto angle = turn * juce::MathConstants<float>::twoPi;
             juce::Path arc;
-            arc.addCentredArc (spinner.getCentreX(), spinner.getCentreY(), 8.0f, 8.0f, angle, 0.0f,
-                               juce::MathConstants<float>::pi * 1.5f, true);
+            arc.addCentredArc (spinner.getCentreX(), spinner.getCentreY(), radius, radius, angle, 0.0f,
+                               juce::MathConstants<float>::twoPi * spinnerSweep, true);
             g.setColour (theme.accent);
-            g.strokePath (arc, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-            area.removeFromTop (8);
+            g.strokePath (arc, juce::PathStrokeType (spinnerStroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            area.removeFromTop (stateGap);
             drawStyledText (g, themeManager, "Loading " + plugin.name + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\xa6")),
-                            stateStyle, area.removeFromTop (16), juce::Justification::centred, theme.textSecondary);
+                            stateStyle, area.removeFromTop (stateLineHeight), juce::Justification::centred, theme.textSecondary);
         }
         else
         {
             const auto error = rack.getLoadError (plugin.id);
-            drawStyledText (g, themeManager, plugin.name + " didn't load", stateStyle, area.removeFromTop (16),
+            drawStyledText (g, themeManager, plugin.name + " didn't load", stateStyle, area.removeFromTop (stateLineHeight),
                             juce::Justification::centred, theme.rec);
             drawStyledText (g, themeManager, error.isNotEmpty() ? error : "It took longer than " + juce::String (loadTimeoutMs / 1000.0, 1) + " s to start.",
-                            stateDetailStyle, area.removeFromTop (16), juce::Justification::centred, theme.textDim);
+                            stateDetailStyle, area.removeFromTop (stateLineHeight), juce::Justification::centred, theme.textDim);
         }
     }
 }
@@ -490,19 +505,20 @@ void PluginWindow::paintTitle (juce::Graphics& g)
     // Plug (accent), track › name, vendor, format badge; what's left is the drag area.
     auto& theme = themeManager.getTheme();
     auto title = titleArea();
-    drawIcon (g, Icon::plug, title.removeFromLeft (12).toFloat().withSizeKeepingCentre (12.0f, 12.0f), theme.accent);
+    drawIcon (g, Icon::plug, title.removeFromLeft (plugGlyph).toFloat().withSizeKeepingCentre ((float) plugGlyph, (float) plugGlyph),
+              theme.accent);
     title.removeFromLeft (gap);
     drawTrackAndName (g, title);
     drawTitleText (g, title, vendorOf (plugin), vendorStyle, theme.textDim);
 
     const auto badgeText = plugin.formatBadge();
-    const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 2 * 5 + 2;
+    const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 2 * (badgePadding + 1);
 
     if (badgeWidth <= title.getWidth())
     {
-        const auto badge = title.removeFromLeft (badgeWidth).withSizeKeepingCentre (badgeWidth, 13);
+        const auto badge = title.removeFromLeft (badgeWidth).withSizeKeepingCentre (badgeWidth, badgeHeight);
         g.setColour (theme.border);
-        g.drawRoundedRectangle (badge.toFloat().reduced (0.5f), 3.0f, 1.0f);
+        g.drawRoundedRectangle (badge.toFloat().reduced (0.5f), theme.radiusSm, 1.0f);
         drawNumber (g, themeManager, badgeText, badgeStyle, badge, juce::Justification::centred, theme.textSecondary);
     }
 }
@@ -536,16 +552,25 @@ void PluginWindow::showPresetMenu()
 {
     juce::PopupMenu menu;
     const auto presets = rack.getPresetNames (plugin.id);
+    const juce::Component::SafePointer<PluginWindow> safe (this);
 
     for (int i = 0; i < presets.size(); ++i)
         menu.addItem (presets[i], true, presets[i] == plugin.presetName,
-                      [this, i] { commands.invoke (cmd::pluginSelectPreset, { plugin.id, i }); });
+                      [safe, i]
+                      {
+                          if (safe != nullptr)
+                              safe->commands.invoke (cmd::pluginSelectPreset, { safe->plugin.id, i });
+                      });
 
     if (presets.isEmpty())
         menu.addItem ("No presets yet: Save stores one", false, false, nullptr);
 
     menu.addSeparator();
-    menu.addItem ("Save Preset" + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\xa6")), [this] { askPresetName(); });
+    menu.addItem ("Save Preset" + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\xa6")), [safe]
+    {
+        if (safe != nullptr)
+            safe->askPresetName();
+    });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (presetName.get()));
 }
 

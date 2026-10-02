@@ -8,6 +8,9 @@ namespace
 {
     // Design: InsertSlot/Filled pads 0 7 with a 6 px gap; InsertSlot/Plugin pads 0 6 with 5, a 9 px plug, a 7 px mono format.
     constexpr int filledPadding = 7, filledGap = 6, pluginPadding = 6, pluginGap = 5, ledSize = 6, plugSize = 9, badgeWidth = 40;
+
+    /** How far the power LED's click target reaches past the LED on each side. */
+    constexpr int ledHitSlop = 3;
     const TypeStyle nameStyle { 10.0f, false, 400 }, formatStyle { 7.0f, true, 400 };
 }
 
@@ -46,7 +49,7 @@ void InsertSlot::setDropHighlight (std::optional<bool> valid)
 
 juce::Rectangle<int> InsertSlot::powerBounds() const
 {
-    return getLocalBounds().removeFromLeft (filledPadding + ledSize + 3).withTrimmedLeft (4);
+    return getLocalBounds().removeFromLeft (filledPadding + ledSize + ledHitSlop).withTrimmedLeft (filledPadding - ledHitSlop);
 }
 
 void InsertSlot::paint (juce::Graphics& g)

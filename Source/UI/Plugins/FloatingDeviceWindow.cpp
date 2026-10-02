@@ -7,6 +7,18 @@ namespace
 {
     constexpr int foregroundPollMs = 250;
 
+    // Design: an icon button's 12 px glyph; Bypass pads 0 7 with a 10 px power and a 4 px gap; a text
+    // button pads 0 6 with a 9 px chevron in a 10 px slot; the title's chevron is 9 px; Pin and Close
+    // sit 2 px apart. Bypass on is a 10 % accent wash.
+    constexpr int iconGlyph = 12, powerGlyph = 10, chevronGlyph = 9, bypassPadding = 7, bypassGap = 4, textPadding = 6,
+                  chevronSlot = 10, titleButtonGap = 2;
+    constexpr float bypassOnWash = 0.1f;
+
+    juce::Rectangle<float> glyphIn (juce::Rectangle<int> area, int size)
+    {
+        return area.toFloat().withSizeKeepingCentre ((float) size, (float) size);
+    }
+
     const TypeStyle trackStyle { 10.0f, false, 400 }, nameStyle { 11.5f, false, 600 }, controlStyle { 9.5f, false, 600 },
                     slotStyle { 9.0f, false, 700 };
 }
@@ -38,7 +50,7 @@ void FloatingDeviceWindow::ChromeButton::paintButton (juce::Graphics& g, bool hi
             }
 
             const auto colour = on && accentWhenOn ? theme.accent : theme.textSecondary;
-            drawIcon (g, *icon, bounds.withSizeKeepingCentre (12.0f, 12.0f), colour);
+            drawIcon (g, *icon, bounds.withSizeKeepingCentre ((float) iconGlyph, (float) iconGlyph), colour);
             break;
         }
 
@@ -46,14 +58,14 @@ void FloatingDeviceWindow::ChromeButton::paintButton (juce::Graphics& g, bool hi
         {
             // On: a 10 % accent wash, accent-dim border, accent power and label.
             const auto frame = bounds.reduced (0.5f);
-            g.setColour (on ? theme.accent.withAlpha (0.1f) : highlighted || down ? theme.bgHover : theme.bgSlot);
+            g.setColour (on ? theme.accent.withAlpha (bypassOnWash) : highlighted || down ? theme.bgHover : theme.bgSlot);
             g.fillRoundedRectangle (frame, controlRadius);
             g.setColour (on ? theme.accentDim : theme.border);
             g.drawRoundedRectangle (frame, controlRadius, 1.0f);
-            auto content = getLocalBounds().reduced (7, 0);
-            drawIcon (g, Icon::power, content.removeFromLeft (10).toFloat().withSizeKeepingCentre (10.0f, 10.0f),
+            auto content = getLocalBounds().reduced (bypassPadding, 0);
+            drawIcon (g, Icon::power, glyphIn (content.removeFromLeft (powerGlyph), powerGlyph),
                       on ? theme.accent : theme.textDim);
-            content.removeFromLeft (4);
+            content.removeFromLeft (bypassGap);
             drawStyledText (g, themeManager, on ? "On" : "Off", controlStyle, content, juce::Justification::centredLeft,
                             on ? theme.accent : theme.textSecondary);
             break;
@@ -63,10 +75,10 @@ void FloatingDeviceWindow::ChromeButton::paintButton (juce::Graphics& g, bool hi
         {
             g.setColour (highlighted || down ? theme.bgHover : theme.bgSlot);
             g.fillRoundedRectangle (bounds.reduced (0.5f), controlRadius);
-            auto content = getLocalBounds().reduced (6, 0);
+            auto content = getLocalBounds().reduced (textPadding, 0);
 
             if (icon)
-                drawIcon (g, *icon, content.removeFromRight (10).toFloat().withSizeKeepingCentre (9.0f, 9.0f), theme.textDim);
+                drawIcon (g, *icon, glyphIn (content.removeFromRight (chevronSlot), chevronGlyph), theme.textDim);
 
             drawStyledText (g, themeManager, getButtonText(), controlStyle, content,
                             icon ? juce::Justification::centredLeft : juce::Justification::centred, theme.textPrimary);
@@ -221,7 +233,7 @@ void FloatingDeviceWindow::layoutTitleBar()
 {
     auto title = titleBar().withTrimmedLeft (titlePaddingLeft).withTrimmedRight (titlePaddingRight);
     close->setBounds (title.removeFromRight (iconTarget).withSizeKeepingCentre (iconTarget, iconTarget));
-    title.removeFromRight (2);
+    title.removeFromRight (titleButtonGap);
     pin->setBounds (title.removeFromRight (iconTarget).withSizeKeepingCentre (iconTarget, iconTarget));
 }
 
@@ -237,7 +249,7 @@ void FloatingDeviceWindow::drawTrackAndName (juce::Graphics& g, juce::Rectangle<
 {
     auto& theme = themeManager.getTheme();
     drawTitleText (g, area, trackName, trackStyle, theme.textDim);
-    drawIcon (g, Icon::chevronRight, area.removeFromLeft (9).toFloat().withSizeKeepingCentre (9.0f, 9.0f), theme.textDim);
+    drawIcon (g, Icon::chevronRight, glyphIn (area.removeFromLeft (chevronGlyph), chevronGlyph), theme.textDim);
     area.removeFromLeft (gap);
     drawTitleText (g, area, plugin.name, nameStyle, theme.textPrimary);
 }
