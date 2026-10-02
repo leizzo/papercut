@@ -68,6 +68,16 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         rack.setParameter (a.pluginId, a.parameterId, a.value, a.continuesGesture);
     });
 
+    registry.add (cmd::pluginSetParameters, { "Change Parameters" }, [&rack] (const PluginParametersArgs& a)
+    {
+        rack.setParameters (a.pluginId, a.values, a.continuesGesture);
+    });
+
+    registry.add (cmd::pluginAudition, { "Audition Band" }, [&rack] (const PluginAuditionArgs& a)
+    {
+        rack.getNativeDevices().setAudition (a.pluginId, a.band);
+    });
+
     registry.add (cmd::pluginReplace, { "Replace Plug-in" }, [&rack, &host] (const PluginReplaceArgs& a)
     {
         host.report (rack.replace (a.trackId, a.pluginId, a.plugin));

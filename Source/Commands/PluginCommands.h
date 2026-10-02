@@ -57,6 +57,22 @@ struct PluginParameterArgs
     bool continuesGesture = false;
 };
 
+/** Several parameters of one plug-in set as one change (an EQ node's
+    frequency and gain); continuesGesture joins a drag into one undo step. */
+struct PluginParametersArgs
+{
+    juce::String pluginId;
+    std::vector<ParameterValue> values;
+    bool continuesGesture = false;
+};
+
+/** Plays one EQ Eight band alone (band -1: stops). Monitoring, not an Edit change. */
+struct PluginAuditionArgs
+{
+    juce::String pluginId;
+    int band = -1;
+};
+
 /** A new plug-in in pluginId's place. plugin is a type name or a catalogue path. */
 struct PluginReplaceArgs
 {
@@ -90,6 +106,8 @@ namespace cmd
     inline constexpr CommandRef<PluginArgs> pluginMoveToDeviceChain { "plugin.moveToDeviceChain" };   ///< a mixer insert
     inline constexpr CommandRef<PluginCopyArgs> pluginCopyInsert { "plugin.copyInsert" };
     inline constexpr CommandRef<PluginParameterArgs> pluginSetParameter { "plugin.setParameter" };
+    inline constexpr CommandRef<PluginParametersArgs> pluginSetParameters { "plugin.setParameters" };
+    inline constexpr CommandRef<PluginAuditionArgs> pluginAudition { "plugin.audition" };   ///< never undoable
     inline constexpr CommandRef<PluginReplaceArgs> pluginReplace { "plugin.replace" };
     inline constexpr CommandRef<PluginPinArgs> pluginSetPinned { "plugin.setPinned" };
     inline constexpr CommandRef<PluginSizeArgs> pluginSetSize { "plugin.setSize" };       ///< a view: never undoable

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NativeDevices.h"
+
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <functional>
@@ -54,6 +56,17 @@ struct PluginParameter
     float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
     bool automated = false;   ///< has an automation curve
     bool output = false;      ///< a native device's Mix / Out: its card's last zone
+
+    /** How a value maps to a control's travel (a frequency's is logarithmic)
+        and which values are legal (a choice steps by 1). */
+    juce::NormalisableRange<float> range { 0.0f, 1.0f };
+};
+
+/** One value of a multi-parameter gesture (PluginRack::setParameters). */
+struct ParameterValue
+{
+    juce::String parameterId;
+    float value = 0;
 };
 
 /** Facade over the current Edit's plug-ins.
@@ -141,6 +154,12 @@ public:
         undoable in between: a knob drag is one step (see EngineUndo). */
     bool setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture = false);
 
+    /** Sets several parameters of one plug-in as one change: dragging an EQ
+        node moves its frequency and gain together. continuesGesture joins the
+        previous call's undo step when that set the same parameters with
+        nothing undoable in between. False when nothing changed. */
+    bool setParameters (const juce::String& pluginId, const std::vector<ParameterValue>& values, bool continuesGesture = false);
+
     /** Pins a parameter of an external plug-in to its card (at the end), or
         unpins it. At most maxPinnedParameters; a built-in edits every parameter
         on its card, so it pins none. Saved with the project; one undo step. */
@@ -173,11 +192,15 @@ public:
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
     std::unique_ptr<juce::Component> createEditor (const juce::String& pluginId);
 
+    /** The v2 native devices' curves, spectra and meters. */
+    NativeDevices& getNativeDevices() noexcept   { return nativeDevices; }
+
 private:
     struct ScanThread;
     friend struct test::PluginRackTests;
 
     ProjectManager& projectManager;
+    NativeDevices nativeDevices { projectManager };
     std::unique_ptr<ScanThread> scanThread;
     std::atomic<bool> scanning { false };
 
