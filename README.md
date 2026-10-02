@@ -119,7 +119,7 @@ A build of the app also contains [JUCE](https://juce.com/legal/juce-8-licence/) 
 
 You may run the app, including for paid work. You may also share and sell a build when that distribution stays under the AGPL and the GPL and the corresponding source is offered. A closed-source build needs your own JUCE licence and your own Tracktion Engine licence. Each is bought from that vendor, and one does not include the other. Both can be taken out before any sale.
 
-This is a summary of those texts, not legal advice. Citations are in [docs/research/juce-tracktion-licensing.md](docs/research/juce-tracktion-licensing.md).
+This is a summary of those texts, not legal advice.
 
 ---
 
@@ -130,8 +130,7 @@ This is a summary of those texts, not legal advice. Citations are in [docs/resea
 *Teknik bölüm, komut ve kod terimleri ortak olduğu için İngilizce tutulmuştur.*
 
 Resamper is built on [JUCE](https://juce.com) + [Tracktion Engine](https://github.com/Tracktion/tracktion_engine)
-+ [GIN](https://github.com/FigBug/Gin). [PRD.md](PRD.md) is the source of truth for product behaviour;
-[CONTEXT.md](CONTEXT.md) defines the domain language.
++ [GIN](https://github.com/FigBug/Gin). [CONTEXT.md](CONTEXT.md) defines the domain language.
 
 ## Dependencies (pinned git submodules)
 
@@ -202,4 +201,4 @@ DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; 
 
 ## License
 
-Resamper's own code is [MIT](LICENSE). A binary also contains JUCE (AGPLv3 or a commercial JUCE licence) and Tracktion Engine (GPLv3 or a commercial Tracktion licence); GIN is BSD-3-Clause. What that means for distribution is in the public [License](#license) section, with citations in [docs/research/juce-tracktion-licensing.md](docs/research/juce-tracktion-licensing.md).
+Resamper's own code is [MIT](LICENSE). A binary also contains JUCE (AGPLv3 or a commercial JUCE licence) and Tracktion Engine (GPLv3 or a commercial Tracktion licence); GIN is BSD-3-Clause. What that means for distribution is in the public [License](#license) section.

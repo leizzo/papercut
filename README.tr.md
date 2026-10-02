@@ -121,4 +121,4 @@ Uygulamanın derlenmiş hali ayrıca [JUCE](https://juce.com/legal/juce-8-licenc
 
 Uygulamayı çalıştırmak serbesttir; ücretli iş buna dahildir. Bir derlemeyi, dağıtım AGPL ve GPL altında kaldığında ve karşılık gelen kaynak sunulduğunda paylaşabilir ve satabilirsiniz. Kapalı kaynak bir derleme için kendi JUCE lisansınız ve kendi Tracktion Engine lisansınız gerekir. Her biri kendi satıcısından alınır; biri diğerini kapsamaz. İkisi de satıştan önce edinilebilir.
 
-Bu, o metinlerin özetidir; hukuki görüş değildir. Kaynaklar [docs/research/juce-tracktion-licensing.md](docs/research/juce-tracktion-licensing.md) içindedir.
+Bu, o metinlerin özetidir; hukuki görüş değildir.
