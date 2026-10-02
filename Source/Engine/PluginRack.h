@@ -1,5 +1,7 @@
 #pragma once
 
+#include "NativeDevices.h"
+
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <functional>
@@ -42,7 +44,9 @@ struct PluginInfo
     PluginChain chain = PluginChain::device;   ///< on a track: which chain it is on
     bool enabled = true;                        ///< false when bypassed
     bool missing = false;                       ///< saved in the project but not installed; audio passes through
-    bool sandboxed = false;                     ///< runs out of process; never yet, plug-ins are hosted in-process
+    bool failedScan = false;                    ///< in the catalogue: its scan crashed or timed out; it can only be retried
+    bool sandboxed = false;                     ///< runs out of process, in its sandbox (see PluginSandbox)
+    bool crashed = false;                       ///< its sandbox died: its audio is bypassed until it is reloaded
     int latencySamples = 0;                     ///< the latency the plug-in reports
     juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
     DeviceSize size = DeviceSize::compact;      ///< a native device's card
@@ -74,6 +78,17 @@ struct PluginParameter
     float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
     bool automated = false;   ///< has an automation curve
     bool output = false;      ///< a native device's Mix / Out: its card's last zone
+
+    /** How a value maps to a control's travel (a frequency's is logarithmic)
+        and which values are legal (a choice steps by 1). */
+    juce::NormalisableRange<float> range { 0.0f, 1.0f };
+};
+
+/** One value of a multi-parameter gesture (PluginRack::setParameters). */
+struct ParameterValue
+{
+    juce::String parameterId;
+    float value = 0;
 };
 
 /** Facade over the current Edit's plug-ins.
@@ -104,13 +119,22 @@ public:
     explicit PluginRack (ProjectManager&);
     ~PluginRack();
 
-    /** Built-in engine plug-ins, plus whatever the scan has already found. */
+    /** Built-in engine plug-ins, plus whatever the scan has already found, plus
+        the plug-ins that failed to scan (failedScan; their name is the file's). */
     juce::Array<PluginInfo> getCatalogue() const;
 
-    /** Returns immediately. The disk scan runs on a juce::Thread. No-op if one is
-        running. When it finishes, missing plug-ins it found load (a card's Locate). */
+    /** Returns immediately. The disk scan runs on a juce::Thread, each plug-in
+        file in its own scan worker process (PluginScanner) with a timeout, so
+        one that hangs or crashes fails alone and the scan goes on. No-op if one
+        is running. A file that failed before is not tried again until retried.
+        When it finishes, missing plug-ins it found load (a card's Locate). */
     void startScan();
     bool isScanning() const;
+
+    /** Scans one plug-in that failed to scan again, in the background like
+        startScan; nothing else is rescanned. path is its catalogue path. Fails
+        if it didn't fail to scan or a scan is running. */
+    juce::Result retryScan (const juce::String& path);
 
     /** Names from the engine format manager (VST3, AudioUnit, ...). */
     juce::StringArray getHostedFormats() const;
@@ -120,7 +144,8 @@ public:
 
     /** Adds a plug-in at the end of a chain. typeOrIdentifier is a built-in type
         name (ReverbPlugin::xmlTypeName, ...) or a catalogue path / identifier.
-        On success, addedId (if given) receives the new plug-in's id. */
+        A plug-in that failed to scan can't be inserted. On success, addedId
+        (if given) receives the new plug-in's id. */
     juce::Result insert (const juce::String& trackId, const juce::String& typeOrIdentifier,
                          PluginChain = PluginChain::device, juce::String* addedId = nullptr);
 
@@ -174,6 +199,12 @@ public:
         undoable in between: a knob drag is one step (see EngineUndo). */
     bool setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture = false);
 
+    /** Sets several parameters of one plug-in as one change: dragging an EQ
+        node moves its frequency and gain together. continuesGesture joins the
+        previous call's undo step when that set the same parameters with
+        nothing undoable in between. False when nothing changed. */
+    bool setParameters (const juce::String& pluginId, const std::vector<ParameterValue>& values, bool continuesGesture = false);
+
     /** Pins a parameter of an external plug-in to its card (at the end), or
         unpins it. At most maxPinnedParameters; a built-in edits every parameter
         on its card, so it pins none. Saved with the project; one undo step. */
@@ -222,8 +253,27 @@ public:
     /** Why an external plug-in couldn't be instantiated; empty if it was, or isn't external. */
     juce::String getLoadError (const juce::String& pluginId) const;
 
-    /** Instantiates a plug-in again (the window's Retry). */
+    /** Instantiates a plug-in again from its last saved state: the window's
+        Retry, and a crashed plug-in's Reload. Not an undo step. */
     juce::Result reload (const juce::String& pluginId);
+
+    /** Runs an external plug-in in its sandbox (out of process, the default)
+        or in-process (the window's Run in-process), and instantiates it again
+        that way. Saved with the project, per instance; not an undo step. A
+        plug-in whose format can't be sandboxed runs in-process either way. */
+    juce::Result setSandboxed (const juce::String& pluginId, bool sandboxed);
+
+    /** Told when a plug-in's sandbox dies (PluginInfo::crashed). */
+    struct Listener
+    {
+        virtual ~Listener() = default;
+
+        /** A plug-in of this rack's Edit crashed. On the message thread. */
+        virtual void pluginCrashed (const juce::String& pluginId) = 0;
+    };
+
+    void addListener (Listener*);
+    void removeListener (Listener*);
 
     /** The presets the window's menu offers: the plug-in's own programs, then
         those saved with savePreset, in that order. */
@@ -249,13 +299,26 @@ public:
     /** Copies A over B (the window's Copy A→B). */
     juce::Result copyAToB (const juce::String& pluginId);
 
+    /** The v2 native devices' curves, spectra and meters. */
+    NativeDevices& getNativeDevices() noexcept   { return nativeDevices; }
+
 private:
     struct ScanThread;
+    struct CrashWatch;
     friend struct test::PluginRackTests;
 
     ProjectManager& projectManager;
+    NativeDevices nativeDevices { projectManager };
     std::unique_ptr<ScanThread> scanThread;
+    std::unique_ptr<CrashWatch> crashWatch;
+    juce::ListenerList<Listener> listeners;
     std::atomic<bool> scanning { false };
+
+    /** Set: the running scan is a retry of this one file only. */
+    juce::String retryPath;
+
+    /** The formats a scan walks: what the engine hosts, by format name. */
+    juce::StringArray scanFormats { "VST3", "AudioUnit", "CLAP" };
 
     /** Set from the scan thread when its body starts on a thread other than startScan's caller. */
     std::atomic<bool> scanBodyRanOffCaller { false };
@@ -273,6 +336,13 @@ private:
     static constexpr int scanStopTimeoutMs = 120000;
 
     void runScan();
+    void startScanThread (const juce::String& onlyPath);
+
+    /** Gives the engine's plug-in list a scanner that times each file out after timeoutMs. */
+    void installScanner (int timeoutMs);
+
+    /** Whether path is in the plug-in list's blacklist: a scan of it failed. */
+    bool failedToScan (const juce::String& path) const;
 
     /** Asks a running scan to stop and waits for it, keeping the message loop
         running meanwhile when called on the message thread. */

@@ -45,7 +45,7 @@ struct Theme
                  border, borderSoft, gridBar, gridBeat,
                  textPrimary, textSecondary, textDim, textOnAccent,
                  accent, accentHover, accentDim, focusRing, rec,
-                 stateWarning, stateMute, statePre, stateSolo, statePolarity,
+                 stateWarning, stateMute, statePre, stateSolo, statePolarity, stateSidechain,
                  playhead, meterLow, meterMid, meterHigh, scrim;
 
     /** clip-drums, clip-bass, clip-chords, clip-pads, clip-arp, clip-vocal, clip-fx. */
@@ -90,6 +90,7 @@ struct LayoutMetrics
     // Sizing scale (§15.3)
     int controlXs = 0, controlSm = 0, controlMd = 0, controlLg = 0;   ///< control heights 16 / 20 / 22 / 26
     int transportButton = 0;     ///< square transport buttons
+    int iconChip = 0, iconControl = 0, iconSection = 0, iconToolbar = 0;   ///< icon sizes (§15.8) 10 / 12 / 14 / 16
     int toolbarHeight = 0;
     int topBarHeight = 0;
     int inspectorWidth = 0;

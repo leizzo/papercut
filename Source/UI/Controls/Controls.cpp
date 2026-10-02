@@ -5,6 +5,10 @@ namespace resamper
 
 namespace
 {
+    // Design: a device's segmented switch (mono 8): a radius-4 well, radius-3 items, 1 px apart and from the edge.
+    const TypeStyle deviceSegmentStyle { 8.0f, true, 400 };
+    constexpr float deviceWellRadius = 4.0f, deviceItemRadius = 3.0f, deviceItemGap = 1.0f;
+
     int textWidth (const juce::Font& font, const juce::String& text)
     {
         return (int) std::ceil (juce::GlyphArrangement::getStringWidth (font, text));
@@ -293,6 +297,9 @@ Segmented::Segmented (ThemeManager& tm, juce::StringArray itemList, Style s)
 
 const TypeStyle& Segmented::textStyle() const
 {
+    if (style == Style::device)
+        return deviceSegmentStyle;
+
     return style == Style::tabs ? themeManager.getTheme().label : themeManager.getTheme().bodySm;
 }
 
@@ -323,6 +330,15 @@ int Segmented::getIdealWidth() const
 juce::Rectangle<float> Segmented::itemBounds (int index) const
 {
     auto area = getLocalBounds().toFloat();
+
+    if (style == Style::device)
+    {
+        // Equal items in a 1 px padded well, 1 px apart.
+        area = area.reduced (deviceItemGap);
+        const auto w = (area.getWidth() - deviceItemGap * (float) (items.size() - 1)) / (float) juce::jmax (1, items.size());
+        return juce::isPositiveAndBelow (index, items.size()) ? juce::Rectangle<float> (area.getX() + (float) index * (w + deviceItemGap), area.getY(), w, area.getHeight())
+                                                              : juce::Rectangle<float>();
+    }
 
     if (style != Style::tabs)
         area = area.reduced (2.0f);
@@ -365,6 +381,36 @@ void Segmented::paint (juce::Graphics& g)
     auto& theme = themeManager.getTheme();
     const auto tabs = style == Style::tabs;
     const auto radius = tabs ? 5.0f : theme.radiusSm;
+
+    if (style == Style::device)
+    {
+        // Design: a bg-slot well (radius 4), the active item bg-elevated (radius 3) in text-primary 700, the rest text-dim.
+        g.setColour (theme.bgSlot);
+        g.fillRoundedRectangle (getLocalBounds().toFloat(), deviceWellRadius);
+
+        for (int i = 0; i < items.size(); ++i)
+        {
+            const auto r = itemBounds (i);
+            const auto active = i == selected;
+
+            if (active || i == hovered)
+            {
+                g.setColour (active ? theme.bgElevated : theme.bgHover);
+                g.fillRoundedRectangle (r, deviceItemRadius);
+            }
+
+            auto itemStyle = textStyle();
+            itemStyle.weight = active ? 700 : 400;
+            g.setColour (active ? theme.textPrimary : theme.textDim);
+            g.setFont (themeManager.font (itemStyle));
+            g.drawText (items[i], r, juce::Justification::centred, true);
+        }
+
+        if (hasKeyboardFocus (false))
+            paintFocusRing (g, theme, getLocalBounds().toFloat(), deviceWellRadius);
+
+        return;
+    }
 
     const auto sunken = style == Style::sunken;
 

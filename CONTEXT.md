@@ -1,6 +1,6 @@
 # Resamper
 
-A desktop DAW for electronic producers and mix engineers. This glossary pins the project's domain language. The spec is `PRD.md` and the GitHub issues it points to; implementation details live in the code, not here.
+A desktop DAW for electronic producers and mix engineers. This glossary pins the project's domain language. Open product decisions are tracked as GitHub issues; implementation details live in the code, not here.
 
 ## Language
 
@@ -126,7 +126,7 @@ _Avoid_: Comp (compositing Takes is not supported)
 One processor in a Device Chain or a Mixer Insert slot: a Native Device, a Plug-in, or (in a Device Chain only) a Rack.
 
 **Native Device**:
-A Device built into Resamper, edited inline on its card.
+A Device built into Resamper, edited inline on its card with Resamper's own controls, never in a window of its own. Every Native Device follows one contract: the same header, the zones Input → Display → Controls → Output, and three sizes (Folded, Compact, Expanded). Its graphs are controllers: dragging an EQ node or a compressor's threshold line sets the parameter, and the knobs mirror the graph. EQ Eight and Compressor are Resamper's own processors, not wrappers of the engine's equaliser and compressor (those have four bands and no M/S).
 _Avoid_: built-in plug-in, internal plugin
 
 **Plug-in**:
@@ -140,6 +140,10 @@ _Avoid_: plug-in editor, vendor window
 **Native Device Window**:
 The floating window that shows one Native Device's card, Expanded: opened from the card's Open in Window or by clicking its Mixer Insert. It follows the Plug-in Window's rules (one per Device, Pin, hidden while its track isn't selected unless pinned).
 _Avoid_: native editor popover, device popover
+
+**Sandbox**:
+The separate process a Plug-in runs in by default (one per instance), so a crash takes down only that Plug-in: its audio is bypassed, the rest of the session plays on, and **Reload** starts it again from its last saved state. A Plug-in can be set to run in-process instead (**Run in-process**), per instance, saved with the project.
+_Avoid_: bridge, out-of-process host (for the concept; fine for the mechanism)
 
 **Device Chain**:
 A track's sound: its instrument (on a MIDI track), Racks and creative effects, in order, edited only in the Detail View. It runs before the Mixer Inserts. A MIDI track has one instrument; adding an instrument replaces the current one. A Bus's chain and the Master's rack are also Device Chains.
@@ -175,7 +179,7 @@ The Native Device that plays many samples, each in a Zone.
 One sample in a Sampler, with the key range and velocity range that trigger it. Zones with the same velocity range form a velocity layer.
 
 **Plugin Catalogue**:
-The scanned list of Devices the user can insert: name, manufacturer, format, category. Native Devices are listed without a scan; engine plumbing (fader, meters, sends and returns) is not listed.
+The scanned list of Devices the user can insert: name, manufacturer, format, category. Native Devices are listed without a scan; engine plumbing (fader, meters, sends and returns) is not listed. A Plug-in whose scan crashed or timed out is listed as *Failed to scan*: it can be retried, never inserted.
 _Avoid_: plugin database
 
 **Mixer Insert**:

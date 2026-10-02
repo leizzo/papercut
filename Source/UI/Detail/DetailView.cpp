@@ -1,6 +1,7 @@
 #include "DetailView.h"
 #include "Commands/CommandRegistry.h"
 #include "Commands/PluginCommands.h"
+#include "Commands/TrackCommands.h"
 #include "UI/Browser/Library.h"
 #include "UI/Controls/ValueFormat.h"
 
@@ -283,33 +284,7 @@ struct DetailView::Chain : juce::Component,
         }
 
         if (auto item = itemFromDrag (d.description))
-            insertDropped (item->pluginPath);
-    }
-
-    /** Adds a dropped device at the end; a native one takes focus (§9.2.3). A
-        plug-in's window opens by the opening rule, whichever view inserted it. */
-    void insertDropped (const juce::String& path)
-    {
-        const auto track = trackId;
-        const auto before = owner.rack.getChain (track, PluginChain::device);
-
-        if (! owner.commands.invoke (cmd::pluginInsert, { track, path, PluginChain::device }))
-            return;
-
-        const auto after = owner.rack.getChain (track, PluginChain::device);
-
-        if (after.size() <= before.size())
-            return;
-
-        const auto& added = after.back();
-
-        if (added.external)
-            return;
-
-        owner.refresh();
-
-        if (auto* card = findCard (added.id))
-            card->focusFirstControl();
+            owner.insertDevice (trackId, item->pluginPath);
     }
 
     DetailView& owner;
@@ -357,6 +332,34 @@ void DetailView::setOpenWindows (const juce::StringArray& pluginIds)
 
     for (auto& card : chain->cards)
         card->setWindowOpen (openWindowIds.contains (card->getPlugin().id));
+}
+
+void DetailView::insertDevice (const juce::String& trackId, const juce::String& path)
+{
+    const auto before = rack.getChain (trackId, PluginChain::device);
+
+    if (! commands.invoke (cmd::pluginInsert, { trackId, path, PluginChain::device }))
+        return;
+
+    const auto after = rack.getChain (trackId, PluginChain::device);
+
+    if (after.size() <= before.size())
+        return;
+
+    const auto& added = after.back();
+
+    // A plug-in's window opens by the opening rule (pluginAdded), whichever view inserted it.
+    if (added.external)
+        return;
+
+    // The chain shown is the selected track's: show this one, then focus the new card.
+    if (model.getSelectedTrackId() != trackId)
+        commands.invoke (cmd::trackSelect, { trackId });
+
+    refresh();
+
+    if (auto* card = chain->findCard (added.id))
+        card->focusFirstControl();
 }
 
 void DetailView::revealDeviceChain()

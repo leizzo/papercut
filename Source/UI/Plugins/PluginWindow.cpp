@@ -227,7 +227,14 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
     copyAToB->onClick = [this] { commands.invoke (cmd::pluginCopyAToB, { plugin.trackId, plugin.id }); };
     undo->onClick = [this] { commands.invoke (cmd::editUndo); };
     redo->onClick = [this] { commands.invoke (cmd::editRedo); };
-    retry->onClick = [this] { retryLoading(); };
+    retry->onClick = [this]
+    {
+        // A load that failed starts again; one still under way is waited for afresh.
+        if (rack.getLoadError (plugin.id).isNotEmpty())
+            commands.invoke (cmd::pluginReload, { plugin.trackId, plugin.id });
+
+        retryLoading();
+    };
     runInProcess->onClick = [this] { if (onRunInProcess) onRunInProcess(); };
     scale->onChange = [this] (int index)
     {
@@ -593,13 +600,16 @@ void PluginWindow::timerCallback()
 {
     if (status == Status::loading)
     {
-        if (! rack.isLoading (plugin.id))
+        const auto loading = rack.isLoading (plugin.id);
+
+        if (! loading && rack.getLoadError (plugin.id).isEmpty())
         {
             loadVendor();
             return;
         }
 
-        if (juce::Time::getMillisecondCounter() - loadStartedAt > (juce::uint32) loadTimeoutMs)
+        // Failed to load (its sandbox died or timed out), or still loading after the timeout.
+        if (! loading || juce::Time::getMillisecondCounter() - loadStartedAt > (juce::uint32) loadTimeoutMs)
         {
             status = Status::failed;
             retry->setVisible (true);
@@ -608,6 +618,15 @@ void PluginWindow::timerCallback()
         }
 
         repaint (vendorArea());
+    }
+
+    // In or out of its sandbox, and its latency, change without an Edit change.
+    if (auto info = rack.getPlugin (plugin.id);
+        info.has_value() && (info->sandboxed != plugin.sandboxed || info->latencySamples != plugin.latencySamples))
+    {
+        plugin.sandboxed = info->sandboxed;
+        plugin.latencySamples = info->latencySamples;
+        updateTexts();
     }
 
     auto text = juce::String (rack.getCpuLoad (plugin.id) * 100.0, 1) + "%";

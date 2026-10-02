@@ -1,5 +1,9 @@
 #include "PluginRack.h"
 #include "EditTracks.h"
+#include "EngineManager.h"
+#include "PluginSandbox.h"
+#include "PluginScanner.h"
+#include "NativeDevicePlugins.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -60,6 +64,8 @@ namespace
             { te::CompressorPlugin::xmlTypeName, { "output gain" } },
             { te::DelayPlugin::xmlTypeName,      { "mix proportion" } },
             { te::FourOscPlugin::xmlTypeName,    { "masterLevel" } },
+            { EqEightPlugin::xmlTypeName,        { "scale", "output" } },
+            { CompressorV2Plugin::xmlTypeName,   { "makeupAuto", "makeup", "mix", "output" } },
         };
 
         auto found = outputs.find (pluginType);
@@ -107,17 +113,27 @@ namespace
         return info;
     }
 
+    /** A v2 native device of Resamper's own (PRD §9.2.1a). */
+    template <typename PluginClass>
+    PluginInfo nativeV2()
+    {
+        auto info = builtIn<PluginClass> (false);
+        info.manufacturer = "Resamper";
+        return info;
+    }
+
     /** The built-ins a user can put on a track. Engine plumbing (the fader,
         meters, aux sends and returns, freeze points, patch bays, text) is added
-        by the app where it belongs, never from the catalogue. */
+        by the app where it belongs, never from the catalogue. EQ Eight and
+        Compressor v2 replace the engine's equaliser and compressor (v1). */
     const juce::Array<PluginInfo>& builtInCatalogue()
     {
         static const auto catalogue = []
         {
             juce::Array<PluginInfo> list;
-            list.add (builtIn<te::EqualiserPlugin> (false));
+            list.add (nativeV2<EqEightPlugin>());
             list.add (builtIn<te::ReverbPlugin> (false));
-            list.add (builtIn<te::CompressorPlugin> (false));
+            list.add (nativeV2<CompressorV2Plugin>());
             list.add (builtIn<te::ChorusPlugin> (false));
             list.add (builtIn<te::DelayPlugin> (false));
             list.add (builtIn<te::PhaserPlugin> (false));
@@ -138,7 +154,9 @@ namespace
             if (info.path == type)
                 return true;
 
-        return false;
+        // The v1 equaliser and compressor are out of the catalogue, but a
+        // project or a Command that names them still gets them.
+        return type == te::EqualiserPlugin::xmlTypeName || type == te::CompressorPlugin::xmlTypeName;
     }
 
     PluginInfo infoFromDescription (const juce::PluginDescription& desc)
@@ -153,6 +171,24 @@ namespace
         info.instrument = desc.isInstrument;
         info.external = true;
         return info;
+    }
+
+    /** Whether the catalogue knows the plug-in (by its identifier or its file). */
+    bool isKnown (te::ExternalPlugin& plugin)
+    {
+        auto& known = plugin.engine.getPluginManager().knownPluginList;
+        return known.getTypeForIdentifierString (plugin.desc.createIdentifierString()) != nullptr
+            || known.getTypeForFile (plugin.desc.fileOrIdentifier) != nullptr;
+    }
+
+    /** Missing: no instance, and not installed. One the catalogue knows that
+        failed to load (its sandbox died or timed out) isn't: it has a load error. */
+    bool isMissing (te::Plugin& plugin)
+    {
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (&plugin))
+            return external->isMissing() && ! isKnown (*external);
+
+        return plugin.isMissing();
     }
 
     PluginInfo infoFromPlugin (te::Plugin& plugin)
@@ -175,6 +211,8 @@ namespace
             info.external = true;
             info.pinnedParameters = pinsOf (plugin);
             info.pinnedParameters.removeEmptyStrings();
+            info.sandboxed = PluginSandbox::isSandboxed (external->getAudioPluginInstance());
+            info.crashed = PluginSandbox::hasCrashed (external->getAudioPluginInstance());
         }
         else
         {
@@ -186,7 +224,7 @@ namespace
         info.midiEffect = isMidiEffect (plugin);
         info.chain = chainOf (plugin);
         info.enabled = plugin.isEnabled();
-        info.missing = plugin.isMissing();
+        info.missing = isMissing (plugin);
         info.presetName = plugin.state[presetProperty].toString();
         info.abSlot = (int) plugin.state[abSlotProperty] == 1 ? 1 : 0;
 
@@ -326,9 +364,21 @@ namespace
         return false;
     }
 
-    bool isScanFormat (const juce::String& formatName)
+    /** A plug-in that failed to scan, as the catalogue lists it: named after its file. */
+    PluginInfo failedInfo (juce::AudioPluginFormat& format, const juce::String& fileOrIdentifier)
     {
-        return formatName == "VST3" || formatName == "AudioUnit";
+        PluginInfo info;
+        info.name = format.getNameOfPluginFromIdentifier (fileOrIdentifier);
+
+        if (info.name.isEmpty() || info.name == fileOrIdentifier)
+            info.name = juce::File::isAbsolutePath (fileOrIdentifier) ? juce::File (fileOrIdentifier).getFileNameWithoutExtension()
+                                                                     : fileOrIdentifier.fromLastOccurrenceOf ("/", false, false);
+
+        info.format = format.getName();
+        info.path = fileOrIdentifier;
+        info.external = true;
+        info.failedScan = true;
+        return info;
     }
 }
 
@@ -342,15 +392,38 @@ struct PluginRack::ScanThread : juce::Thread
     PluginRack& rack;
 };
 
-PluginRack::PluginRack (ProjectManager& pm) : projectManager (pm)
+/** Hears the engine's sandbox, and passes on the crashes of this rack's plug-ins. */
+struct PluginRack::CrashWatch : PluginSandbox::Listener
 {
+    CrashWatch (PluginRack& r, PluginSandbox& s) : rack (r), sandbox (s)   { sandbox.addListener (this); }
+    ~CrashWatch() override                                                { sandbox.removeListener (this); }
+
+    void pluginCrashed (const juce::String& pluginId) override
+    {
+        if (rack.contains (pluginId))
+            rack.listeners.call ([&] (PluginRack::Listener& l) { l.pluginCrashed (pluginId); });
+    }
+
+    PluginRack& rack;
+    PluginSandbox& sandbox;
+};
+
+PluginRack::PluginRack (ProjectManager& pm)
+    : projectManager (pm),
+      crashWatch (std::make_unique<CrashWatch> (*this, pm.getEngineManager().getPluginSandbox()))
+{
+    installScanner (PluginScanner::defaultTimeoutMs);
     publishExternalSnapshot();
 }
 
 PluginRack::~PluginRack()
 {
+    crashWatch.reset();
     stopScan();
 }
+
+void PluginRack::addListener (Listener* l)      { listeners.add (l); }
+void PluginRack::removeListener (Listener* l)   { listeners.remove (l); }
 
 void PluginRack::stopScan()
 {
@@ -381,11 +454,22 @@ juce::Array<PluginInfo> PluginRack::getCatalogue() const
     return catalogue;
 }
 
+void PluginRack::installScanner (int timeoutMs)
+{
+    auto& manager = projectManager.getEdit().engine.getPluginManager();
+
+    // Tracktion's own scanner goes, and with it what its abort hook points at.
+    // A scan here is stopped by stopping its thread.
+    manager.abortCurrentPluginScan = [] {};
+    manager.knownPluginList.setCustomScanner (PluginScanner::createScanner (timeoutMs));
+}
+
 void PluginRack::publishExternalSnapshot()
 {
     juce::Array<PluginInfo> scanned;
+    auto& manager = projectManager.getEdit().engine.getPluginManager();
 
-    for (const auto& desc : projectManager.getEdit().engine.getPluginManager().knownPluginList.getTypes())
+    for (const auto& desc : manager.knownPluginList.getTypes())
     {
         if (te::PluginManager::isBuiltInPlugin (desc))
             continue;
@@ -393,17 +477,48 @@ void PluginRack::publishExternalSnapshot()
         scanned.add (infoFromDescription (desc));
     }
 
+    // The list keeps the files whose scan failed in its blacklist.
+    for (const auto& path : manager.knownPluginList.getBlacklistedFiles())
+        for (auto* format : manager.pluginFormatManager.getFormats())
+            if (scanFormats.contains (format->getName()) && format->fileMightContainThisPluginType (path))
+            {
+                scanned.add (failedInfo (*format, path));
+                break;
+            }
+
     const juce::ScopedLock sl (snapshotLock);
     externalSnapshot = std::move (scanned);
 }
 
 void PluginRack::startScan()
 {
-    if (scanning.load())
-        return;
+    if (! scanning.load())
+        startScanThread ({});
+}
 
+juce::Result PluginRack::retryScan (const juce::String& path)
+{
+    if (! failedToScan (path))
+        return juce::Result::fail ("That plug-in didn't fail to scan");
+
+    if (scanning.load())
+        return juce::Result::fail ("A plug-in scan is in progress");
+
+    startScanThread (path);
+    return juce::Result::ok();
+}
+
+bool PluginRack::failedToScan (const juce::String& path) const
+{
+    return path.isNotEmpty()
+        && projectManager.getEdit().engine.getPluginManager().knownPluginList.getBlacklistedFiles().contains (path);
+}
+
+void PluginRack::startScanThread (const juce::String& onlyPath)
+{
     stopScan();
 
+    retryPath = onlyPath;
     scanning.store (true);
     scanBodyRanOffCaller.store (false);
     scanCallerId = juce::Thread::getCurrentThreadId();
@@ -448,10 +563,18 @@ void PluginRack::runScan()
 
         auto* format = formats.getFormat (i);
 
-        if (format == nullptr || ! isScanFormat (format->getName()))
+        if (format == nullptr || ! scanFormats.contains (format->getName()))
             continue;
 
-        const auto files = format->searchPathsForPlugins (format->getDefaultLocationsToSearch(), true, false);
+        // A retry scans its one file, and only with a format that can hold it.
+        if (retryPath.isNotEmpty() && ! format->fileMightContainThisPluginType (retryPath))
+            continue;
+
+        if (retryPath.isNotEmpty())
+            manager.knownPluginList.removeFromBlacklist (retryPath);
+
+        const auto files = retryPath.isNotEmpty() ? juce::StringArray (retryPath)
+                                                  : format->searchPathsForPlugins (format->getDefaultLocationsToSearch(), true, false);
 
         for (const auto& file : files)
         {
@@ -476,14 +599,10 @@ void PluginRack::runScan()
 
 void PluginRack::reloadMissing()
 {
-    auto& edit = projectManager.getEdit();
-    auto& known = edit.engine.getPluginManager().knownPluginList;
-
-    for (auto* plugin : te::getAllPlugins (edit, false))
-        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin); external != nullptr && external->isMissing())
-            if (known.getTypeForIdentifierString (external->desc.createIdentifierString()) != nullptr
-                || known.getTypeForFile (external->desc.fileOrIdentifier) != nullptr)
-                external->forceFullReinitialise();
+    for (auto* plugin : te::getAllPlugins (projectManager.getEdit(), false))
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin);
+            external != nullptr && external->isMissing() && isKnown (*external))
+            external->forceFullReinitialise();
 }
 
 juce::StringArray PluginRack::getHostedFormats() const
@@ -512,10 +631,11 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
 
     const bool builtIn = isBuiltInType (typeOrIdentifier);
     juce::PluginDescription external;
-    const bool haveExternal = ! builtIn && ! scanning.load() && findExternal (edit.engine, typeOrIdentifier, external);
+    // Each file is scanned in a worker process, so a running scan doesn't stop an insert.
+    const bool haveExternal = ! builtIn && findExternal (edit.engine, typeOrIdentifier, external);
 
-    if (! builtIn && scanning.load())
-        return juce::Result::fail ("A plug-in scan is in progress");
+    if (! builtIn && ! haveExternal && failedToScan (typeOrIdentifier))
+        return juce::Result::fail ("That plug-in failed to scan: retry it in the Browser");
 
     if (! builtIn && ! haveExternal)
         return juce::Result::fail ("Unknown plug-in");
@@ -839,7 +959,8 @@ std::vector<PluginParameter> PluginRack::getParameters (const juce::String& plug
             result.push_back ({ parameter->paramID, parameter->getParameterName(), range.getStart(), range.getEnd(),
                                 parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()),
                                 parameter->hasAutomationPoints(),
-                                isOutputParameter (plugin->getPluginType(), parameter->paramID) });
+                                isOutputParameter (plugin->getPluginType(), parameter->paramID),
+                                parameter->valueRange });
         }
     }
 
@@ -864,13 +985,51 @@ bool PluginRack::setParameter (const juce::String& pluginId, const juce::String&
     if (parameter == nullptr)
         return false;
 
-    const auto clamped = parameter->getValueRange().clipValue (value);
+    const auto clamped = parameter->valueRange.snapToLegalValue (parameter->getValueRange().clipValue (value));
 
     if (juce::exactlyEqual (clamped, parameter->getCurrentValue()))
         return false;
 
     projectManager.getUndo().beginGestureStep ("Change " + parameter->getParameterName(), pluginId + ":" + parameterId, continuesGesture);
     return edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameterId, parameter->getCurrentValue(), clamped));
+}
+
+bool PluginRack::setParameters (const juce::String& pluginId, const std::vector<ParameterValue>& values, bool continuesGesture)
+{
+    auto& edit = projectManager.getEdit();
+    auto plugin = findPlugin (edit, pluginId);
+
+    if (plugin == nullptr)
+        return false;
+
+    std::vector<std::pair<te::AutomatableParameter::Ptr, float>> changes;
+    juce::StringArray ids;
+
+    for (const auto& v : values)
+    {
+        auto parameter = findParameter (*plugin, v.parameterId);
+
+        if (parameter == nullptr)
+            return false;
+
+        ids.add (v.parameterId);
+        const auto clamped = parameter->valueRange.snapToLegalValue (parameter->getValueRange().clipValue (v.value));
+
+        if (! juce::exactlyEqual (clamped, parameter->getCurrentValue()))
+            changes.emplace_back (parameter, clamped);
+    }
+
+    if (changes.empty())
+        return false;
+
+    // The gesture's key names every parameter it sets, so a drag that only
+    // happens to change one of them for a moment stays one step.
+    projectManager.getUndo().beginGestureStep ("Change " + plugin->getName(), pluginId + ":" + ids.joinIntoString (","), continuesGesture);
+
+    for (auto& [parameter, value] : changes)
+        edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameter->paramID, parameter->getCurrentValue(), value));
+
+    return true;
 }
 
 juce::Result PluginRack::setPinned (const juce::String& pluginId, const juce::String& parameterId, bool pinned)
@@ -979,6 +1138,9 @@ juce::Result PluginRack::locate (const juce::String& pluginId, const juce::File&
     auto& formats = manager.pluginFormatManager;
     const auto path = file.getFullPathName();
     bool foundAny = false;
+
+    // Pointing at the file is a retry, even if its scan failed before.
+    manager.knownPluginList.removeFromBlacklist (path);
 
     for (auto* format : formats.getFormats())
     {
@@ -1100,8 +1262,42 @@ juce::Result PluginRack::reload (const juce::String& pluginId)
     if (external == nullptr)
         return juce::Result::fail ("Only a plug-in can be reloaded");
 
-    external->forceFullReinitialise();
+    // An instance (a crashed one too) goes first: processing off and on again
+    // creates a new one from the state saved on the plug-in. Neither is an undo
+    // step. The plug-in may hear the property before its cached value follows,
+    // so it is told again once the value has.
+    if (external->getAudioPluginInstance() != nullptr)
+    {
+        for (auto processing : { false, true })
+        {
+            external->state.setProperty (te::IDs::process, processing, nullptr);
+            external->processingChanged();
+        }
+    }
+    else
+    {
+        external->forceFullReinitialise();
+    }
+
     return juce::Result::ok();
+}
+
+juce::Result PluginRack::setSandboxed (const juce::String& pluginId, bool sandboxed)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (dynamic_cast<te::ExternalPlugin*> (plugin.get()) == nullptr)
+        return juce::Result::fail ("Only a plug-in runs in a sandbox");
+
+    // Saved on the plug-in, as how it runs, not what it is: never an undo step.
+    const juce::Identifier inProcess (PluginSandbox::inProcessProperty);
+
+    if (sandboxed)
+        plugin->state.removeProperty (inProcess, nullptr);
+    else
+        plugin->state.setProperty (inProcess, true, nullptr);
+
+    return reload (pluginId);
 }
 
 namespace

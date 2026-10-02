@@ -1,4 +1,7 @@
 #include "TestFixture.h"
+#include "TestPluginFormat.h"
+#include "Engine/PluginSandbox.h"
+#include "Engine/PluginScanner.h"
 
 #include <iostream>
 
@@ -21,6 +24,23 @@ EngineManager& getEngineManager()
 int main (int argc, char** argv)
 {
     juce::ScopedJuceInitialiser_GUI juceInit;
+
+    // Run again by a plug-in scan (PluginScanner): scan one file, test plug-ins included.
+    if (resamper::PluginScanner::isWorker (argc, argv))
+    {
+        std::vector<std::unique_ptr<juce::AudioPluginFormat>> formats;
+        formats.push_back (std::make_unique<resamper::test::TestPluginFormat>());
+        return resamper::PluginScanner::runWorker (argc, argv, std::move (formats));
+    }
+
+    // Run again by a sandboxed plug-in (PluginSandbox): host it, test plug-ins included.
+    if (resamper::PluginSandbox::isHost (argc, argv))
+    {
+        resamper::test::TestPluginFormat::inSandboxHost = true;
+        std::vector<std::unique_ptr<juce::AudioPluginFormat>> formats;
+        formats.push_back (std::make_unique<resamper::test::TestPluginFormat>());
+        return resamper::PluginSandbox::runHost (argc, argv, std::move (formats));
+    }
 
     // The whole run shares one headless engine, as Tracktion's own TestRunner does.
     resamper::EngineManager engine ("ResamperTests", resamper::EngineManager::AudioDevice::none);

@@ -41,6 +41,10 @@ add_library(resamper_engine STATIC
     Source/Engine/ClipWaveform.cpp
     Source/Engine/Production.cpp
     Source/Engine/PluginRack.cpp
+    Source/Engine/PluginSandbox.cpp
+    Source/Engine/PluginScanner.cpp
+    Source/Engine/NativeDevicePlugins.cpp
+    Source/Engine/NativeDevices.cpp
     Source/Engine/Mixer.cpp
     Source/Engine/Session.cpp
     Source/Engine/Automation.cpp
@@ -164,6 +168,9 @@ add_library(resamper_ui STATIC
     Source/UI/Browser/Browser.cpp
     Source/UI/Detail/DeviceCard.cpp
     Source/UI/Detail/NativeDeviceCard.cpp
+    Source/UI/Detail/DeviceBody.cpp
+    Source/UI/Detail/EqEightDevice.cpp
+    Source/UI/Detail/CompressorDevice.cpp
     Source/UI/Detail/PluginDeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
     Source/UI/Plugins/FloatingDeviceWindow.cpp
@@ -231,6 +238,7 @@ juce_add_console_app(ResamperTests PRODUCT_NAME "ResamperTests")
 target_sources(ResamperTests PRIVATE
     Tests/TestMain.cpp
     Tests/TestFixture.cpp
+    Tests/TestPluginFormat.cpp
     Tests/EngineManagerTests.cpp
     Tests/ProjectTests.cpp
     Tests/TrackCommandTests.cpp
@@ -245,16 +253,19 @@ target_sources(ResamperTests PRIVATE
     Tests/ComponentFactoryTests.cpp
     Tests/ProductionTests.cpp
     Tests/PluginRackTests.cpp
+    Tests/PluginSandboxTests.cpp
     Tests/MixerTests.cpp
     Tests/SessionTests.cpp
     Tests/AutomationTests.cpp
     Tests/ShaperTests.cpp
     Tests/ThemeTests.cpp
+    Tests/IconTests.cpp
     Tests/ControlTests.cpp
     Tests/ControlViewTests.cpp
     Tests/DeviceChainTests.cpp
     Tests/DeviceCardTests.cpp
     Tests/PluginWindowTests.cpp
+    Tests/NativeDeviceTests.cpp
     Tests/EngineUndoTests.cpp
     Tests/ShellTests.cpp
     Tests/BrowserTests.cpp

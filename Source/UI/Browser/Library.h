@@ -24,10 +24,19 @@ struct LibraryItem
     juce::File file;            ///< a folder or an audio file
     bool instrument = false;
     bool midiEffect = false;
+    juce::String format {};     ///< a scanned plug-in's format (VST3, AudioUnit, ...); empty for a native device
+    bool failedScan = false;    ///< a plug-in that failed to scan: listed, never inserted, only retried
+
+    /** A scanned plug-in, not a native device. */
+    bool isPlugin() const   { return kind == Kind::plugin && format.isNotEmpty(); }
+
+    /** The format badge of a plug-in's row (VST3, AU, CLAP); empty for a native device. */
+    juce::String formatBadge() const   { return format == "AudioUnit" ? juce::String ("AU") : format; }
 };
 
 /** What the Browser lists. Instruments, Audio Effects, MIDI Effects and
-    Plugins come from the Plugin Catalogue; Sounds, Drums, Clips and Samples are
+    Plugins come from the Plugin Catalogue (plug-ins that failed to scan only
+    under Plugins); Sounds, Drums, Clips and Samples are
     folders of audio under the library root (created on first use), browsed
     folder by folder. */
 class Library
@@ -59,7 +68,8 @@ private:
 juce::var dragDescription (const LibraryItem&);
 std::optional<LibraryItem> itemFromDrag (const juce::var&);
 
-/** A device goes on any track's device chain; a sample only onto an audio track. */
+/** A device goes on any track's device chain; a sample only onto an audio track.
+    A plug-in that failed to scan goes nowhere. */
 bool canDropOnTrack (const LibraryItem&, TrackKind);
 
 class CommandRegistry;

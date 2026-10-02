@@ -27,6 +27,11 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
 {
     registry.add (cmd::pluginScan, { "Scan Plug-ins", [&rack] { return ! rack.isScanning(); } }, [&rack] { rack.startScan(); });
 
+    registry.add (cmd::pluginRetryScan, { "Retry Plug-in Scan" }, [&rack, &host] (const PluginPathArgs& a)
+    {
+        host.report (rack.retryScan (a.plugin));
+    });
+
     registry.add (cmd::pluginInsert, { "Insert Plug-in" }, [&rack, &host] (const PluginInsertArgs& a)
     {
         if (a.trackId.isEmpty() || a.plugin.isEmpty())
@@ -83,6 +88,16 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         rack.setParameter (a.pluginId, a.parameterId, a.value, a.continuesGesture);
     });
 
+    registry.add (cmd::pluginSetParameters, { "Change Parameters" }, [&rack] (const PluginParametersArgs& a)
+    {
+        rack.setParameters (a.pluginId, a.values, a.continuesGesture);
+    });
+
+    registry.add (cmd::pluginAudition, { "Audition Band" }, [&rack] (const PluginAuditionArgs& a)
+    {
+        rack.getNativeDevices().setAudition (a.pluginId, a.band);
+    });
+
     registry.add (cmd::pluginReplace, { "Replace Plug-in" }, [&rack, &host] (const PluginReplaceArgs& a)
     {
         juce::String added;
@@ -111,6 +126,11 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     registry.add (cmd::pluginReload, { "Reload Plug-in" }, [&rack, &host] (const PluginArgs& a)
     {
         host.report (rack.reload (a.pluginId));
+    });
+
+    registry.add (cmd::pluginSetSandboxed, { "Run Plug-in Sandboxed" }, [&rack, &host] (const PluginSandboxArgs& a)
+    {
+        host.report (rack.setSandboxed (a.pluginId, a.sandboxed));
     });
 
     registry.add (cmd::pluginSelectPreset, { "Select Preset" }, [&rack, &host] (const PluginPresetArgs& a)

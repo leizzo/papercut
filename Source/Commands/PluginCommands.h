@@ -57,6 +57,22 @@ struct PluginParameterArgs
     bool continuesGesture = false;
 };
 
+/** Several parameters of one plug-in set as one change (an EQ node's
+    frequency and gain); continuesGesture joins a drag into one undo step. */
+struct PluginParametersArgs
+{
+    juce::String pluginId;
+    std::vector<ParameterValue> values;
+    bool continuesGesture = false;
+};
+
+/** Plays one EQ Eight band alone (band -1: stops). Monitoring, not an Edit change. */
+struct PluginAuditionArgs
+{
+    juce::String pluginId;
+    int band = -1;
+};
+
 /** A new plug-in in pluginId's place. plugin is a type name or a catalogue path. */
 struct PluginReplaceArgs
 {
@@ -108,9 +124,23 @@ struct PluginABArgs
     int slot = 0;
 };
 
+/** Whether a plug-in runs in its sandbox (out of process) or in-process. */
+struct PluginSandboxArgs
+{
+    juce::String pluginId;
+    bool sandboxed = true;
+};
+
+/** A catalogue plug-in, by its path (what plugin.insert takes). */
+struct PluginPathArgs
+{
+    juce::String plugin;
+};
+
 namespace cmd
 {
     inline constexpr CommandRef<> pluginScan { "plugin.scan" };
+    inline constexpr CommandRef<PluginPathArgs> pluginRetryScan { "plugin.retryScan" };   ///< one that failed to scan
     inline constexpr CommandRef<PluginInsertArgs> pluginInsert { "plugin.insert" };
     inline constexpr CommandRef<PluginArgs> pluginRemove { "plugin.remove" };
     inline constexpr CommandRef<PluginMoveArgs> pluginMove { "plugin.move" };
@@ -118,13 +148,16 @@ namespace cmd
     inline constexpr CommandRef<PluginArgs> pluginMoveToDeviceChain { "plugin.moveToDeviceChain" };   ///< a mixer insert
     inline constexpr CommandRef<PluginCopyArgs> pluginCopyInsert { "plugin.copyInsert" };
     inline constexpr CommandRef<PluginParameterArgs> pluginSetParameter { "plugin.setParameter" };
+    inline constexpr CommandRef<PluginParametersArgs> pluginSetParameters { "plugin.setParameters" };
+    inline constexpr CommandRef<PluginAuditionArgs> pluginAudition { "plugin.audition" };   ///< never undoable
     inline constexpr CommandRef<PluginReplaceArgs> pluginReplace { "plugin.replace" };
     inline constexpr CommandRef<PluginPinArgs> pluginSetPinned { "plugin.setPinned" };
     inline constexpr CommandRef<PluginSizeArgs> pluginSetSize { "plugin.setSize" };       ///< a view: never undoable
     inline constexpr CommandRef<PluginArgs> pluginLocate { "plugin.locate" };             ///< asks for the missing plug-in's file
     inline constexpr CommandRef<PluginArgs> pluginUndoInsert { "plugin.undoInsert" };     ///< the "added" toast's Undo
     inline constexpr CommandRef<PluginWindowArgs> pluginSetWindow { "plugin.setWindow" }; ///< a view: never undoable
-    inline constexpr CommandRef<PluginArgs> pluginReload { "plugin.reload" };             ///< the window's Retry
+    inline constexpr CommandRef<PluginArgs> pluginReload { "plugin.reload" };             ///< Retry; a crashed plug-in's Reload
+    inline constexpr CommandRef<PluginSandboxArgs> pluginSetSandboxed { "plugin.setSandboxed" };  ///< Run in-process; never undoable
     inline constexpr CommandRef<PluginPresetArgs> pluginSelectPreset { "plugin.selectPreset" };
     inline constexpr CommandRef<PluginSavePresetArgs> pluginSavePreset { "plugin.savePreset" };
     inline constexpr CommandRef<PluginABArgs> pluginSelectAB { "plugin.selectAB" };

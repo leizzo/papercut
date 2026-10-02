@@ -53,6 +53,9 @@ public:
 
     tracktion::Edit& getEdit() const noexcept;
 
+    /** The engine every Project of this manager runs on. */
+    EngineManager& getEngineManager() const noexcept   { return engineManager; }
+
     /** Readies an audio file to become a clip, and sets playable to the file the
         clip should play. A WAV or AIFF plays where it is. A compressed file (FLAC,
         OGG, MP3) is decoded to a 32-bit float WAV at its own sample rate, under a

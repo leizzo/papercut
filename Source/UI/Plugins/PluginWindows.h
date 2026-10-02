@@ -32,6 +32,9 @@ namespace resamper
     - Each window's open / pinned / position / UI scale is written through
       plugin.setWindow; a window is never left over once its plug-in is gone,
       and a project's open windows come back when it loads.
+    - Crash (the sandbox): a crashed plug-in's window closes, and a toast
+      explains, offering Reload. Run in-process (the error state's) takes
+      that instance out of its sandbox, through plugin.setSandboxed.
 
     The rules are kept apart from what a window shows: windows are made in
     one place (createWindow), and the rules only use a FloatingDeviceWindow's
@@ -39,6 +42,7 @@ namespace resamper
     plug-in runs in or out of process (the sandbox, #69) only changes what
     the window reports (PluginInfo::sandboxed) and what onRunInProcess does. */
 class PluginWindows : private ApplicationModel::Listener,
+                      private PluginRack::Listener,
                       private juce::ValueTree::Listener,
                       private juce::Timer
 {
@@ -54,10 +58,6 @@ public:
 
     /** Called after windows open or close (the cards' "Window open · focus"). */
     std::function<void()> onOpenWindowsChanged;
-
-    /** The error state's Run in-process. Until the sandbox (#69) every plug-in
-        is in-process, so by default this reloads the plug-in. */
-    std::function<void (const juce::String& pluginId)> onRunInProcess;
 
     /** Opens the device's window (a plug-in's window, a native device
         floating expanded), or brings it forward; focused unless focus is
@@ -123,6 +123,7 @@ private:
     void openWindowsChanged();
 
     void modelChanged() override;
+    void pluginCrashed (const juce::String& pluginId) override;
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void timerCallback() override;
 

@@ -1,5 +1,6 @@
 #include "TestFixture.h"
 #include "Commands/PluginCommands.h"
+#include "TestPluginFormat.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -29,6 +30,48 @@ namespace
 
         return false;
     }
+
+    /** The folder the test plug-in format scans: one per run, emptied by each test using it. */
+    juce::File testPluginFolder()
+    {
+        return TestPluginFormat::scanFolder();
+    }
+
+    /** Adds the test plug-in format to the run's engine (once), scanning testPluginFolder. */
+    void registerTestPluginFormat (te::Engine& engine)
+    {
+        TestPluginFormat::registerWith (engine.getPluginManager().pluginFormatManager);
+    }
+
+    /** Forgets every test plug-in the engine's list holds, found or failed. */
+    void forgetTestPlugins (te::Engine& engine)
+    {
+        auto& known = engine.getPluginManager().knownPluginList;
+
+        for (const auto& desc : known.getTypes())
+            if (desc.pluginFormatName == TestPluginFormat::formatName)
+                known.removeType (desc);
+
+        for (const auto& path : known.getBlacklistedFiles())
+            if (path.endsWith (TestPluginFormat::fileExtension))
+                known.removeFromBlacklist (path);
+    }
+
+    juce::File writeTestPlugin (const juce::String& name, const juce::String& text)
+    {
+        auto file = testPluginFolder().getChildFile (name + TestPluginFormat::fileExtension);
+        file.replaceWithText (text);
+        return file;
+    }
+
+    const PluginInfo* findInCatalogue (const juce::Array<PluginInfo>& catalogue, const juce::String& name)
+    {
+        for (const auto& info : catalogue)
+            if (info.name == name)
+                return &info;
+
+        return nullptr;
+    }
 }
 
 struct PluginRackTests : juce::UnitTest
@@ -43,8 +86,143 @@ struct PluginRackTests : juce::UnitTest
         bool undoOnce()   { const bool could = model.canUndo(); invoke (cmd::editUndo); return could; }
     };
 
+    /** Lets the rack scan only test plug-ins, with a short per-plug-in timeout. */
+    static void scanTestPluginsOnly (PluginRack& rack, int timeoutMs)
+    {
+        rack.scanFormats = { TestPluginFormat::formatName };
+        rack.installScanner (timeoutMs);
+    }
+
+    /** Waits for the rack's scan to end; false if it is still running after timeoutMs. */
+    static bool waitForScan (PluginRack& rack, int timeoutMs = 30000)
+    {
+        const auto started = juce::Time::getMillisecondCounter();
+
+        while (rack.isScanning())
+        {
+            if (juce::Time::getMillisecondCounter() - started > (juce::uint32) timeoutMs)
+                return false;
+
+            juce::Thread::sleep (10);
+        }
+
+        return true;
+    }
+
+    void runScanTests()
+    {
+        beginTest ("A test plug-in that crashes or hangs its scan is listed as Failed to scan while the others load");
+        {
+            Plugins f;
+            auto& engine = f.projects.getEdit().engine;
+            registerTestPluginFormat (engine);
+            forgetTestPlugins (engine);
+            testPluginFolder().deleteRecursively();
+            testPluginFolder().createDirectory();
+
+            constexpr int timeoutMs = 1500;
+            scanTestPluginsOnly (f.plugins, timeoutMs);
+
+            writeTestPlugin ("Alpha", "ok Alpha Delay");
+            const auto crash = writeTestPlugin ("Crashes", "crash");
+            const auto hang = writeTestPlugin ("Hangs", "hang");
+            writeTestPlugin ("Omega", "ok Omega Chorus");
+
+            // Startup never waits: the scan runs on, a worker per plug-in.
+            const auto started = juce::Time::getMillisecondCounter();
+            f.invoke (cmd::pluginScan);
+            expect (juce::Time::getMillisecondCounter() - started < (juce::uint32) timeoutMs);
+            expect (f.plugins.isScanning());
+
+            expect (waitForScan (f.plugins));
+
+            const auto catalogue = f.plugins.getCatalogue();
+
+            for (auto* name : { "Alpha Delay", "Omega Chorus" })
+            {
+                auto* loaded = findInCatalogue (catalogue, name);
+                expect (loaded != nullptr && ! loaded->failedScan && loaded->external, name);
+            }
+
+            for (auto [name, file] : { std::pair { "Crashes", crash }, std::pair { "Hangs", hang } })
+            {
+                auto* failed = findInCatalogue (catalogue, name);
+                expect (failed != nullptr && failed->failedScan, name);
+
+                if (failed != nullptr)
+                {
+                    expectEquals (failed->path, file.getFullPathName());
+                    expectEquals (failed->format, juce::String (TestPluginFormat::formatName));
+                }
+            }
+
+            // A plug-in that failed to scan can't be inserted.
+            f.invoke (cmd::trackAdd);
+            const auto trackId = f.trackId();
+            f.errors.clear();
+            f.invoke (cmd::pluginInsert, { trackId, crash.getFullPathName() });
+            expect (f.plugins.getChain (trackId, PluginChain::device).empty());
+            expectEquals (f.errors.size(), 1);
+
+            // A second full scan doesn't try them again.
+            f.invoke (cmd::pluginScan);
+            expect (waitForScan (f.plugins));
+            expect (findInCatalogue (f.plugins.getCatalogue(), "Hangs") != nullptr);
+
+            forgetTestPlugins (engine);
+        }
+
+        beginTest ("Retry re-scans only the one plug-in that failed to scan");
+        {
+            Plugins f;
+            auto& engine = f.projects.getEdit().engine;
+            registerTestPluginFormat (engine);
+            forgetTestPlugins (engine);
+            testPluginFolder().deleteRecursively();
+            testPluginFolder().createDirectory();
+            scanTestPluginsOnly (f.plugins, 1500);
+
+            writeTestPlugin ("Alpha", "ok Alpha Delay");
+            const auto crash = writeTestPlugin ("Crashes", "crash");
+            writeTestPlugin ("Hangs", "hang");
+
+            f.invoke (cmd::pluginScan);
+            expect (waitForScan (f.plugins));
+            expect (findInCatalogue (f.plugins.getCatalogue(), "Crashes") != nullptr);
+
+            // Fixed (an update, say). A new plug-in appears, which a full scan would find.
+            crash.replaceWithText ("ok Crashes Fixed");
+            writeTestPlugin ("Newcomer", "ok Newcomer Reverb");
+
+            // Only failed plug-ins can be retried.
+            f.errors.clear();
+            f.invoke (cmd::pluginRetryScan, { testPluginFolder().getChildFile ("Alpha.resampertest").getFullPathName() });
+            expectEquals (f.errors.size(), 1);
+            expect (! f.plugins.isScanning());
+
+            const auto started = juce::Time::getMillisecondCounter();
+            f.invoke (cmd::pluginRetryScan, { crash.getFullPathName() });
+            expect (juce::Time::getMillisecondCounter() - started < 1500u);
+            expect (waitForScan (f.plugins));
+
+            const auto catalogue = f.plugins.getCatalogue();
+            auto* fixed = findInCatalogue (catalogue, "Crashes Fixed");
+            expect (fixed != nullptr && ! fixed->failedScan);
+            expect (findInCatalogue (catalogue, "Crashes") == nullptr);
+            expect (findInCatalogue (catalogue, "Newcomer Reverb") == nullptr);
+
+            auto* hang = findInCatalogue (catalogue, "Hangs");
+            expect (hang != nullptr && hang->failedScan);
+            expect (findInCatalogue (catalogue, "Alpha Delay") != nullptr);
+
+            forgetTestPlugins (engine);
+        }
+    }
+
     void runTest() override
     {
+        runScanTests();
+
         beginTest ("Hosted formats include VST3");
         {
             Plugins f;

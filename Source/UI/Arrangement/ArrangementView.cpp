@@ -271,7 +271,12 @@ void ArrangementView::itemDropped (const SourceDetails& details)
         const auto x = (float) lanes.getLocalPoint (this, details.localPosition).x;
         const auto seconds = lanes.getBounds().contains (details.localPosition) ? std::max (0.0, view.xToTime (x))
                                                                                 : model.getInsertMarkerSeconds();
-        dropOnTrack (commands, *item, tracks[(size_t) target.row].id, seconds);
+        const auto& trackId = tracks[(size_t) target.row].id;
+
+        if (item->kind == LibraryItem::Kind::plugin && onDeviceDropped != nullptr)
+            onDeviceDropped (trackId, item->pluginPath);
+        else
+            dropOnTrack (commands, *item, trackId, seconds);
     }
 }
 
