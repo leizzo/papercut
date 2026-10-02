@@ -145,6 +145,14 @@ _Avoid_: native editor popover, device popover
 The separate process a Plug-in runs in by default (one per instance), so a crash takes down only that Plug-in: its audio is bypassed, the rest of the session plays on, and **Reload** starts it again from its last saved state. A Plug-in can be set to run in-process instead (**Run in-process**), per instance, saved with the project.
 _Avoid_: bridge, out-of-process host (for the concept; fine for the mechanism)
 
+**Plug-in Hosting**:
+Where and how each Plug-in instance runs: in its Sandbox or in-process, and whether it is ready to play. The Sandbox is the mechanism; Plug-in Hosting decides which Plug-ins use it, starts and reloads them, and knows each one's Hosting State.
+_Avoid_: loader, plug-in host (the sandbox host is the process a sandboxed Plug-in runs in)
+
+**Hosting State**:
+The one state a Plug-in is in at a time: **Loading**, **Sandboxed**, **In-process**, **Crashed** (its Sandbox died; its audio is bypassed until Reload), **Failed** (it could not be loaded, and says why; Retry or Run in-process) or **Missing** (saved in the Project but not installed). A Plug-in being reloaded is Loading, even while its old instance still plays or stays bypassed until the new one is ready.
+_Avoid_: load state, plug-in status
+
 **Device Chain**:
 A track's sound: its instrument (on a MIDI track), Racks and creative effects, in order, edited only in the Detail View. It runs before the Mixer Inserts. A MIDI track has one instrument; adding an instrument replaces the current one. A Bus's chain and the Master's rack are also Device Chains.
 _Avoid_: Track chain (only the mixer strip's read-only label for it), bus chain, master rack, insert chain
