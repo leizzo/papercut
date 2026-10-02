@@ -17,7 +17,7 @@ namespace sandboxdock
     struct WindowRef
     {
         juce::int64 number = 0;   ///< 0: none (not on the desktop)
-        int level = 0;
+        int level = 0;            ///< its window level (floating while Resamper is in front)
 
         bool operator== (const WindowRef&) const = default;
     };

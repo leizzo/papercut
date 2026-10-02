@@ -62,6 +62,8 @@ public:
 
     /** Shows the plug-in's parameters in place of its vendor UI, or the vendor UI again. */
     void showParameters (bool);
+
+    /** Whether the parameters show in place of the vendor UI. */
     bool isShowingParameters() const noexcept        { return parameterPanel != nullptr; }
 
     std::function<void()> onRunInProcess;            ///< the error state's Run in-process

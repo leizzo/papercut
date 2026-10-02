@@ -16,8 +16,12 @@ namespace
     constexpr int toolbarPadding = 10, footerPaddingLeft = 12, footerPaddingRight = 8, bypassWidth = 46, controlHeight = 22,
                   presetStepWidth = 18, presetNameWidth = 120, slotWidth = 22, slotHeight = 16, copyWidth = 66,
                   statsWidth = 92, sandboxWidth = 16, scaleWidth = 120, scaleHeight = 18, gripSize = 14,
-                  minFrameWidth = 566, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20, footerGap = 8,
+                  minFrameWidth = 565, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20, footerGap = 8,
                   slotWellPadding = 2, slotsGap = 6;
+
+    // Parameters: an icon button as wide as the preset steps. The design's 540 px minimum frame
+    // grows by it and a gap, so the stats keep their full width.
+    constexpr int parametersWidth = presetStepWidth;
 
     // The format badge in the title: 12 px plug, the badge pads 0 5 inside a 1 px border and is 13 high.
     constexpr int plugGlyph = 12, badgePadding = 5, badgeHeight = 13;
@@ -462,7 +466,7 @@ void PluginWindow::layoutToolbar (juce::Rectangle<int> bar)
     copyAToB->setBounds (take (copyWidth));
     undo->setBounds (take (presetStepWidth));
     redo->setBounds (take (presetStepWidth));
-    parameters->setBounds (take (presetStepWidth));
+    parameters->setBounds (take (parametersWidth));
 
     sandbox->setBounds (bar.removeFromRight (sandboxWidth));
     bar.removeFromRight (gap);
