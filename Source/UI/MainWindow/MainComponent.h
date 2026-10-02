@@ -7,7 +7,7 @@
 #include "UI/PianoRoll/PianoRollView.h"
 #include "UI/Detail/DetailView.h"
 #include "UI/Browser/Browser.h"
-#include "UI/Plugins/PluginEditorWindow.h"
+#include "UI/Plugins/PluginWindows.h"
 #include "UI/Developer/DeveloperOverlay.h"
 #include "UI/Developer/LayoutWatcher.h"
 #include "UI/State/ShellState.h"
@@ -31,6 +31,10 @@ namespace cmd
     inline constexpr CommandRef<> pianoRollQuantize { "pianoRoll.quantize" };
     inline constexpr CommandRef<int> pianoRollTranspose { "pianoRoll.transpose" };   ///< semitones
     inline constexpr CommandRef<> pianoRollSelectAll { "pianoRoll.selectAll" };
+    inline constexpr CommandRef<> pluginWindowToggleAll { "pluginWindow.toggleAll" };           ///< Mod+Alt+P
+    inline constexpr CommandRef<> pluginWindowCloseFocused { "pluginWindow.closeFocused" };     ///< Mod+W
+    inline constexpr CommandRef<> pluginWindowToggleAutoOpen { "pluginWindow.toggleAutoOpen" }; ///< a preference
+    inline constexpr CommandRef<> pluginWindowToggleSelectedTrackOnly { "pluginWindow.toggleSelectedTrackOnly" }; ///< a preference
 }
 
 /** The MainWindow's content (PRD §5–6): the top bar, then the view the shell
@@ -60,6 +64,9 @@ public:
     /** A toast at the bottom centre (PRD §16.7). undoable offers Undo (edit.undo). */
     void showToast (const juce::String& message, bool undoable, bool isError = false);
     ~MainComponent() override;
+
+    /** The plug-in windows and their rules (PRD §9.6). */
+    PluginWindows& getPluginWindows() noexcept   { return pluginWindows; }
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -113,9 +120,10 @@ private:
     juce::TooltipWindow tooltips { this, 600 };
     std::unique_ptr<LayoutWatcher> layoutWatch;
     std::unique_ptr<LayoutWatcher> themeWatch;
-    std::unique_ptr<PluginEditorWindow> pluginEditor;
+    PluginWindows pluginWindows;
 
     void updateStatusBar();
+    void registerPluginWindowCommands();
     void registerArrangementZoomCommands();
     void registerEscapeCommand();
     void registerDeveloperOverlayCommand();

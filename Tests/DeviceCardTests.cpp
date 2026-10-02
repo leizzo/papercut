@@ -1,3 +1,5 @@
+#include "ComponentSearch.h"
+#include "FakePlugin.h"
 #include "TestFixture.h"
 #include "Commands/PluginCommands.h"
 #include "Commands/ProjectCommands.h"
@@ -14,192 +16,6 @@ namespace te = tracktion;
 
 namespace resamper::test
 {
-
-namespace
-{
-    /** A plug-in with six parameters and no editor, standing in for a scanned VST3. */
-    struct FakePlugin : juce::AudioPluginInstance
-    {
-        static juce::PluginDescription description()
-        {
-            juce::PluginDescription d;
-            d.name = "Pinboard";
-            d.descriptiveName = "Pinboard";
-            d.manufacturerName = "Resamper Tests";
-            d.version = "1.2.0";
-            d.pluginFormatName = "VST3";
-            d.category = "Fx";
-            d.fileOrIdentifier = "/Library/Audio/Plug-Ins/VST3/Pinboard.vst3";
-            d.uniqueId = d.deprecatedUid = 0x50696e62;
-            d.numInputChannels = d.numOutputChannels = 2;
-            return d;
-        }
-
-        FakePlugin()
-            : juce::AudioPluginInstance (BusesProperties().withInput ("In", juce::AudioChannelSet::stereo())
-                                                          .withOutput ("Out", juce::AudioChannelSet::stereo()))
-        {
-            for (int i = 0; i < 6; ++i)
-                juce::AudioProcessor::addParameter (new juce::AudioParameterFloat (juce::ParameterID { "p" + juce::String (i), 1 },
-                                                             "Param " + juce::String (i + 1), 0.0f, 1.0f, 0.5f));
-        }
-
-        void fillInPluginDescription (juce::PluginDescription& d) const override   { d = description(); }
-        const juce::String getName() const override                    { return "Pinboard"; }
-        void prepareToPlay (double, int) override                     {}
-        void releaseResources() override                              {}
-        void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
-        double getTailLengthSeconds() const override                  { return 0; }
-        bool acceptsMidi() const override                             { return false; }
-        bool producesMidi() const override                            { return false; }
-        juce::AudioProcessorEditor* createEditor() override           { return nullptr; }
-        bool hasEditor() const override                               { return false; }
-        int getNumPrograms() override                                 { return 1; }
-        int getCurrentProgram() override                              { return 0; }
-        void setCurrentProgram (int) override                         {}
-        const juce::String getProgramName (int) override              { return {}; }
-        void changeProgramName (int, const juce::String&) override    {}
-        void getStateInformation (juce::MemoryBlock&) override        {}
-        void setStateInformation (const void*, int) override          {}
-    };
-
-    /** A plug-in format whose ".fakeplugin" files hold FakePlugin: what Locate scans. */
-    struct FakeFormat : juce::AudioPluginFormat
-    {
-        static constexpr const char* extension = ".fakeplugin";
-
-        juce::String getName() const override   { return "Fake"; }
-
-        void findAllTypesForFile (juce::OwnedArray<juce::PluginDescription>& results, const juce::String& path) override
-        {
-            if (! fileMightContainThisPluginType (path))
-                return;
-
-            auto d = FakePlugin::description();
-            d.pluginFormatName = getName();
-            d.fileOrIdentifier = path;
-            results.add (new juce::PluginDescription (d));
-        }
-
-        bool fileMightContainThisPluginType (const juce::String& path) override   { return path.endsWith (extension); }
-        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return path; }
-        bool pluginNeedsRescanning (const juce::PluginDescription&) override      { return false; }
-        bool doesPluginStillExist (const juce::PluginDescription&) override       { return true; }
-        bool canScanForPlugins() const override                                   { return false; }
-        bool isTrivialToScan() const override                                     { return true; }
-        juce::StringArray searchPathsForPlugins (const juce::FileSearchPath&, bool, bool) override { return {}; }
-        juce::FileSearchPath getDefaultLocationsToSearch() override               { return {}; }
-        bool requiresUnblockedMessageThreadDuringCreation (const juce::PluginDescription&) const override { return false; }
-
-        void createPluginInstance (const juce::PluginDescription&, double, int, PluginCreationCallback callback) override
-        {
-            callback (std::make_unique<FakePlugin>(), {});
-        }
-
-        /** Registers the format with the engine once per run (a format can't be removed). */
-        static void registerWith (te::PluginManager& manager)
-        {
-            static bool registered = false;
-
-            if (! std::exchange (registered, true))
-                manager.pluginFormatManager.addFormat (std::make_unique<FakeFormat>());
-        }
-
-        /** Forgets what Locate found, so later tests see the plug-in missing again. */
-        static void forgetFound (te::PluginManager& manager)
-        {
-            for (auto& type : manager.knownPluginList.getTypes())
-                if (type.pluginFormatName == "Fake")
-                    manager.knownPluginList.removeType (type);
-        }
-    };
-
-    /** While alive, the engine knows FakePlugin as a scanned VST3 and can create it. */
-    struct ScannedPlugin
-    {
-        explicit ScannedPlugin (Fixture& f) : manager (f.projects.getEdit().engine.getPluginManager())
-        {
-            previous = manager.createPluginInstance;
-            manager.createPluginInstance = [fallback = previous] (const juce::PluginDescription& d, double rate, int block,
-                                                                  juce::String& error) -> std::unique_ptr<juce::AudioPluginInstance>
-            {
-                if (d.fileOrIdentifier == FakePlugin::description().fileOrIdentifier)
-                    return std::make_unique<FakePlugin>();
-
-                return fallback (d, rate, block, error);
-            };
-            manager.knownPluginList.addType (FakePlugin::description());
-        }
-
-        ~ScannedPlugin()
-        {
-            manager.knownPluginList.removeType (FakePlugin::description());
-            manager.createPluginInstance = previous;
-        }
-
-        te::PluginManager& manager;
-        decltype (te::PluginManager::createPluginInstance) previous;
-    };
-
-    void findAll (juce::Component& root, const juce::String& id, std::vector<juce::Component*>& out)
-    {
-        for (auto* child : root.getChildren())
-        {
-            if (child->getComponentID() == id)
-                out.push_back (child);
-
-            findAll (*child, id, out);
-        }
-    }
-
-    std::vector<juce::Component*> findAll (juce::Component& root, const juce::String& id)
-    {
-        std::vector<juce::Component*> out;
-        findAll (root, id, out);
-        return out;
-    }
-
-    juce::Component* findOne (juce::Component& root, const juce::String& id)
-    {
-        auto all = findAll (root, id);
-        return all.size() == 1 ? all.front() : nullptr;
-    }
-
-    template <typename Type>
-    Type* findType (juce::Component& root)
-    {
-        for (auto* child : root.getChildren())
-        {
-            if (auto* match = dynamic_cast<Type*> (child))
-                return match;
-
-            if (auto* match = findType<Type> (*child))
-                return match;
-        }
-
-        return nullptr;
-    }
-
-    /** The plug-in windows on screen. */
-    int visiblePluginWindows()
-    {
-        int count = 0;
-
-        for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i)
-            if (auto* c = juce::Desktop::getInstance().getComponent (i); c->getComponentID() == "PluginEditorWindow" && c->isVisible())
-                ++count;
-
-        return count;
-    }
-
-    void click (juce::Component* c)
-    {
-        if (auto* button = dynamic_cast<juce::Button*> (c))
-            button->triggerClick();
-
-        juce::MessageManager::getInstance()->runDispatchLoopUntil (50);   // triggerClick is async
-    }
-}
 
 /** PRD §9.2 (#66): native devices and plug-ins share the chain but follow
     different card contracts, told apart at a glance. */
@@ -432,7 +248,7 @@ struct DeviceCardTests : juce::UnitTest
             click (open);
             expectEquals (opened.joinIntoString (","), id);
 
-            view->setOpenEditor (id);
+            view->setOpenWindows ({ id });
             expect (open != nullptr && open->getButtonText().startsWith ("Window open"));
 
             card->mouseDoubleClick (mouseEvent (*card, { 60, 10 }, { 60, 10 }, false));
@@ -657,24 +473,22 @@ struct DeviceCardTests : juce::UnitTest
             expectEquals (visiblePluginWindows(), 1);
 
             f.invoke (cmd::pluginRemove, { f.trackId(), id });
-            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
             expect (f.plugins.getChain (f.trackId(), PluginChain::device).empty());
-            expectEquals (visiblePluginWindows(), 0, "the deleted plug-in's window stayed open");
+            expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "the deleted plug-in's window stayed open");
 
             // Any other way the plug-in goes: its insert undone, its track deleted.
             const auto again = f.insert (reverb);
             detail->onOpenEditor (again);
             expectEquals (visiblePluginWindows(), 1);
             f.invoke (cmd::editUndo);
-            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);   // the model notifies asynchronously
             expect (! f.plugins.contains (again));
-            expectEquals (visiblePluginWindows(), 0, "undoing the insert left its window open");
+            // The model notifies asynchronously.
+            expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "undoing the insert left its window open");
 
             const auto onTrack = f.insert (reverb);
             detail->onOpenEditor (onTrack);
             f.invoke (cmd::trackRemove);
-            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
-            expectEquals (visiblePluginWindows(), 0, "deleting the track left its plug-in's window open");
+            expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "deleting the track left its plug-in's window open");
         }
 
         beginTest ("A missing plug-in offers Locate and Replace, never its window");
@@ -711,14 +525,15 @@ struct DeviceCardTests : juce::UnitTest
             expect (opened.isEmpty());
         }
 
-        beginTest ("The chain ends in a drop zone; a dropped plug-in opens its window");
+        beginTest ("The chain ends in a drop zone; a drop inserts through plugin.insert, where the opening rule hears it");
         {
             Cards f;
             ScannedPlugin scanned (f);
             f.insert (reverb);
             auto view = f.view();
-            juce::StringArray opened;
+            juce::StringArray opened, added;
             view->onOpenEditor = [&] (const juce::String& plugin) { opened.add (plugin); };
+            f.host.pluginAdded = [&] (const juce::String&, const juce::String& plugin) { added.add (plugin); };
 
             auto* zone = findOne (*view, "dropZone");
             auto* card = findOne (*view, "DeviceCard/Native");
@@ -737,13 +552,15 @@ struct DeviceCardTests : juce::UnitTest
 
             auto chain = f.plugins.getChain (f.trackId(), PluginChain::device);
             expectEquals ((int) chain.size(), 2);
-            expectEquals (opened.joinIntoString (","), chain.back().id);
+            expectEquals (added.joinIntoString (","), chain.back().id);
 
-            // A native device opens no window.
+            // The window is the opening rule's (PluginWindows), not the chain's: it opens it once.
+            expect (opened.isEmpty(), "the chain opened the window itself");
+
             item.name = "Reverb";
             item.pluginPath = reverb;
             target->itemDropped ({ dragDescription (item), nullptr, { 2000, 50 } });
-            expectEquals (opened.size(), 1);
+            expectEquals (added.size(), 2);
         }
     }
 };

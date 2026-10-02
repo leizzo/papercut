@@ -141,6 +141,7 @@ add_library(resamper_ui STATIC
     Source/UI/State/UIStateStore.cpp
     Source/UI/State/ArrangementViewState.cpp
     Source/UI/State/ShellState.cpp
+    Source/UI/State/Preferences.cpp
     Source/UI/Theme/ThemeManager.cpp
     Source/UI/Theme/Interaction.cpp
     Source/UI/Controls/ValueFormat.cpp
@@ -166,7 +167,8 @@ add_library(resamper_ui STATIC
     Source/UI/Detail/PluginDeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
     Source/UI/MainWindow/FloatingWindow.cpp
-    Source/UI/Plugins/PluginEditorWindow.cpp
+    Source/UI/Plugins/PluginWindow.cpp
+    Source/UI/Plugins/PluginWindows.cpp
     Source/UI/Mixer/Metering.cpp
     Source/UI/Mixer/StripParts.cpp
     Source/UI/Mixer/InsertSlot.cpp
@@ -251,6 +253,7 @@ target_sources(ResamperTests PRIVATE
     Tests/ControlViewTests.cpp
     Tests/DeviceChainTests.cpp
     Tests/DeviceCardTests.cpp
+    Tests/PluginWindowTests.cpp
     Tests/EngineUndoTests.cpp
     Tests/ShellTests.cpp
     Tests/BrowserTests.cpp

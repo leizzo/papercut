@@ -93,6 +93,10 @@
     "L2": [
       { "x": 0, "y": 12, "blur": 32, "color": "#000000A0" },
       { "x": 0, "y": 2, "blur": 6, "color": "#00000066" }
+    ],
+    "L3": [
+      { "x": 0, "y": 18, "blur": 48, "color": "#000000B0" },
+      { "x": 0, "y": 2, "blur": 6, "color": "#00000066" }
     ]
   },
   "style": {
@@ -140,6 +144,10 @@
     "pianoScrollMargin": 4,
     "velocityLaneHeight": 80,
     "gridEighthPixels": 48,
-    "gridSixteenthPixels": 90
+    "gridSixteenthPixels": 90,
+    "h-plugin-titlebar": 36,
+    "h-plugin-toolbar": 38,
+    "h-plugin-footer": 26,
+    "window-cascade": 24
   }
 }

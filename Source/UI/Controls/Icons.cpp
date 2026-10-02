@@ -61,6 +61,11 @@ namespace
             case Icon::unfoldVertical: return { "M12 22v-6 M12 8V2 M4 12H2 M10 12H8 M16 12h-2 M22 12h-2 M15 19l-3 3-3-3 M15 5l-3-3-3 3", false };
             case Icon::squareDashed:  return { "M5 3a2 2 0 0 0-2 2 M19 3a2 2 0 0 1 2 2 M21 19a2 2 0 0 1-2 2 M5 21a2 2 0 0 1-2-2 "
                                                "M9 3h1 M9 21h1 M14 3h1 M14 21h1 M3 9v1 M21 9v1 M3 14v1 M21 14v1", false };
+            case Icon::chevronLeft:   return { "M15 18 L9 12 L15 6", false };
+            case Icon::undo2:         return { "M9 14 L4 9 L9 4 M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11", false };
+            case Icon::redo2:         return { "M15 14 L20 9 L15 4 M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13", false };
+            case Icon::save:          return { "M15.2 3a2 2 0 0 1 1.4 0.6l3.8 3.8a2 2 0 0 1 0.6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z "
+                                               "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7 M7 3v4a1 1 0 0 0 1 1h7", false };
         }
 
         return { "", false };

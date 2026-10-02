@@ -12,6 +12,7 @@
 #include "Engine/SamplePreview.h"
 #include "Engine/Session.h"
 #include "Engine/Shaper.h"
+#include "UI/State/Preferences.h"
 #include "UI/State/UIStateStore.h"
 
 namespace resamper
@@ -48,6 +49,7 @@ struct ResamperApp
     SamplePreview preview { engine };
 
     UIStateStore uiState;
+    Preferences preferences;    ///< app-wide; the app gives it a file, tests keep it in memory
     AppCommandHost host;
     CommandRegistry commands;   // last: its Commands refer to everything above
 

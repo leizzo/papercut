@@ -60,6 +60,8 @@ public:
 
         engine = std::make_unique<EngineManager> (getApplicationName(), EngineManager::AudioDevice::initialise);
         app = std::make_unique<ResamperApp> (*engine, theme);
+        app->preferences.setFile (juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                                      .getChildFile ("Resamper").getChildFile ("preferences.xml"));
         wireCommandHost();
         mainWindow = std::make_unique<MainWindow> (getApplicationName(), *app);
 

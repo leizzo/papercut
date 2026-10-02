@@ -427,6 +427,8 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "pianoBlackKeyWidth", &LayoutMetrics::pianoBlackKeyWidth }, { "pianoScrollMargin", &LayoutMetrics::pianoScrollMargin },
         { "velocityLaneHeight", &LayoutMetrics::velocityLaneHeight },
         { "gridEighthPixels", &LayoutMetrics::gridEighthPixels }, { "gridSixteenthPixels", &LayoutMetrics::gridSixteenthPixels },
+        { "h-plugin-titlebar", &LayoutMetrics::pluginTitleBarHeight }, { "h-plugin-toolbar", &LayoutMetrics::pluginToolbarHeight },
+        { "h-plugin-footer", &LayoutMetrics::pluginFooterHeight }, { "window-cascade", &LayoutMetrics::windowCascade },
     };
 
     Theme newTheme;
@@ -454,6 +456,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
 
     for (auto r : { readElevation (elevation, colours, "L1", newTheme.elevation1),
                     readElevation (elevation, colours, "L2", newTheme.elevation2),
+                    readElevation (elevation, colours, "L3", newTheme.elevation3),
                     readNumber (style, "style", "cornerRadius", newTheme.cornerRadius),
                     readNumber (style, "style", "fontSize", newTheme.fontSize),
                     readNumber (style, "style", "opacity-disabled", newTheme.disabledOpacity) })

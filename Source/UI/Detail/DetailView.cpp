@@ -191,7 +191,7 @@ struct DetailView::Chain : juce::Component,
         for (size_t i = 0; i < plugins.size(); ++i)
         {
             cards[i]->setState (plugins[i]);
-            cards[i]->setWindowOpen (plugins[i].id == owner.openEditorId);
+            cards[i]->setWindowOpen (owner.openWindowIds.contains (plugins[i].id));
         }
 
         dropZone.setVisible (trackId.isNotEmpty());
@@ -289,7 +289,8 @@ struct DetailView::Chain : juce::Component,
             insertDropped (item->pluginPath);
     }
 
-    /** Adds a dropped device at the end; a native one takes focus, a plug-in opens its window (§9.2.3). */
+    /** Adds a dropped device at the end; a native one takes focus (§9.2.3). A
+        plug-in's window opens by the opening rule, whichever view inserted it. */
     void insertDropped (const juce::String& path)
     {
         const auto track = trackId;
@@ -306,12 +307,7 @@ struct DetailView::Chain : juce::Component,
         const auto& added = after.back();
 
         if (added.external)
-        {
-            if (owner.onOpenEditor)
-                owner.onOpenEditor (added.id);
-
             return;
-        }
 
         owner.refresh();
 
@@ -417,12 +413,12 @@ void DetailView::refreshDeviceWindow()
     deviceWindow.reset();
 }
 
-void DetailView::setOpenEditor (const juce::String& pluginId)
+void DetailView::setOpenWindows (const juce::StringArray& pluginIds)
 {
-    openEditorId = pluginId;
+    openWindowIds = pluginIds;
 
     for (auto& card : chain->cards)
-        card->setWindowOpen (card->getPlugin().id == openEditorId);
+        card->setWindowOpen (openWindowIds.contains (card->getPlugin().id));
 }
 
 void DetailView::revealDeviceChain()

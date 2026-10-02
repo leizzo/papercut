@@ -13,7 +13,8 @@ enum class Icon
     chevronDown, chevronRight, layers, arrowUpRight, arrowDown, power, search,
     folder, plus, x, audioLines, music, file, gripVertical, gitMerge,
     plug, appWindow, externalLink, pin, cpu, timer, shieldCheck, ellipsis, maximize2, minimize2,
-    foldVertical, unfoldVertical, squareDashed
+    foldVertical, unfoldVertical, squareDashed,
+    chevronLeft, undo2, redo2, save
 };
 
 /** Draws the icon centred in area, stroked (or filled, for solid glyphs) in colour. */

@@ -73,6 +73,8 @@ namespace
         "arrange.zoomOut",
         "arrange.zoomToSelection",
         "arrange.zoomToSong",
+        "pluginWindow.toggleAll",
+        "pluginWindow.closeFocused",
         "theme.use",
         "dev.reloadLayout",
         "dev.reloadTheme",
@@ -94,6 +96,8 @@ namespace
         "transport.tapTempo",
         "view.toggleFollow",
         "plugin.scan",
+        "pluginWindow.toggleAutoOpen",
+        "pluginWindow.toggleSelectedTrackOnly",
         "session.stopAll",
         "session.recordToArrangement",
     };
@@ -188,6 +192,8 @@ namespace
 
         // Other app shortcuts
         KeyBinding { "plugin.scan",               'P',                 cmd | shift,       anyView },
+        KeyBinding { "pluginWindow.toggleAll",    'P',                 cmd | alt,         anyView },
+        KeyBinding { "pluginWindow.closeFocused", 'W',                 cmd,               anyView },
         KeyBinding { "dev.reloadLayout",          'L',                 cmd | alt | shift, anyView },
         KeyBinding { "dev.reloadTheme",           'T',                 cmd | alt | shift, anyView },
         KeyBinding { "dev.toggleOverlay",         'D',                 cmd | alt | shift, anyView },
