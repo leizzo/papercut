@@ -201,4 +201,4 @@ DMG, and the commit list from [git-cliff](https://git-cliff.org) (`cliff.toml`; 
 
 ## License
 
-Resamper's own code is [MIT](LICENSE). A binary also contains JUCE (AGPLv3 or a commercial JUCE licence) and Tracktion Engine (GPLv3 or a commercial Tracktion licence); GIN is BSD-3-Clause. What that means for distribution is in the public [License](#license) section.
+Resamper's own code is [MIT](LICENSE). A binary also contains JUCE (AGPLv3 or a commercial JUCE licence) and Tracktion Engine (GPLv3 or a commercial Tracktion licence); GIN is BSD-3-Clause. The embedded [lucide](https://lucide.dev) icons are ISC / MIT (`Source/UI/Controls/Lucide-LICENSE.txt`). What that means for distribution is in the public [License](#license) section.
