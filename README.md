@@ -101,7 +101,7 @@ build from source (see [For developers](#for-developers)).
 
 Found a bug or have an idea? [Open an issue](https://github.com/leizzo/resamper/issues).
 
-If Resamper is useful to you, you can [sponsor the project on GitHub](https://github.com/sponsors/leizzo).
+If Resamper is useful to you, you can [sponsor the project on GitHub](https://github.com/sponsors/leizzo) — monthly ($5 or $20) or one-time ($10 or $25).
 
 ## License
 
@@ -216,7 +216,7 @@ dosyasını (Apple Silicon) indirip açın ve Resamper'ı Applications'a sürük
 
 Bir hata mı buldunuz ya da bir fikriniz mi var? [Issue açın](https://github.com/leizzo/resamper/issues).
 
-Resamper işinize yarıyorsa [GitHub üzerinden destek olabilirsiniz](https://github.com/sponsors/leizzo).
+Resamper işinize yarıyorsa [GitHub üzerinden destek olabilirsiniz](https://github.com/sponsors/leizzo): aylık (5 $ veya 20 $) ya da tek seferlik (10 $ veya 25 $).
 
 ## Lisans
 
