@@ -5,6 +5,7 @@
 [![Release build](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/release.yml?label=release%20build)](https://github.com/leizzo/resamper/actions/workflows/release.yml)
 [![Commits](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/commits.yml?label=commits)](https://github.com/leizzo/resamper/actions/workflows/commits.yml)
 [![Version](https://img.shields.io/github/v/release/leizzo/resamper?include_prereleases&label=version)](https://github.com/leizzo/resamper/releases)
+[![Sponsors](https://img.shields.io/github/sponsors/leizzo?label=sponsors)](https://github.com/sponsors/leizzo)
 
 <p align="center">
   <img src="docs/images/hero.png" alt="Resamper — sound design in racks, mixing on a real console. The arrangement view with the sidechain source picker and the send editor." width="100%">
@@ -100,6 +101,8 @@ build from source (see [For developers](#for-developers)).
 
 Found a bug or have an idea? [Open an issue](https://github.com/leizzo/resamper/issues).
 
+If Resamper is useful to you, you can [sponsor the project on GitHub](https://github.com/sponsors/leizzo).
+
 ## License
 
 Resamper's source code is released under the [MIT License](LICENSE).
@@ -115,6 +118,7 @@ Resamper's source code is released under the [MIT License](LICENSE).
 [![Sürüm derlemesi](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/release.yml?label=s%C3%BCr%C3%BCm%20derlemesi)](https://github.com/leizzo/resamper/actions/workflows/release.yml)
 [![Commit mesajları](https://img.shields.io/github/actions/workflow/status/leizzo/resamper/commits.yml?label=commit%20mesajlar%C4%B1)](https://github.com/leizzo/resamper/actions/workflows/commits.yml)
 [![Sürüm](https://img.shields.io/github/v/release/leizzo/resamper?include_prereleases&label=s%C3%BCr%C3%BCm)](https://github.com/leizzo/resamper/releases)
+[![Destekçiler](https://img.shields.io/github/sponsors/leizzo?label=destek%C3%A7iler)](https://github.com/sponsors/leizzo)
 
 <p align="center">
   <img src="docs/images/hero.png" alt="Resamper — ses tasarımı rack'lerde, miks gerçek bir konsolda. Sidechain kaynak seçici ve send editörüyle arrangement görünümü." width="100%">
@@ -211,6 +215,8 @@ dosyasını (Apple Silicon) indirip açın ve Resamper'ı Applications'a sürük
 ## Geri bildirim
 
 Bir hata mı buldunuz ya da bir fikriniz mi var? [Issue açın](https://github.com/leizzo/resamper/issues).
+
+Resamper işinize yarıyorsa [GitHub üzerinden destek olabilirsiniz](https://github.com/sponsors/leizzo).
 
 ## Lisans
 
