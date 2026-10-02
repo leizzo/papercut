@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <map>
 #include <new>
 #include <thread>
@@ -86,7 +87,9 @@ namespace
 
         for (const auto meta : midi)
         {
-            if (meta.samplePosition < start || meta.samplePosition >= start + length)
+            // Its size goes in 16 bits: a longer event (a huge SysEx) can't cross.
+            if (meta.samplePosition < start || meta.samplePosition >= start + length
+                || meta.numBytes > std::numeric_limits<juce::uint16>::max())
                 continue;
 
             const auto needed = (int) (sizeof (juce::int32) + sizeof (juce::uint16)) + meta.numBytes;
@@ -420,7 +423,9 @@ public:
                 bypass (buffer, midi, start, length);
         }
 
-        midi.swapWith (outMidi);
+        // Copied, not swapped: outMidi keeps the room prepareToPlay made, so the audio thread doesn't allocate.
+        midi.clear();
+        midi.addEvents (outMidi, 0, -1, 0);
     }
 
     bool isBusesLayoutSupported (const BusesLayout& layout) const override
@@ -440,7 +445,17 @@ public:
     int getNumPrograms() override                  { return juce::jmax (1, programNames.size()); }
     int getCurrentProgram() override               { return currentProgram; }
     const juce::String getProgramName (int index) override   { return programNames[index]; }
-    void changeProgramName (int, const juce::String&) override {}
+    void changeProgramName (int index, const juce::String& newName) override
+    {
+        if (! juce::isPositiveAndBelow (index, programNames.size()))
+            return;
+
+        programNames.set (index, newName);
+        juce::ValueTree message (msg::programName);
+        message.setProperty (msg::index, index, nullptr);
+        message.setProperty (msg::name, newName, nullptr);
+        remote->post (message);
+    }
 
     void setCurrentProgram (int index) override
     {
@@ -465,6 +480,8 @@ public:
 
     void setStateInformation (const void* data, int size) override
     {
+        size = juce::jmax (0, size);
+
         {
             const std::scoped_lock lock (stateLock);
             lastState = juce::MemoryBlock (data, (size_t) size);
@@ -791,7 +808,12 @@ namespace
             window.reset();
 
             if (plugin != nullptr)
+            {
+                for (auto* p : parameters)
+                    p->removeListener (this);
+
                 plugin->removeListener (this);
+            }
 
             plugin.reset();
         }
@@ -934,6 +956,10 @@ namespace
             {
                 plugin->setCurrentProgram ((int) m[msg::index]);
                 markAll (byPlugin);
+            }
+            else if (m.hasType (msg::programName))
+            {
+                plugin->changeProgramName ((int) m[msg::index], m[msg::name].toString());
             }
             else if (m.hasType (msg::showEditor))
             {
