@@ -49,6 +49,9 @@ struct PluginInfo
     juce::String trackId;                       ///< on a track: the track it is on
     juce::String presetName;                    ///< the preset last chosen or saved in its window; empty for none
     int abSlot = 0;                             ///< the A/B compare slot in use: 0 = A, 1 = B
+
+    /** An external plug-in's format as its badge reads: VST3, AU, CLAP. */
+    juce::String formatBadge() const   { return format == "AudioUnit" ? juce::String ("AU") : format; }
 };
 
 /** Where a plug-in's window is and how it shows (PRD §20 Plugin.window).

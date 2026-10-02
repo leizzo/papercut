@@ -78,7 +78,8 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         resized();
     };
 
-    // A card or an insert slot opens its plug-in's window, or brings it forward.
+    // A card or an insert slot opens its device's window, or brings it forward: a plug-in's
+    // window, or a native device floating expanded, under the same window rules (#70).
     detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id) { pluginWindows.open (id); };
 
     pluginWindows.onOpenWindowsChanged = [this] { detailView.setOpenWindows (pluginWindows.getOpenPluginIds()); };

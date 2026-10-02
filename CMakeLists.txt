@@ -166,7 +166,8 @@ add_library(resamper_ui STATIC
     Source/UI/Detail/NativeDeviceCard.cpp
     Source/UI/Detail/PluginDeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
-    Source/UI/MainWindow/FloatingWindow.cpp
+    Source/UI/Plugins/FloatingDeviceWindow.cpp
+    Source/UI/Plugins/NativeDeviceWindow.cpp
     Source/UI/Plugins/PluginWindow.cpp
     Source/UI/Plugins/PluginWindows.cpp
     Source/UI/Mixer/Metering.cpp

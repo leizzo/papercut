@@ -167,18 +167,13 @@ PluginDeviceCard::PluginDeviceCard (CommandRegistry& c, PluginRack& r, ThemeMana
 
 PluginDeviceCard::~PluginDeviceCard() = default;
 
-juce::String PluginDeviceCard::formatBadge() const
-{
-    return plugin.format == "AudioUnit" ? juce::String ("AU") : plugin.format;
-}
-
 void PluginDeviceCard::setState (const PluginInfo& info)
 {
     plugin = info;
     setTitle (plugin.name);
     // Never colour-only (§18): the vendor and the format are always said.
     const auto vendor = plugin.manufacturer.isNotEmpty() ? plugin.manufacturer : juce::String ("Unknown vendor");
-    setDescription (vendor + " " + middleDot + " " + formatBadge() + " plug-in" + (plugin.missing ? ", missing" : ""));
+    setDescription (vendor + " " + middleDot + " " + plugin.formatBadge() + " plug-in" + (plugin.missing ? ", missing" : ""));
     setAlpha (plugin.enabled ? 1.0f : 0.5f);
     power.setToggleState (plugin.enabled, juce::dontSendNotification);
 
@@ -346,7 +341,7 @@ void PluginDeviceCard::paint (juce::Graphics& g)
     drawIcon (g, Icon::plug, title.removeFromLeft (11).toFloat().withSizeKeepingCentre (11.0f, 11.0f), theme.textSecondary);
     title.removeFromLeft (titleGap);
 
-    const auto badgeText = formatBadge();
+    const auto badgeText = plugin.formatBadge();
     const auto badgeWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (badgeStyle), badgeText) + 2 * 4 + 2;
     const auto badge = title.removeFromRight (badgeWidth).withSizeKeepingCentre (badgeWidth, 11);
     g.setColour (theme.border);

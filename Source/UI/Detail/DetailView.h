@@ -26,11 +26,10 @@ public:
     DetailView (ApplicationModel&, PluginRack&, CommandRegistry&, ThemeManager&, ShellState&, juce::ValueTree uiState);
     ~DetailView() override;
 
+    /** A card wants its device's window: a plug-in's window (its Open
+        button, a double-click on its title), or a native device floating
+        expanded (Open in Window). PluginWindows opens both. */
     std::function<void (const juce::String& pluginId)> onOpenEditor;
-
-    /** Opens a native device, expanded, in its own window (one at a time). It
-        follows the device's state and closes when the device goes. */
-    void openDeviceWindow (const juce::String& trackId, const juce::String& pluginId);
 
     /** The plug-ins whose windows are open; their cards say so. */
     void setOpenWindows (const juce::StringArray& pluginIds);
@@ -50,7 +49,6 @@ public:
 private:
     struct ClipPanel;
     struct Chain;
-    struct DeviceWindow;
 
     ApplicationModel& model;
     PluginRack& rack;
@@ -64,11 +62,9 @@ private:
     juce::Viewport chainView;
     juce::Component* inspector = nullptr;
     juce::StringArray openWindowIds;
-    std::unique_ptr<DeviceWindow> deviceWindow;
     int heightAtDragStart = 0;
 
     void refresh();
-    void refreshDeviceWindow();
     bool onResizeEdge (juce::Point<int>) const;
     void modelChanged() override   { refresh(); }
 };

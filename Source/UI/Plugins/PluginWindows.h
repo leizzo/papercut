@@ -10,7 +10,10 @@
 namespace resamper
 {
 
-/** The plug-in windows of the Edit, and their rules (PRD §9.6 window behaviour).
+/** The device windows of the Edit, and their rules (PRD §9.6 window
+    behaviour): a plug-in's window (PluginWindow), or a native device's
+    floating Expanded editor (NativeDeviceWindow), which follows the same
+    rules (#70). open() makes whichever the device needs.
 
     - One per instance: open() on a plug-in with a window brings it forward.
     - Placement: the first window centres over the anchor area (the
@@ -31,8 +34,8 @@ namespace resamper
       and a project's open windows come back when it loads.
 
     The rules are kept apart from what a window shows: windows are made in
-    one place (createWindow), and the rules only use a PluginWindow's
-    position, pin, focus and callbacks, never its vendor slot. Whether a
+    one place (createWindow), and the rules only use a FloatingDeviceWindow's
+    position, pin, focus and callbacks, never what it holds. Whether a
     plug-in runs in or out of process (the sandbox, #69) only changes what
     the window reports (PluginInfo::sandboxed) and what onRunInProcess does. */
 class PluginWindows : private ApplicationModel::Listener,
@@ -56,8 +59,9 @@ public:
         is in-process, so by default this reloads the plug-in. */
     std::function<void (const juce::String& pluginId)> onRunInProcess;
 
-    /** Opens the plug-in's window, or brings its window forward; focused
-        unless focus is false. Does nothing for an unknown or missing plug-in. */
+    /** Opens the device's window (a plug-in's window, a native device
+        floating expanded), or brings it forward; focused unless focus is
+        false. Does nothing for an unknown or missing plug-in. */
     void open (const juce::String& pluginId, bool focus = true);
 
     /** Closes a window (saved as closed). */
@@ -74,10 +78,15 @@ public:
 
     void setPinned (const juce::String& pluginId, bool);
 
-    /** Plug-ins with a window, shown or hidden. */
+    /** Devices with a window, shown or hidden. */
     juce::StringArray getOpenPluginIds() const;
     bool isOpen (const juce::String& pluginId) const;
     bool isShowing (const juce::String& pluginId) const;
+
+    /** The device's window, of either kind; nullptr if it has none. */
+    FloatingDeviceWindow* getDeviceWindow (const juce::String& pluginId) const;
+
+    /** A plug-in's window; nullptr if it has none or the device is native. */
     PluginWindow* getWindow (const juce::String& pluginId) const;
 
     /** The loading timeout every window gets (10 s; tests shorten it). */
@@ -89,7 +98,7 @@ public:
 private:
     struct Entry
     {
-        std::unique_ptr<PluginWindow> window;
+        std::unique_ptr<FloatingDeviceWindow> window;
         bool hiddenByUser = false;   ///< toggleAll hid it
     };
 
@@ -102,14 +111,15 @@ private:
     int loadTimeoutMs = PluginWindow::defaultLoadTimeoutMs;
     bool refreshing = false, refreshAgain = false;
 
-    std::unique_ptr<PluginWindow> createWindow (const PluginInfo&);
+    std::unique_ptr<FloatingDeviceWindow> createWindow (const PluginInfo&);
+    void addWindow (const PluginInfo&);
     juce::String trackNameOf (const juce::String& trackId) const;
-    juce::Point<int> placementFor (const PluginWindow&, const PluginWindowState&) const;
+    juce::Point<int> placementFor (const FloatingDeviceWindow&, const PluginWindowState&) const;
     static bool isOnADisplay (juce::Rectangle<int> frame);
     bool shouldShow (const Entry&) const;
-    void saveState (const PluginWindow&, bool open);
-    void selectTrackOf (const PluginWindow&);
-    void announceAndFocus (PluginWindow&);
+    void saveState (const FloatingDeviceWindow&, bool open);
+    void selectTrackOf (const FloatingDeviceWindow&);
+    void announceAndFocus (FloatingDeviceWindow&);
     void openWindowsChanged();
 
     void modelChanged() override;

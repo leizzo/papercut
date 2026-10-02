@@ -1,7 +1,15 @@
 #include "InsertSlot.h"
+#include "UI/Controls/Icons.h"
 
 namespace resamper
 {
+
+namespace
+{
+    // Design: InsertSlot/Filled pads 0 7 with a 6 px gap; InsertSlot/Plugin pads 0 6 with 5, a 9 px plug, a 7 px mono format.
+    constexpr int filledPadding = 7, filledGap = 6, pluginPadding = 6, pluginGap = 5, ledSize = 6, plugSize = 9, badgeWidth = 40;
+    const TypeStyle nameStyle { 10.0f, false, 400 }, formatStyle { 7.0f, true, 400 };
+}
 
 InsertSlot::InsertSlot (ThemeManager& tm, int i) : themeManager (tm), index (i)
 {
@@ -12,9 +20,21 @@ InsertSlot::InsertSlot (ThemeManager& tm, int i) : themeManager (tm), index (i)
 void InsertSlot::setPlugin (std::optional<PluginInfo> p)
 {
     plugin = std::move (p);
-    setTooltip (plugin ? plugin->name + (plugin->missing ? " (missing)" : juce::String())
-                       : juce::String ("Empty insert: click to add an effect, or drop one here"));
+
+    if (! plugin)
+        setTooltip ("Empty insert: click to add an effect, or drop one here");
+    else if (plugin->external)
+        setTooltip (plugin->name + " (" + plugin->formatBadge() + " plug-in" + (plugin->missing ? ", missing)" : "): click to open its window"));
+    else
+        setTooltip (plugin->name + ": click to open its editor");
+
+    setDescription (getTooltip());
     repaint();
+}
+
+InsertSlot::Look InsertSlot::getLook() const noexcept
+{
+    return ! plugin ? Look::empty : plugin->external ? Look::plugin : Look::filled;
 }
 
 void InsertSlot::setDropHighlight (std::optional<bool> valid)
@@ -26,7 +46,7 @@ void InsertSlot::setDropHighlight (std::optional<bool> valid)
 
 juce::Rectangle<int> InsertSlot::powerBounds() const
 {
-    return getLocalBounds().removeFromLeft (7 + 6 + 3).withTrimmedLeft (4);
+    return getLocalBounds().removeFromLeft (filledPadding + ledSize + 3).withTrimmedLeft (4);
 }
 
 void InsertSlot::paint (juce::Graphics& g)
@@ -42,20 +62,36 @@ void InsertSlot::paint (juce::Graphics& g)
     if (plugin)
     {
         const auto on = plugin->enabled;
-        auto r = getLocalBounds().reduced (7, 0);
+        const auto isPlugin = getLook() == Look::plugin;
+        const auto gap = isPlugin ? pluginGap : filledGap;
+        auto r = getLocalBounds().reduced (isPlugin ? pluginPadding : filledPadding, 0);
         g.setColour (plugin->missing ? theme.rec : on ? theme.accent : theme.textDim);
-        g.fillEllipse (r.removeFromLeft (6).withSizeKeepingCentre (6, 6).toFloat());
-        r.removeFromLeft (6);
+        g.fillEllipse (r.removeFromLeft (ledSize).withSizeKeepingCentre (ledSize, ledSize).toFloat());
+        r.removeFromLeft (gap);
 
         if (plugin->missing)
         {
-            auto badge = r.removeFromRight (40).withSizeKeepingCentre (40, 12);
+            auto badge = r.removeFromRight (badgeWidth).withSizeKeepingCentre (badgeWidth, 12);
             g.setColour (theme.rec.withAlpha (0.2f));
             g.fillRoundedRectangle (badge.toFloat(), theme.radiusSm);
             drawStyledText (g, themeManager, "Missing", theme.micro, badge, juce::Justification::centred, theme.rec);
+            r.removeFromRight (gap);
         }
 
-        drawStyledText (g, themeManager, plugin->name, TypeStyle { 10.0f, false, 400 }, r, juce::Justification::centredLeft,
+        // A plug-in: the plug icon and its format, at the right of the name.
+        if (isPlugin)
+        {
+            const auto format = plugin->formatBadge();
+            const auto formatWidth = juce::GlyphArrangement::getStringWidthInt (themeManager.font (formatStyle), format) + 1;
+            drawNumber (g, themeManager, format, formatStyle, r.removeFromRight (formatWidth), juce::Justification::centredRight,
+                        theme.textDim);
+            r.removeFromRight (gap);
+            drawIcon (g, Icon::plug, r.removeFromRight (plugSize).toFloat().withSizeKeepingCentre ((float) plugSize, (float) plugSize),
+                      theme.textDim);
+            r.removeFromRight (gap);
+        }
+
+        drawStyledText (g, themeManager, plugin->name, nameStyle, r, juce::Justification::centredLeft,
                         on ? theme.textPrimary : theme.textDim);
 
         if (plugin->missing)

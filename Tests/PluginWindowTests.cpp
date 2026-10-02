@@ -5,7 +5,10 @@
 #include "Commands/PluginCommands.h"
 #include "Commands/ProjectCommands.h"
 #include "Commands/TrackCommands.h"
+#include "UI/Detail/DeviceCard.h"
 #include "UI/MainWindow/MainComponent.h"
+#include "UI/Mixer/InsertSlot.h"
+#include "UI/Plugins/NativeDeviceWindow.h"
 
 namespace te = tracktion;
 
@@ -13,7 +16,8 @@ namespace resamper::test
 {
 
 /** PRD §9.6 (#68): a plug-in's host-chromed window opens on insert, one per
-    instance, and follows the window rules. */
+    instance, and follows the window rules. A native device's floating
+    Expanded editor follows the same rules (#70). */
 struct PluginWindowTests : juce::UnitTest
 {
     PluginWindowTests() : juce::UnitTest ("Plug-in Window", "Resamper") {}
@@ -48,6 +52,36 @@ struct PluginWindowTests : juce::UnitTest
         PluginWindows& windows()   { return main->getPluginWindows(); }
 
         Toasts* toasts()   { return findType<Toasts> (*main); }
+
+        /** The mixer's slot holding the insert, once the mixer shows it; nullptr if none does. */
+        InsertSlot* insertSlot (const juce::String& pluginId)
+        {
+            InsertSlot* found = nullptr;
+
+            std::function<void (juce::Component&)> search = [&] (juce::Component& parent)
+            {
+                for (auto* child : parent.getChildren())
+                {
+                    if (auto* slot = dynamic_cast<InsertSlot*> (child); slot != nullptr && slot->getPlugin()
+                                                                         && slot->getPlugin()->id == pluginId)
+                        found = slot;
+
+                    search (*child);
+                }
+            };
+
+            dispatchUntil ([&] { search (*main); return found != nullptr; });
+            return found;
+        }
+
+        /** Clicks a slot away from its power LED, as the user opens an insert. */
+        static void clickSlot (InsertSlot& slot)
+        {
+            const auto centre = slot.getLocalBounds().getCentre();
+            slot.mouseDown (mouseEvent (slot, centre, centre, false));
+            slot.mouseUp (mouseEvent (slot, centre, centre, false));
+            settle();
+        }
 
         /** Lets pending messages (the model's asynchronous notification, a deferred close) land. */
         static void settle()   { juce::MessageManager::getInstance()->runDispatchLoopUntil (60); }
@@ -400,5 +434,169 @@ struct PluginWindowTests : juce::UnitTest
 };
 
 static PluginWindowTests pluginWindowTests;
+
+//==============================================================================
+/** PRD §9.2.3, §10.6 (#70): native and plug-in mixer inserts look different;
+    clicking one opens its device's window: a plug-in's window, or the native
+    device's floating Expanded editor under the same window rules. */
+struct MixerInsertWindowTests : juce::UnitTest
+{
+    MixerInsertWindowTests() : juce::UnitTest ("Mixer Insert Windows", "Resamper") {}
+
+    using Windows = PluginWindowTests::Windows;
+
+    static int visibleNativeWindows()   { return (int) visibleDesktopWindows ("NativeDeviceWindow").size(); }
+
+    void runTest() override
+    {
+        const juce::String reverb (te::ReverbPlugin::xmlTypeName), pinboard (FakePlugin::description().fileOrIdentifier);
+
+        beginTest ("A native insert is InsertSlot/Filled, a plug-in insert InsertSlot/Plugin with its format");
+        {
+            Windows f;
+            const auto native = f.insert (reverb, PluginChain::mixer);
+            const auto plugIn = f.insert (pinboard, PluginChain::mixer);
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+
+            // MixerChannel.inserts hold either kind; effects only.
+            const auto inserts = f.plugins.getChain (f.trackId(), PluginChain::mixer);
+            expect (inserts.size() == 2 && ! inserts[0].external && inserts[1].external);
+            f.invoke (cmd::pluginInsert, { f.trackId(), te::FourOscPlugin::xmlTypeName, PluginChain::mixer });
+            expectEquals ((int) f.plugins.getChain (f.trackId(), PluginChain::mixer).size(), 2, "an instrument went in a mixer insert");
+
+            auto* nativeSlot = f.insertSlot (native);
+            auto* plugInSlot = f.insertSlot (plugIn);
+            expect (nativeSlot != nullptr && plugInSlot != nullptr);
+
+            if (nativeSlot == nullptr || plugInSlot == nullptr)
+                return;
+
+            expect (nativeSlot->getLook() == InsertSlot::Look::filled);
+            expect (plugInSlot->getLook() == InsertSlot::Look::plugin);
+
+            // Never colour alone (§18): the plug-in says what it is and its format.
+            expect (plugInSlot->getTooltip().contains ("VST3 plug-in"), plugInSlot->getTooltip());
+            expect (! nativeSlot->getTooltip().contains ("plug-in"), nativeSlot->getTooltip());
+        }
+
+        beginTest ("Clicking a plug-in insert opens its window, or brings it forward");
+        {
+            Windows f;
+            const auto id = f.insert (pinboard, PluginChain::mixer);
+            expect (f.windows().isShowing (id), "adding a plug-in to a slot didn't open its window");
+            f.windows().close (id);
+            Windows::settle();
+
+            auto* slot = f.insertSlot (id);
+            expect (slot != nullptr);
+
+            if (slot == nullptr)
+                return;
+
+            Windows::clickSlot (*slot);
+            expect (f.windows().isShowing (id) && f.windows().getWindow (id) != nullptr);
+            Windows::clickSlot (*slot);
+            expectEquals (visiblePluginWindows(), 1);
+            expectEquals (visibleNativeWindows(), 0);
+        }
+
+        beginTest ("Clicking a native insert floats its device expanded: one per instance, no plug-in window");
+        {
+            Windows f;
+            const auto id = f.insert (reverb, PluginChain::mixer);
+            expectEquals (visibleNativeWindows(), 0, "adding a native device opened a window");
+
+            auto* slot = f.insertSlot (id);
+            expect (slot != nullptr);
+
+            if (slot == nullptr)
+                return;
+
+            Windows::clickSlot (*slot);
+            Windows::clickSlot (*slot);
+            expectEquals (visibleNativeWindows(), 1);
+            expectEquals (visiblePluginWindows(), 0);
+            expect (f.windows().getWindow (id) == nullptr, "a native device got a plug-in window");
+
+            auto* window = dynamic_cast<NativeDeviceWindow*> (f.windows().getDeviceWindow (id));
+            expect (window != nullptr);
+
+            if (window == nullptr)
+                return;
+
+            // Its card, expanded: every parameter, nothing to fold or expand; Pin and Close in the title bar.
+            for (auto& p : f.plugins.getParameters (id))
+                expect (findOne (*window, p.id) != nullptr && findOne (*window, p.id)->isVisible(), p.name + " isn't in the window");
+
+            expect (findOne (*window, "fold") == nullptr || ! findOne (*window, "fold")->isVisible());
+
+            for (auto* part : { "pin", "close" })
+                expect (findOne (*window, part) != nullptr && findOne (*window, part)->getWantsKeyboardFocus(), part);
+
+            // It edits the device through Commands, like the docked card.
+            click (findOne (*window, "power"));
+            expect (dispatchUntil ([&] { return ! f.plugins.getChain (f.trackId(), PluginChain::mixer).front().enabled; }),
+                    "the window's power didn't bypass the device");
+        }
+
+        beginTest ("A native device's window follows the window rules: Pin, the selected track, a click selects its track");
+        {
+            Windows f;
+            f.invoke (cmd::trackAdd);
+            const auto onFirst = f.insert (reverb, PluginChain::mixer, 0);
+            const auto onSecond = f.insert (reverb, PluginChain::mixer, 1);
+            f.windows().open (onFirst);
+            f.windows().open (onSecond);
+
+            // Opening a window selects its track; the other track's unpinned window hides.
+            expectEquals (f.model.getSelectedTrackId(), f.trackId (1));
+            expect (dispatchUntil ([&] { return ! f.windows().isShowing (onFirst) && f.windows().isShowing (onSecond); }),
+                    "the deselected track's window still shows");
+
+            f.windows().setPinned (onSecond, true);
+            expect (f.plugins.getWindowState (onSecond).pinned, "Pin wasn't saved on the device");
+            f.invoke (cmd::trackSelect, { f.trackId (0) });
+            expect (dispatchUntil ([&] { return f.windows().isShowing (onFirst) && f.windows().isShowing (onSecond); }),
+                    "a pinned window hid, or the selected track's didn't come back");
+
+            auto* window = f.windows().getDeviceWindow (onSecond);
+            expect (window != nullptr && window->isPinned() && window->onActivated != nullptr);
+
+            if (window == nullptr || window->onActivated == nullptr)
+                return;
+
+            window->onActivated();
+            expectEquals (f.model.getSelectedTrackId(), f.trackId (1));
+
+            // Esc closes it, saved as closed; Mod+Alt+P reaches the other windows too.
+            expect (window->keyPressed (juce::KeyPress (juce::KeyPress::escapeKey)));
+            expect (dispatchUntil ([&] { return ! f.windows().isOpen (onSecond); }), "Esc didn't close the window");
+            expect (! f.plugins.getWindowState (onSecond).open);
+        }
+
+        beginTest ("Open in Window floats a chain device the same way; it follows the device and closes when it goes");
+        {
+            Windows f;
+            const auto id = f.insert (reverb);
+            Windows::settle();
+            auto* card = dynamic_cast<DeviceCard*> (findOne (*f.main, "DeviceCard/Native"));
+            expect (card != nullptr && card->onFloat != nullptr);
+
+            if (card == nullptr || card->onFloat == nullptr)
+                return;
+
+            card->onFloat();
+            card->onFloat();
+            expectEquals (visibleNativeWindows(), 1);
+            expect (f.plugins.getChain (f.trackId(), PluginChain::device).front().size == DeviceSize::compact,
+                    "floating it changed the docked card's size");
+
+            f.invoke (cmd::pluginRemove, { f.trackId(), id });
+            expect (dispatchUntil ([] { return visibleNativeWindows() == 0; }), "the removed device's window stayed open");
+        }
+    }
+};
+
+static MixerInsertWindowTests mixerInsertWindowTests;
 
 } // namespace resamper::test
