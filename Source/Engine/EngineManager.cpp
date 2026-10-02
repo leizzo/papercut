@@ -12,6 +12,68 @@ namespace resamper
 
 namespace
 {
+    /** Whether the engine creates this plug-in asynchronously (AUv3), past the
+        createPluginInstance hook, where no sandboxed stand-in can take its place. */
+    bool createsAsynchronously (te::Engine& engine, const juce::PluginDescription& desc)
+    {
+        for (auto* format : engine.getPluginManager().pluginFormatManager.getFormats())
+            if (format->getName() == desc.pluginFormatName && format->fileMightContainThisPluginType (desc.fileOrIdentifier)
+                && format->requiresUnblockedMessageThreadDuringCreation (desc))
+                return true;
+
+        return false;
+    }
+
+    /** Whether the plug-in runs in its sandbox: one the sandbox can host, not set to run
+        in-process, and not one the engine creates asynchronously. */
+    bool runsSandboxed (PluginSandbox& sandbox, te::ExternalPlugin& plugin)
+    {
+        return ! (bool) plugin.state[PluginSandbox::inProcessProperty] && sandbox.canHost (plugin.desc)
+            && ! createsAsynchronously (plugin.engine, plugin.desc);
+    }
+
+    /** Creates the plug-in's instance anew, now, from the state saved on it; its old one goes first. */
+    void createAgain (te::ExternalPlugin& plugin)
+    {
+        const auto hadInstance = plugin.getAudioPluginInstance() != nullptr;
+
+        // Processing off deletes the instance; neither change is an undo step.
+        if (hadInstance)
+        {
+            plugin.state.setProperty (te::IDs::process, false, nullptr);
+            plugin.processingChanged();
+        }
+
+        // The engine still counts a deleted instance as prepared, and would then read
+        // the new one without checking it could be created. Initialised with none, it doesn't.
+        auto& devices = plugin.engine.getDeviceManager();
+        plugin.initialise ({ {}, devices.getSampleRate(), devices.getBlockSize() });
+
+        if (hadInstance)
+        {
+            plugin.state.setProperty (te::IDs::process, true, nullptr);
+            plugin.processingChanged();
+        }
+        else
+        {
+            plugin.forceFullReinitialise();
+        }
+    }
+
+    /** Has the sandbox load the plug-in in the background, unless it has: true then.
+        Once it has, the plug-in is created again with it (if it still runs sandboxed). */
+    bool loadInSandbox (PluginSandbox& sandbox, te::ExternalPlugin& plugin)
+    {
+        auto& devices = plugin.engine.getDeviceManager();
+
+        return sandbox.loadInBackground (plugin.desc, plugin.itemID.toString(), devices.getSampleRate(),
+                                         devices.getBlockSize(), [&sandbox, ref = te::makeSafeRef (plugin)]
+        {
+            if (ref != nullptr && runsSandboxed (sandbox, *ref))
+                createAgain (*ref);
+        });
+    }
+
     class ResamperEngineBehaviour : public te::EngineBehaviour
     {
     public:
@@ -32,16 +94,21 @@ namespace
         }
 
         /** Called just before a plug-in of an Edit is created: tells the sandbox which
-            instance it is, and whether it runs sandboxed (see createInstance below). */
+            instance it is, and whether it runs sandboxed (see createPluginInstance below).
+            A sandboxed one isn't created until its host has loaded it in the background:
+            till then it has no instance (it is loading), and the message thread goes on. */
         bool shouldLoadPlugin (te::ExternalPlugin& plugin) override
         {
-            const auto load = te::EngineBehaviour::shouldLoadPlugin (plugin);
+            if (! te::EngineBehaviour::shouldLoadPlugin (plugin))
+                return false;
 
-            if (load)
-                sandbox.willLoad (plugin.desc.createIdentifierString(), plugin.itemID.toString(),
-                                  ! (bool) plugin.state[PluginSandbox::inProcessProperty]);
+            const auto sandboxed = runsSandboxed (sandbox, plugin);
 
-            return load;
+            if (sandboxed && ! loadInSandbox (sandbox, plugin))
+                return false;
+
+            sandbox.willLoad (plugin.desc.createIdentifierString(), plugin.itemID.toString(), sandboxed);
+            return true;
         }
 
     private:
@@ -84,8 +151,8 @@ EngineManager::EngineManager (const juce::String& applicationName, AudioDevice a
                                             std::make_unique<ResamperUIBehaviour>(),
                                             std::make_unique<ResamperEngineBehaviour> (audioDevice, *sandbox)))
 {
-    // A plug-in of an Edit runs in its sandbox when the sandbox can host it and
-    // the instance isn't set to run in-process; anything else, as the engine would.
+    // A plug-in of an Edit runs in its sandbox when shouldLoadPlugin said so (its
+    // host has loaded it by now); anything else, as the engine would.
     auto& plugins = engine->getPluginManager();
     plugins.createPluginInstance = [&s = *sandbox, inProcess = plugins.createPluginInstance]
                                    (const juce::PluginDescription& desc, double rate, int blockSize, juce::String& error)
@@ -93,8 +160,8 @@ EngineManager::EngineManager (const juce::String& applicationName, AudioDevice a
         juce::String pluginId;
         bool sandboxed = false;
 
-        if (s.takeLoading (desc.createIdentifierString(), pluginId, sandboxed) && sandboxed && s.canHost (desc))
-            return s.createInstance (desc, rate, blockSize, pluginId, error);
+        if (s.takeLoading (desc.createIdentifierString(), pluginId, sandboxed) && sandboxed)
+            return s.createInstance (desc, pluginId, error);
 
         return inProcess (desc, rate, blockSize, error);
     };
@@ -116,6 +183,14 @@ te::Engine& EngineManager::getEngine() const noexcept
 PluginSandbox& EngineManager::getPluginSandbox() const noexcept
 {
     return *sandbox;
+}
+
+void EngineManager::recreatePlugin (te::ExternalPlugin& plugin)
+{
+    if (runsSandboxed (*sandbox, plugin) && ! loadInSandbox (*sandbox, plugin))
+        return;
+
+    createAgain (plugin);
 }
 
 juce::String EngineManager::describeActiveAudioDevice() const

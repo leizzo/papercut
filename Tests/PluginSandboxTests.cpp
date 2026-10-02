@@ -2,6 +2,7 @@
 #include "TestFixture.h"
 #include "TestPluginFormat.h"
 #include "Commands/ClipCommands.h"
+#include "Commands/EditCommands.h"
 #include "Commands/PluginCommands.h"
 #include "Commands/ProjectCommands.h"
 #include "Commands/TrackCommands.h"
@@ -88,11 +89,20 @@ struct PluginSandboxTests : juce::UnitTest
         return f.model.getTracks().back().id;
     }
 
+    /** Until the plug-in has loaded into its sandbox (in the background) or failed to. */
+    static bool loaded (Fixture& f, const juce::String& pluginId)
+    {
+        return dispatchUntil ([&] { return ! f.plugins.isLoading (pluginId); });
+    }
+
+    /** Inserts the plug-in, and waits until it has loaded. */
     static juce::String insert (Fixture& f, const juce::String& trackId, const juce::String& path)
     {
         f.invoke (cmd::pluginInsert, { trackId, path, PluginChain::device });
         const auto chain = f.plugins.getChain (trackId, PluginChain::device);
-        return chain.empty() ? juce::String() : chain.back().id;
+        const auto id = chain.empty() ? juce::String() : chain.back().id;
+        loaded (f, id);
+        return id;
     }
 
     static juce::AudioPluginInstance* instanceOf (Fixture& f, const juce::String& pluginId)
@@ -195,6 +205,72 @@ struct PluginSandboxTests : juce::UnitTest
                     "latency " + juce::String (plugin.has_value() ? plugin->latencySamples : -1));
         }
 
+        beginTest ("A slow plug-in loads in the background: the insert returns, the window shows loading within 300 ms, then the plug-in");
+        {
+            Fixture f;
+            TestPlugin sluggish (f, "Sandbox Sluggish", "plugin Sluggish Gain");
+            f.theme.load();
+            const auto track = addTrack (f);
+            f.invoke (cmd::trackSelect, { track });
+            juce::ApplicationCommandManager commandManager;
+            auto main = std::make_unique<MainComponent> (f.app, commandManager);
+            main->setSize (1400, 900);
+
+            const auto started = juce::Time::getMillisecondCounterHiRes();
+            f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
+            const auto took = juce::Time::getMillisecondCounterHiRes() - started;
+            expectLessThan (took, 300.0, "the insert waited for the plug-in to load");
+
+            const auto chain = f.plugins.getChain (track, PluginChain::device);
+            const auto id = chain.empty() ? juce::String() : chain.back().id;
+            auto* window = main->getPluginWindows().getWindow (id);
+            expect (window != nullptr && window->isVisible(), "the window isn't up at once");
+            expect (f.plugins.isLoading (id), "it isn't loading");
+            expect (window != nullptr && window->getStatus() == PluginWindow::Status::loading);
+            expect (info (f, id).has_value() && info (f, id)->sandboxed && ! info (f, id)->missing);
+            expect (f.plugins.getLoadError (id).isEmpty(), "loading reads as failed: " + f.plugins.getLoadError (id));
+
+            // The message thread stays free while it loads.
+            int ticks = 0;
+            juce::Timer::callAfterDelay (50, [&ticks] { ++ticks; });
+            expect (dispatchUntil ([&] { return ticks > 0; }) && f.plugins.isLoading (id), "the message thread was held up");
+
+            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }),
+                    "it never loaded");
+            auto* instance = instanceOf (f, id);
+            expect (instance != nullptr && PluginSandbox::isSandboxed (instance));
+            expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+
+            if (instance != nullptr)
+            {
+                prepare (*instance);
+                expectWithinAbsoluteError (processOnes (*instance), 0.5f, 1.0e-6f);
+            }
+
+            main.reset();
+        }
+
+        beginTest ("A plug-in undone while it loads comes back loaded on Redo");
+        {
+            Fixture f;
+            TestPlugin sluggish (f, "Sandbox Sluggish Undo", "plugin Sluggish Undo Gain");
+            const auto track = addTrack (f);
+            f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
+            const auto chain = f.plugins.getChain (track, PluginChain::device);
+            const auto id = chain.empty() ? juce::String() : chain.back().id;
+            expect (f.plugins.isLoading (id));
+
+            f.invoke (cmd::editUndo);
+            expect (! f.plugins.contains (id));
+            auto& sandbox = f.app.engine.getPluginSandbox();
+            expect (dispatchUntil ([&] { return ! sandbox.isLoading (id); }), "the load never ended");
+
+            f.invoke (cmd::editRedo);
+            expect (f.plugins.contains (id) && loaded (f, id));
+            expect (instanceOf (f, id) != nullptr && PluginSandbox::isSandboxed (instanceOf (f, id)),
+                    "redo left it unloaded: " + f.plugins.getLoadError (id));
+        }
+
         beginTest ("A sandboxed plug-in's CPU is its host's time in the plug-in, not the round trip");
         {
             Fixture f;
@@ -279,6 +355,7 @@ struct PluginSandboxTests : juce::UnitTest
 
             // Reload: a new sandbox, from the state last saved.
             f.invoke (cmd::pluginReload, { first, id });
+            expect (loaded (f, id), "Reload never finished loading");
             auto reloaded = info (f, id);
             expect (reloaded.has_value() && reloaded->sandboxed && ! reloaded->crashed);
             expectWithinAbsoluteError (parameterValue (f, id, "Gain"), 0.3f, 1.0e-6f);
@@ -316,12 +393,15 @@ struct PluginSandboxTests : juce::UnitTest
             Fixture reopened;
             reopened.projectToOpen = f.projectSaveLocation;
             reopened.invoke (cmd::projectOpen);
+            expect (loaded (reopened, inProcess) && loaded (reopened, sandboxed));
             expect (info (reopened, inProcess).has_value() && ! info (reopened, inProcess)->sandboxed);
             expect (info (reopened, sandboxed).has_value() && info (reopened, sandboxed)->sandboxed);
 
             // And back into the sandbox.
             expect (reopened.invoke (cmd::pluginSetSandboxed, { inProcess, true }));
+            expect (loaded (reopened, inProcess));
             expect (info (reopened, inProcess).has_value() && info (reopened, inProcess)->sandboxed);
+            expect (instanceOf (reopened, inProcess) != nullptr && PluginSandbox::isSandboxed (instanceOf (reopened, inProcess)));
         }
 
         beginTest ("A sandboxed plug-in's own UI shows in its window's vendor area; Parameters swaps in its parameters");
@@ -422,7 +502,7 @@ struct PluginSandboxTests : juce::UnitTest
 
             const auto id = insert (f, track, fragile.path());
             expect (id.isNotEmpty());
-            expect (info (f, id).has_value() && ! info (f, id)->sandboxed);
+            expect (info (f, id).has_value() && ! info (f, id)->sandboxed && ! f.plugins.isLoading (id));
             expect (f.plugins.getLoadError (id).isNotEmpty(), "no load error");
 
             auto* window = main->getPluginWindows().getWindow (id);
@@ -484,6 +564,7 @@ struct PluginSandboxTests : juce::UnitTest
                     "the card offers no Reload");
 
             expect (toasts != nullptr && toasts->runAction (message, "Reload"));
+            expect (loaded (f, id));
             expect (info (f, id).has_value() && ! info (f, id)->crashed && info (f, id)->sandboxed);
             expect (dispatchUntil ([&] { auto* r = findOne (*main, "reload"); return r == nullptr || ! r->isVisible(); }),
                     "the card still offers Reload");

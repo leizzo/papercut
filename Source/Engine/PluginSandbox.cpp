@@ -187,7 +187,7 @@ namespace
     }
 
     constexpr int stateTimeoutMs = 3000, prepareTimeoutMs = 5000, offlineDeadlineMs = 5000, reportMs = 100,
-                  quitGraceMs = 2000, hostSetGraceMs = 300, dispatchMs = 50;
+                  quitGraceMs = 2000, hostSetGraceMs = 300, dispatchMs = 50, maxLoaders = 8;
 }
 
 #if RESAMPER_SANDBOX
@@ -260,6 +260,11 @@ public:
 
         {
             const std::scoped_lock lock (waitersLock);
+
+            // Gone since the check above: nothing would wake this waiter.
+            if (dead.load())
+                return {};
+
             waiters[id] = waiter;
         }
 
@@ -288,6 +293,18 @@ public:
 
         if (dead.load() && ! closing.load())
             reportDeath();
+    }
+
+    /** Gives the host up, from any thread: a request waiting for it returns at once, and none is sent again. */
+    void cancel()
+    {
+        closing.store (true);
+        dead.store (true);
+
+        const std::scoped_lock lock (waitersLock);
+
+        for (auto& [id, waiter] : waiters)
+            waiter->done.signal();
     }
 
     std::atomic<bool> dead { false };
@@ -369,7 +386,58 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE (Remote)
 };
+
+/** On a loader thread: starts the host and has it load the plug-in request
+    describes. The host's answer, or invalid with error set. */
+juce::ValueTree loadInHost (Remote& remote, juce::ValueTree request, const juce::String& name, juce::String& error)
+{
+    if (! remote.createShared())
+    {
+        error = "The sandbox couldn't share memory with its host";
+        return {};
+    }
+
+    // No output streams: an unread pipe fills up and stalls the host.
+    if (! remote.launchWorkerProcess (executable(), PluginSandbox::hostId, 0, 0))
+    {
+        error = "The plug-in's sandbox didn't start";
+        return {};
+    }
+
+    request.setProperty (msg::shared, remote.getSharedFile().getFullPathName(), nullptr);
+    request.setProperty (msg::semaphore, remote.getSemaphoreName(), nullptr);
+
+    const auto loaded = remote.request (request, PluginSandbox::loadTimeoutMs);
+    remote.releaseNames();
+
+    if (! loaded.isValid())
+    {
+        error = remote.dead.load() ? name + " crashed while loading in its sandbox"
+                                   : name + " didn't load in its sandbox within "
+                                         + juce::String (PluginSandbox::loadTimeoutMs / 1000) + " s";
+        return {};
+    }
+
+    if (loaded.hasProperty (msg::error))
+    {
+        error = loaded[msg::error].toString();
+        return {};
+    }
+
+    return loaded;
+}
 } // namespace
+
+/** A plug-in loading into its sandbox host, or loaded there and not yet taken. On the message thread. */
+struct PluginSandbox::Load
+{
+    juce::String identifier;
+    std::shared_ptr<Remote> remote;
+    std::function<void()> onDone;
+    bool done = false;
+    juce::ValueTree loaded;
+    juce::String error;
+};
 
 //==============================================================================
 /** A sandboxed plug-in's stand-in: what the engine holds in its place. */
@@ -377,7 +445,7 @@ class PluginSandbox::Instance final : public juce::AudioPluginInstance
 {
 public:
     Instance (PluginSandbox& owner, const juce::PluginDescription& d, const juce::String& id,
-              std::unique_ptr<Remote> r, const juce::ValueTree& loaded)
+              std::shared_ptr<Remote> r, const juce::ValueTree& loaded)
         : juce::AudioPluginInstance (busesFor (loaded)),
           sandbox (&owner), desc (d), pluginId (id), remote (std::move (r)),
           numIns ((int) loaded[msg::inputs]), numOuts ((int) loaded[msg::outputs]),
@@ -626,7 +694,7 @@ private:
     juce::WeakReference<PluginSandbox> sandbox;
     const juce::PluginDescription desc;
     const juce::String pluginId;
-    std::unique_ptr<Remote> remote;
+    std::shared_ptr<Remote> remote;
     const int numIns, numOuts;
     const bool midiIn, midiOut, midiEffect, ownEditor;
     const double tailSeconds;
@@ -1255,6 +1323,7 @@ namespace
 
             audioThread = std::make_unique<AudioThread> (*this);
             audioThread->startThread (juce::Thread::Priority::highest);
+
             startTimer (reportMs);
             reply (request, answer);
         }
@@ -1531,12 +1600,24 @@ PluginSandbox::PluginSandbox()
 
     for (auto* format : defaults.getFormats())
         hostedFormats.addIfNotAlreadyThere (format->getName());
+
+    // A loader mostly waits on its host: a project's plug-ins load side by side.
+    loaders = std::make_unique<juce::ThreadPool> (juce::ThreadPoolOptions{}.withThreadName ("Sandbox Loader")
+                                                                            .withNumberOfThreads (maxLoaders));
    #endif
 }
 
 PluginSandbox::~PluginSandbox()
 {
     masterReference.clear();
+
+   #if RESAMPER_SANDBOX
+    // A loader waiting on its host returns at once; the hosts quit with their loads.
+    for (auto& [id, load] : loads)
+        load->remote->cancel();
+
+    loaders.reset();
+   #endif
 }
 
 bool PluginSandbox::isHost (int argc, const char* const* argv)
@@ -1581,61 +1662,142 @@ void PluginSandbox::addHostedFormat (const juce::String& formatName)
    #endif
 }
 
+void PluginSandbox::removeHostedFormat (const juce::String& formatName)
+{
+    hostedFormats.removeString (formatName);
+}
+
 bool PluginSandbox::canHost (const juce::PluginDescription& desc) const
 {
     return hostedFormats.contains (desc.pluginFormatName);
 }
 
-std::unique_ptr<juce::AudioPluginInstance> PluginSandbox::createInstance (const juce::PluginDescription& desc, double sampleRate,
-                                                                           int blockSize, const juce::String& pluginId,
-                                                                           juce::String& error)
+bool PluginSandbox::loadInBackground (const juce::PluginDescription& desc, const juce::String& pluginId, double sampleRate,
+                                      int blockSize, std::function<void()> onDone)
 {
    #if RESAMPER_SANDBOX
-    auto remote = std::make_unique<Remote>();
+    JUCE_ASSERT_MESSAGE_THREAD
+    const auto identifier = desc.createIdentifierString();
 
-    if (! remote->createShared())
+    if (auto found = loads.find (pluginId); found != loads.end())
     {
-        error = "The sandbox couldn't share memory with its host";
-        return {};
+        if (found->second->identifier == identifier)
+        {
+            // The newest plug-in object asking is the one to tell.
+            if (! found->second->done)
+                found->second->onDone = std::move (onDone);
+
+            return found->second->done;
+        }
+
+        dropLoad (pluginId, found->second.get());
     }
 
-    // No output streams: an unread pipe fills up and stalls the host.
-    if (! remote->launchWorkerProcess (executable(), hostId, 0, 0))
-    {
-        error = "The plug-in's sandbox didn't start";
-        return {};
-    }
+    auto load = std::make_shared<Load>();
+    load->identifier = identifier;
+    load->remote = std::make_shared<Remote>();
+    load->onDone = std::move (onDone);
+    loads[pluginId] = load;
 
-    juce::ValueTree load (msg::load);
+    juce::ValueTree request (msg::load);
 
     if (auto xml = desc.createXml())
-        load.setProperty (msg::description, xml->toString(), nullptr);
+        request.setProperty (msg::description, xml->toString(), nullptr);
 
-    load.setProperty (msg::shared, remote->getSharedFile().getFullPathName(), nullptr);
-    load.setProperty (msg::semaphore, remote->getSemaphoreName(), nullptr);
-    load.setProperty (msg::rate, sampleRate, nullptr);
-    load.setProperty (msg::block, blockSize, nullptr);
+    request.setProperty (msg::rate, sampleRate, nullptr);
+    request.setProperty (msg::block, blockSize, nullptr);
 
-    const auto loaded = remote->request (load, loadTimeoutMs);
-    remote->releaseNames();
+    // Made here, on the message thread: the loader only copies it, and it is read back here.
+    juce::WeakReference<PluginSandbox> self (this);
 
-    if (! loaded.isValid())
+    loaders->addJob ([remote = load->remote, request, name = desc.name, self, pluginId, which = load.get()]() mutable
     {
-        error = remote->dead.load() ? desc.name + " crashed while loading in its sandbox"
-                                    : desc.name + " didn't load in its sandbox within "
-                                          + juce::String (loadTimeoutMs / 1000) + " s";
-        return {};
-    }
+        juce::String error;
+        auto loaded = loadInHost (*remote, request, name, error);
+        remote.reset();
 
-    if (loaded.hasProperty (msg::error))
-    {
-        error = loaded[msg::error].toString();
-        return {};
-    }
+        juce::MessageManager::callAsync ([self, pluginId, which, loaded, error]
+        {
+            if (auto* sandbox = self.get())
+                sandbox->loadFinished (pluginId, which, loaded, error);
+        });
+    });
 
-    return std::make_unique<Instance> (*this, desc, pluginId, std::move (remote), loaded);
+    return false;
    #else
-    juce::ignoreUnused (desc, sampleRate, blockSize, pluginId);
+    juce::ignoreUnused (desc, pluginId, sampleRate, blockSize, onDone);
+    return true;
+   #endif
+}
+
+bool PluginSandbox::isLoading (const juce::String& pluginId) const
+{
+    const auto found = loads.find (pluginId);
+    return found != loads.end() && ! found->second->done;
+}
+
+void PluginSandbox::loadFinished (const juce::String& pluginId, const Load* which, const juce::ValueTree& loaded,
+                                  const juce::String& error)
+{
+   #if RESAMPER_SANDBOX
+    const auto found = loads.find (pluginId);
+
+    // Dropped (and maybe loading again) since.
+    if (found == loads.end() || found->second.get() != which)
+        return;
+
+    auto& load = *found->second;
+    load.done = true;
+    load.loaded = loaded;
+    load.error = error;
+
+    if (auto onDone = std::move (load.onDone))
+        onDone();
+
+    // Nobody took it (the plug-in went, or runs in-process now): its host quits.
+    dropLoad (pluginId, which);
+   #else
+    juce::ignoreUnused (pluginId, which, loaded, error);
+   #endif
+}
+
+void PluginSandbox::dropLoad (const juce::String& pluginId, const Load* which)
+{
+   #if RESAMPER_SANDBOX
+    if (auto found = loads.find (pluginId); found != loads.end() && found->second.get() == which)
+    {
+        found->second->remote->cancel();
+        loads.erase (found);
+    }
+   #else
+    juce::ignoreUnused (pluginId, which);
+   #endif
+}
+
+std::unique_ptr<juce::AudioPluginInstance> PluginSandbox::createInstance (const juce::PluginDescription& desc,
+                                                                           const juce::String& pluginId, juce::String& error)
+{
+   #if RESAMPER_SANDBOX
+    const auto found = loads.find (pluginId);
+
+    if (found == loads.end() || ! found->second->done || found->second->identifier != desc.createIdentifierString())
+    {
+        error = desc.name + " hasn't loaded in its sandbox";
+        return {};
+    }
+
+    const auto load = found->second;
+    loads.erase (found);
+
+    if (load->error.isNotEmpty())
+    {
+        error = load->error;
+        return {};
+    }
+
+    return std::make_unique<Instance> (*this, desc, pluginId, load->remote, load->loaded);
+   #else
+    juce::ignoreUnused (desc, pluginId);
     error = "Plug-ins can't run sandboxed on this platform";
     return {};
    #endif

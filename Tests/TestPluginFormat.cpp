@@ -184,6 +184,10 @@ void TestPluginFormat::createPluginInstance (const juce::PluginDescription& desc
     if (inSandboxHost && text.startsWith ("sandboxcrash "))
         std::_Exit (134);
 
+    // A plug-in named "Sluggish ..." takes a while to load in its sandbox: the app mustn't wait for it.
+    if (inSandboxHost && desc.name.startsWith ("Sluggish "))
+        juce::Thread::sleep (sluggishLoadMs);
+
     callback (std::make_unique<TestPlugin> (desc), {});
 }
 

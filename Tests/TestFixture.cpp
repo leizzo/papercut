@@ -99,8 +99,14 @@ float renderPeak (Fixture& f)
     auto rendered = f.scratchDir().getChildFile ("render.wav");
     rendered.deleteFile();
 
-    // Not Renderer::renderToFile (Edit&, File): that un-mutes and solo-isolates every track.
     auto& edit = f.projects.getEdit();
+
+    // As render::renderToFile does: an Edit that has restarted playback (a plug-in
+    // loaded in the background, say) has a playback context; this frees it and
+    // keeps it from being rebuilt while rendering. false: headless, don't reattach.
+    const tracktion::Edit::ScopedRenderStatus renderStatus (edit, false);
+
+    // Not Renderer::renderToFile (Edit&, File): that un-mutes and solo-isolates every track.
     tracktion::Renderer::Parameters params (edit);
     params.destFile = rendered;
     params.audioFormat = edit.engine.getAudioFileFormatManager().getWavFormat();

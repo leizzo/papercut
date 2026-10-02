@@ -1,6 +1,8 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -30,6 +32,13 @@ namespace resamper
     - everything else (loading, state, programs, latency, showing its UI) is a
       message on a pipe (juce::ChildProcessCoordinator), the state ones
       answered synchronously with a timeout.
+
+    Loading never holds up the message thread (§19: a plug-in's window shows
+    within 300 ms of its insert). The engine asks loadInBackground before it
+    creates a sandboxed plug-in: a host starts and loads it on a loader thread
+    while the plug-in has no instance yet (it is "loading"), and once it has,
+    the engine creates the plug-in again and createInstance hands the loaded
+    host over at once.
 
     The plug-in's own UI runs in the host process too, in a panel the host
     lays over the stand-in's editor (sandboxdock): the plug-in window shows
@@ -71,15 +80,28 @@ public:
         (a format added through runHost's extraFormats) run sandboxed. */
     void addHostedFormat (const juce::String& formatName);
 
+    /** Plug-ins of the format run in-process from now on (for tests whose double
+        creates a format's plug-ins itself, through the engine's creation hook). */
+    void removeHostedFormat (const juce::String& formatName);
+
     /** Whether a plug-in of this description can run sandboxed. */
     bool canHost (const juce::PluginDescription&) const;
 
-    /** Starts a sandbox host for the plug-in and waits (at most loadTimeoutMs)
-        until it has loaded it. pluginId names the instance to Listeners.
-        nullptr, with error set, if the host crashed, timed out or couldn't
-        load the plug-in. */
-    std::unique_ptr<juce::AudioPluginInstance> createInstance (const juce::PluginDescription&, double sampleRate,
-                                                               int blockSize, const juce::String& pluginId,
+    /** Has a sandbox host of its own load the plug-in on a loader thread, unless
+        one already is (at most loadTimeoutMs). False while it loads; true once
+        it has loaded or failed, when createInstance hands it over at once.
+        onDone runs on the message thread when it has: a load nobody takes
+        there (with createInstance) is dropped, and its host quits. */
+    bool loadInBackground (const juce::PluginDescription&, const juce::String& pluginId, double sampleRate,
+                           int blockSize, std::function<void()> onDone);
+
+    /** Whether the plug-in is loading into its sandbox host. On the message thread. */
+    bool isLoading (const juce::String& pluginId) const;
+
+    /** The plug-in loadInBackground loaded, as its stand-in; pluginId names it
+        to Listeners. nullptr, with error set, if its host crashed, timed out or
+        couldn't load it, or it hasn't finished loading. */
+    std::unique_ptr<juce::AudioPluginInstance> createInstance (const juce::PluginDescription&, const juce::String& pluginId,
                                                                juce::String& error);
 
     /** Whether the instance is a sandboxed plug-in's stand-in. */
@@ -128,6 +150,7 @@ public:
 
 private:
     class Instance;
+    struct Load;
 
     struct Loading
     {
@@ -138,8 +161,12 @@ private:
     juce::StringArray hostedFormats;
     std::mutex loadingLock;
     std::vector<Loading> loading;
+    std::map<juce::String, std::shared_ptr<Load>> loads;   ///< by plug-in id; on the message thread
+    std::unique_ptr<juce::ThreadPool> loaders;
     juce::ListenerList<Listener> listeners;
 
+    void loadFinished (const juce::String& pluginId, const Load* load, const juce::ValueTree& loaded, const juce::String& error);
+    void dropLoad (const juce::String& pluginId, const Load* load);
     void crashed (const juce::String& pluginId);
     void uiClicked (const juce::String& pluginId);
 

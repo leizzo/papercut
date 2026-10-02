@@ -191,7 +191,7 @@ namespace
         return plugin.isMissing();
     }
 
-    PluginInfo infoFromPlugin (te::Plugin& plugin)
+    PluginInfo infoFromPlugin (te::Plugin& plugin, const PluginSandbox& sandbox)
     {
         PluginInfo info;
         info.id = plugin.itemID.toString();
@@ -211,7 +211,8 @@ namespace
             info.external = true;
             info.pinnedParameters = pinsOf (plugin);
             info.pinnedParameters.removeEmptyStrings();
-            info.sandboxed = PluginSandbox::isSandboxed (external->getAudioPluginInstance());
+            // Loading into its host: it runs there next.
+            info.sandboxed = PluginSandbox::isSandboxed (external->getAudioPluginInstance()) || sandbox.isLoading (info.id);
             info.crashed = PluginSandbox::hasCrashed (external->getAudioPluginInstance());
         }
         else
@@ -867,7 +868,7 @@ std::vector<PluginInfo> PluginRack::getChain (const juce::String& trackId, Plugi
     auto chains = chainsFor (projectManager.getEdit(), trackId);
 
     for (auto& plugin : chains[chain])
-        result.push_back (infoFromPlugin (*plugin));
+        result.push_back (infoFromPlugin (*plugin, projectManager.getEngineManager().getPluginSandbox()));
 
     return result;
 }
@@ -942,7 +943,7 @@ std::vector<PluginInfo> PluginRack::getAllPlugins() const
 
         for (auto* list : { &chains.device, &chains.mixer })
             for (auto& plugin : *list)
-                result.push_back (infoFromPlugin (*plugin));
+                result.push_back (infoFromPlugin (*plugin, projectManager.getEngineManager().getPluginSandbox()));
     }
 
     return result;
@@ -955,7 +956,7 @@ std::optional<PluginInfo> PluginRack::getPlugin (const juce::String& pluginId) c
     // Only a chain member: never the fader, a meter or a send.
     if (auto plugin = findPlugin (edit, pluginId))
         if (auto* track = plugin->getOwnerTrack(); track != nullptr && chainsFor (edit, track->itemID.toString()).find (pluginId) != nullptr)
-            return infoFromPlugin (*plugin);
+            return infoFromPlugin (*plugin, projectManager.getEngineManager().getPluginSandbox());
 
     return std::nullopt;
 }
@@ -1274,13 +1275,18 @@ bool PluginRack::isLoading (const juce::String& pluginId) const
         return false;
 
     if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
-        return external->isInitialisingAsync() || plugin->isInitialising();
+        return external->isInitialisingAsync() || plugin->isInitialising()
+            || projectManager.getEngineManager().getPluginSandbox().isLoading (pluginId);
 
     return plugin->isInitialising();
 }
 
 juce::String PluginRack::getLoadError (const juce::String& pluginId) const
 {
+    // Not loaded yet isn't failed.
+    if (isLoading (pluginId))
+        return {};
+
     if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
         if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
             return external->getLoadError();
@@ -1296,23 +1302,7 @@ juce::Result PluginRack::reload (const juce::String& pluginId)
     if (external == nullptr)
         return juce::Result::fail ("Only a plug-in can be reloaded");
 
-    // An instance (a crashed one too) goes first: processing off and on again
-    // creates a new one from the state saved on the plug-in. Neither is an undo
-    // step. The plug-in may hear the property before its cached value follows,
-    // so it is told again once the value has.
-    if (external->getAudioPluginInstance() != nullptr)
-    {
-        for (auto processing : { false, true })
-        {
-            external->state.setProperty (te::IDs::process, processing, nullptr);
-            external->processingChanged();
-        }
-    }
-    else
-    {
-        external->forceFullReinitialise();
-    }
-
+    projectManager.getEngineManager().recreatePlugin (*external);
     return juce::Result::ok();
 }
 
