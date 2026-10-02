@@ -258,6 +258,7 @@ target_sources(ResamperTests PRIVATE
     Tests/DeviceChainTests.cpp
     Tests/DeviceCardTests.cpp
     Tests/NativeDeviceTests.cpp
+    Tests/DeviceMeasurementTests.cpp
     Tests/EngineUndoTests.cpp
     Tests/ShellTests.cpp
     Tests/BrowserTests.cpp
