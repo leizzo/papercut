@@ -17,6 +17,12 @@ void EngineUndo::beginStep (const juce::String& name)
     projects.getEdit().getUndoManager().beginNewTransaction (name);
 }
 
+void EngineUndo::abandonStep()
+{
+    openGestureKey.clear();
+    projects.getEdit().getUndoManager().undoCurrentTransactionOnly();
+}
+
 void EngineUndo::beginGestureStep (const juce::String& name, const juce::String& gestureKey, bool continues)
 {
     // The open gesture's step must still be the Edit's current transaction.

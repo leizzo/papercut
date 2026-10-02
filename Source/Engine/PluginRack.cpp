@@ -666,19 +666,26 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     // track, the removal of the built-in synth).
     projectManager.getUndo().beginStep ("Insert Plug-in");
 
+    // A refusal after creation takes back what creation wrote: no stray step.
+    auto fail = [this] (const juce::String& why)
+    {
+        projectManager.getUndo().abandonStep();
+        return juce::Result::fail (why);
+    };
+
     te::Plugin::Ptr plugin = builtIn ? edit.getPluginCache().createNewPlugin (typeOrIdentifier, {})
                                      : edit.getPluginCache().createNewPlugin (te::ExternalPlugin::xmlTypeName, external);
 
     if (plugin == nullptr)
-        return juce::Result::fail ("Couldn't create the plug-in");
+        return fail ("Couldn't create the plug-in");
 
     if (! track->canContainPlugin (plugin.get()))
-        return juce::Result::fail ("This track can't hold that plug-in");
+        return fail ("This track can't hold that plug-in");
 
     if (chain == PluginChain::mixer)
     {
         if (auto refusal = mixerRefusal (plugin->isSynth(), isMidiEffect (*plugin)); refusal.isNotEmpty())
-            return juce::Result::fail (refusal);
+            return fail (refusal);
 
         plugin->state.setProperty (chainProperty, mixerChainValue, &edit.getUndoManager());
     }
@@ -697,7 +704,7 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     track->pluginList.insertPlugin (plugin, chainsFor (edit, trackId).endIndex (chain), nullptr);
 
     if (track->pluginList.indexOf (plugin.get()) < 0)
-        return juce::Result::fail ("Couldn't insert the plug-in");
+        return fail ("Couldn't insert the plug-in");
 
     lastInsertedId = plugin->itemID.toString();
     lastInsertDepth = edit.getUndoManager().getUndoDescriptions().size();

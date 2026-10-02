@@ -24,6 +24,10 @@ public:
     /** Starts a new undo step, named for the Edit's undo history. */
     void beginStep (const juce::String& name);
 
+    /** Takes back what the newest step has changed so far and drops it, for a
+        change that failed half-way: no empty or partial step is left behind. */
+    void abandonStep();
+
     /** Starts the step of a gesture, or continues it. gestureKey names what the
         gesture changes (e.g. the parameter and its track). continues is false
         for a gesture's first value and true for the rest. */
