@@ -6,6 +6,7 @@
 #include <map>
 #include <new>
 #include <thread>
+#include <utility>
 
 #if JUCE_MAC || JUCE_LINUX
  #include <csignal>
@@ -256,12 +257,16 @@ public:
             sendMessageToWorker (encode (message));
     }
 
-    /** Messages that answer no request, on the pipe's thread; set once its receiver exists. */
+    /** Messages that answer no request, on the pipe's thread; set once its receiver exists.
+        A host that died before then is reported to onDied at once. */
     void setReceiver (std::function<void (const juce::ValueTree&)> onMessage, std::function<void()> onDied)
     {
         const std::scoped_lock lock (receiverLock);
         receiveMessage = std::move (onMessage);
         hostDied = std::move (onDied);
+
+        if (dead.load() && ! closing.load())
+            reportDeath();
     }
 
     std::atomic<bool> dead { false };
@@ -285,6 +290,7 @@ private:
     std::map<int, std::shared_ptr<Waiter>> waiters;
     std::function<void (const juce::ValueTree&)> receiveMessage;
     std::function<void()> hostDied;
+    bool deathReported = false;
 
     void handleMessageFromWorker (const juce::MemoryBlock& data) override
     {
@@ -330,8 +336,13 @@ private:
             return;
 
         const std::scoped_lock lock (receiverLock);
+        reportDeath();
+    }
 
-        if (hostDied)
+    /** Once only, under receiverLock. */
+    void reportDeath()
+    {
+        if (hostDied && ! std::exchange (deathReported, true))
             hostDied();
     }
 
