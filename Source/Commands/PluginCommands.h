@@ -124,6 +124,13 @@ struct PluginABArgs
     int slot = 0;
 };
 
+/** Whether a plug-in runs in its sandbox (out of process) or in-process. */
+struct PluginSandboxArgs
+{
+    juce::String pluginId;
+    bool sandboxed = true;
+};
+
 /** A catalogue plug-in, by its path (what plugin.insert takes). */
 struct PluginPathArgs
 {
@@ -149,7 +156,8 @@ namespace cmd
     inline constexpr CommandRef<PluginArgs> pluginLocate { "plugin.locate" };             ///< asks for the missing plug-in's file
     inline constexpr CommandRef<PluginArgs> pluginUndoInsert { "plugin.undoInsert" };     ///< the "added" toast's Undo
     inline constexpr CommandRef<PluginWindowArgs> pluginSetWindow { "plugin.setWindow" }; ///< a view: never undoable
-    inline constexpr CommandRef<PluginArgs> pluginReload { "plugin.reload" };             ///< the window's Retry
+    inline constexpr CommandRef<PluginArgs> pluginReload { "plugin.reload" };             ///< Retry; a crashed plug-in's Reload
+    inline constexpr CommandRef<PluginSandboxArgs> pluginSetSandboxed { "plugin.setSandboxed" };  ///< Run in-process; never undoable
     inline constexpr CommandRef<PluginPresetArgs> pluginSelectPreset { "plugin.selectPreset" };
     inline constexpr CommandRef<PluginSavePresetArgs> pluginSavePreset { "plugin.savePreset" };
     inline constexpr CommandRef<PluginABArgs> pluginSelectAB { "plugin.selectAB" };

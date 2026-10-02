@@ -25,7 +25,10 @@ namespace resamper
     The card's menu pins and unpins by name too.
 
     A missing plug-in keeps its name, gets a red dashed outline and a Missing
-    badge, and offers Locate (point at its file) and Replace instead of its window. */
+    badge, and offers Locate (point at its file) and Replace instead of its window.
+    A crashed one (its sandbox died; its audio is bypassed) gets a red outline
+    and a Crashed badge, and offers Reload instead of its window. The card
+    polls the rack for a crash, a reload and the sandbox state. */
 class PluginDeviceCard : public DeviceCard,
                          private juce::Timer
 {
@@ -51,7 +54,7 @@ private:
     class PinnedParameter;
 
     DevicePowerButton power;
-    std::unique_ptr<CardButton> openWindow, locate, replace, pinLearn;
+    std::unique_ptr<CardButton> openWindow, locate, replace, reload, pinLearn;
     std::vector<std::unique_ptr<PinnedParameter>> pins;
     std::unique_ptr<PluginRack::TouchWatch> touchWatch;
     bool windowOpen = false;

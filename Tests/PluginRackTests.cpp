@@ -34,23 +34,13 @@ namespace
     /** The folder the test plug-in format scans: one per run, emptied by each test using it. */
     juce::File testPluginFolder()
     {
-        static const auto folder = []
-        {
-            auto dir = juce::File::createTempFile ("resamper-test-plugins");
-            dir.createDirectory();
-            return dir;
-        }();
-
-        return folder;
+        return TestPluginFormat::scanFolder();
     }
 
     /** Adds the test plug-in format to the run's engine (once), scanning testPluginFolder. */
     void registerTestPluginFormat (te::Engine& engine)
     {
-        static bool registered = false;
-
-        if (! std::exchange (registered, true))
-            engine.getPluginManager().pluginFormatManager.addFormat (std::make_unique<TestPluginFormat> (testPluginFolder()));
+        TestPluginFormat::registerWith (engine.getPluginManager().pluginFormatManager);
     }
 
     /** Forgets every test plug-in the engine's list holds, found or failed. */
