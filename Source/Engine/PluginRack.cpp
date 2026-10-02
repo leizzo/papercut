@@ -3,6 +3,7 @@
 #include "EngineManager.h"
 #include "PluginSandbox.h"
 #include "PluginScanner.h"
+#include "NativeDevicePlugins.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -63,6 +64,8 @@ namespace
             { te::CompressorPlugin::xmlTypeName, { "output gain" } },
             { te::DelayPlugin::xmlTypeName,      { "mix proportion" } },
             { te::FourOscPlugin::xmlTypeName,    { "masterLevel" } },
+            { EqEightPlugin::xmlTypeName,        { "scale", "output" } },
+            { CompressorV2Plugin::xmlTypeName,   { "makeupAuto", "makeup", "mix", "output" } },
         };
 
         auto found = outputs.find (pluginType);
@@ -110,17 +113,27 @@ namespace
         return info;
     }
 
+    /** A v2 native device of Resamper's own (PRD §9.2.1a). */
+    template <typename PluginClass>
+    PluginInfo nativeV2()
+    {
+        auto info = builtIn<PluginClass> (false);
+        info.manufacturer = "Resamper";
+        return info;
+    }
+
     /** The built-ins a user can put on a track. Engine plumbing (the fader,
         meters, aux sends and returns, freeze points, patch bays, text) is added
-        by the app where it belongs, never from the catalogue. */
+        by the app where it belongs, never from the catalogue. EQ Eight and
+        Compressor v2 replace the engine's equaliser and compressor (v1). */
     const juce::Array<PluginInfo>& builtInCatalogue()
     {
         static const auto catalogue = []
         {
             juce::Array<PluginInfo> list;
-            list.add (builtIn<te::EqualiserPlugin> (false));
+            list.add (nativeV2<EqEightPlugin>());
             list.add (builtIn<te::ReverbPlugin> (false));
-            list.add (builtIn<te::CompressorPlugin> (false));
+            list.add (nativeV2<CompressorV2Plugin>());
             list.add (builtIn<te::ChorusPlugin> (false));
             list.add (builtIn<te::DelayPlugin> (false));
             list.add (builtIn<te::PhaserPlugin> (false));
@@ -141,7 +154,9 @@ namespace
             if (info.path == type)
                 return true;
 
-        return false;
+        // The v1 equaliser and compressor are out of the catalogue, but a
+        // project or a Command that names them still gets them.
+        return type == te::EqualiserPlugin::xmlTypeName || type == te::CompressorPlugin::xmlTypeName;
     }
 
     PluginInfo infoFromDescription (const juce::PluginDescription& desc)
@@ -944,7 +959,8 @@ std::vector<PluginParameter> PluginRack::getParameters (const juce::String& plug
             result.push_back ({ parameter->paramID, parameter->getParameterName(), range.getStart(), range.getEnd(),
                                 parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()),
                                 parameter->hasAutomationPoints(),
-                                isOutputParameter (plugin->getPluginType(), parameter->paramID) });
+                                isOutputParameter (plugin->getPluginType(), parameter->paramID),
+                                parameter->valueRange });
         }
     }
 
@@ -969,13 +985,51 @@ bool PluginRack::setParameter (const juce::String& pluginId, const juce::String&
     if (parameter == nullptr)
         return false;
 
-    const auto clamped = parameter->getValueRange().clipValue (value);
+    const auto clamped = parameter->valueRange.snapToLegalValue (parameter->getValueRange().clipValue (value));
 
     if (juce::exactlyEqual (clamped, parameter->getCurrentValue()))
         return false;
 
     projectManager.getUndo().beginGestureStep ("Change " + parameter->getParameterName(), pluginId + ":" + parameterId, continuesGesture);
     return edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameterId, parameter->getCurrentValue(), clamped));
+}
+
+bool PluginRack::setParameters (const juce::String& pluginId, const std::vector<ParameterValue>& values, bool continuesGesture)
+{
+    auto& edit = projectManager.getEdit();
+    auto plugin = findPlugin (edit, pluginId);
+
+    if (plugin == nullptr)
+        return false;
+
+    std::vector<std::pair<te::AutomatableParameter::Ptr, float>> changes;
+    juce::StringArray ids;
+
+    for (const auto& v : values)
+    {
+        auto parameter = findParameter (*plugin, v.parameterId);
+
+        if (parameter == nullptr)
+            return false;
+
+        ids.add (v.parameterId);
+        const auto clamped = parameter->valueRange.snapToLegalValue (parameter->getValueRange().clipValue (v.value));
+
+        if (! juce::exactlyEqual (clamped, parameter->getCurrentValue()))
+            changes.emplace_back (parameter, clamped);
+    }
+
+    if (changes.empty())
+        return false;
+
+    // The gesture's key names every parameter it sets, so a drag that only
+    // happens to change one of them for a moment stays one step.
+    projectManager.getUndo().beginGestureStep ("Change " + plugin->getName(), pluginId + ":" + ids.joinIntoString (","), continuesGesture);
+
+    for (auto& [parameter, value] : changes)
+        edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameter->paramID, parameter->getCurrentValue(), value));
+
+    return true;
 }
 
 juce::Result PluginRack::setPinned (const juce::String& pluginId, const juce::String& parameterId, bool pinned)

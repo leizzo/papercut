@@ -34,18 +34,19 @@ namespace
                                                    .withSizeKeepingCentre (retryWidth, retryHeight);
     }
 
+    /** The design's category icons, its phosphor glyphs as their lucide equivalents (PRD §15.8). */
     Icon iconFor (LibraryCategory c)
     {
         switch (c)
         {
-            case LibraryCategory::sounds:        return Icon::audioLines;
-            case LibraryCategory::drums:         return Icon::record;
-            case LibraryCategory::instruments:   return Icon::music;
-            case LibraryCategory::audioEffects:  return Icon::spline;
-            case LibraryCategory::midiEffects:   return Icon::gripVertical;
-            case LibraryCategory::plugins:       return Icon::layers;
-            case LibraryCategory::clips:         return Icon::file;
-            case LibraryCategory::samples:       return Icon::audioLines;
+            case LibraryCategory::sounds:        return Icon::volume2;
+            case LibraryCategory::drums:         return Icon::drum;
+            case LibraryCategory::instruments:   return Icon::piano;
+            case LibraryCategory::audioEffects:  return Icon::slidersVertical;
+            case LibraryCategory::midiEffects:   return Icon::audioWaveform;
+            case LibraryCategory::plugins:       return Icon::puzzle;
+            case LibraryCategory::clips:         return Icon::music;
+            case LibraryCategory::samples:       return Icon::audioWaveform;
         }
 
         return Icon::file;
