@@ -31,11 +31,13 @@ struct PluginHosting::Impl : private PluginSandbox::Listener
         staying till then. Never an undo step. */
     void recreate (tracktion::ExternalPlugin&);
 
+private:
+    friend class PluginHosting;
+
     PluginSandbox sandbox;
     juce::StringArray hostedFormats;
     juce::ListenerList<PluginHosting::Listener> listeners;
 
-private:
     /** What shouldLoad decided about the plug-in the engine creates next with an
         identifier (PluginDescription::createIdentifierString), for the creation hook. */
     struct Loading

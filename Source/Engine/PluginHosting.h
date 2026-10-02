@@ -50,6 +50,7 @@ public:
     bool waitForLoads();
 
     //==============================================================================
+    /** Hears the Sandbox's events for every plug-in, whichever Edit it is in. */
     struct Listener
     {
         virtual ~Listener() = default;
@@ -61,9 +62,11 @@ public:
         virtual void pluginUiClicked (const juce::String& /*pluginId*/) {}
     };
 
+    /** Adds or removes a Listener. On the message thread. */
     void addListener (Listener*);
     void removeListener (Listener*);
 
+    /** The engine side, for the engine module only (PluginHostingImpl.h). */
     Impl& getImpl() noexcept;
 
 private:

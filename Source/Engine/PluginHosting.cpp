@@ -11,7 +11,8 @@ namespace
 {
     /** Whether the engine creates this plug-in asynchronously (AUv3), past the
         createPluginInstance hook, where no sandboxed stand-in can take its place.
-        Tracktion's own check (ExternalPlugin::requiresAsyncInstantiation) is private. */
+        Tracktion's own check (ExternalPlugin::requiresAsyncInstantiation) is private:
+        this is a copy of it, to keep in step with it when the submodule moves. */
     bool createsAsynchronously (te::Engine& engine, const juce::PluginDescription& desc)
     {
         for (auto* format : engine.getPluginManager().pluginFormatManager.getFormats())
