@@ -121,12 +121,14 @@ private:
 
 /** `Segmented/Item · Item Active` in a well, `Tab/View · Tab/View Active`
     (the view switcher), or sunken: a bg-elevated well whose active item sinks
-    to bg-slot with accent text (the mixer's meter mode). One item is selected; clicking another, or the arrow
+    to bg-slot with accent text (the mixer's meter mode), or device: a native
+    device's small mono switch (EQ Eight's St / L-R / M-S), equal items in a
+    bg-slot well, the active one raised to bg-elevated. One item is selected; clicking another, or the arrow
     keys when focused, selects it and calls onChange. */
 class Segmented : public juce::Component
 {
 public:
-    enum class Style { segmented, tabs, sunken };
+    enum class Style { segmented, tabs, sunken, device };
 
     Segmented (ThemeManager&, juce::StringArray items, Style = Style::segmented);
 

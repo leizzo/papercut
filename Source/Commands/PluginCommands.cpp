@@ -1,6 +1,7 @@
 #include "PluginCommands.h"
 
 #include "AppCommandHost.h"
+#include "EditCommands.h"
 #include "Engine/PluginRack.h"
 
 namespace resamper
@@ -13,6 +14,12 @@ namespace
     {
         if (host.reportError)
             host.reportError (message);
+    }
+
+    void announceAdded (const AppCommandHost& host, const juce::String& trackId, const juce::String& pluginId)
+    {
+        if (host.pluginAdded && pluginId.isNotEmpty())
+            host.pluginAdded (trackId, pluginId);
     }
 }
 
@@ -28,9 +35,17 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
     registry.add (cmd::pluginInsert, { "Insert Plug-in" }, [&rack, &host] (const PluginInsertArgs& a)
     {
         if (a.trackId.isEmpty() || a.plugin.isEmpty())
+        {
             reportMessage (host, "Plug-in insert needs a track and a plug-in");
-        else
-            host.report (rack.insert (a.trackId, a.plugin, a.chain));
+            return;
+        }
+
+        juce::String added;
+        const auto result = rack.insert (a.trackId, a.plugin, a.chain, &added);
+        host.report (result);
+
+        if (result.wasOk())
+            announceAdded (host, a.trackId, added);
     });
 
     registry.add (cmd::pluginRemove, { "Remove Plug-in" }, [&rack, &host] (const PluginArgs& a)
@@ -73,9 +88,64 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         rack.setParameter (a.pluginId, a.parameterId, a.value, a.continuesGesture);
     });
 
+    registry.add (cmd::pluginSetParameters, { "Change Parameters" }, [&rack] (const PluginParametersArgs& a)
+    {
+        rack.setParameters (a.pluginId, a.values, a.continuesGesture);
+    });
+
+    registry.add (cmd::pluginAudition, { "Audition Band" }, [&rack] (const PluginAuditionArgs& a)
+    {
+        rack.getNativeDevices().setAudition (a.pluginId, a.band);
+    });
+
     registry.add (cmd::pluginReplace, { "Replace Plug-in" }, [&rack, &host] (const PluginReplaceArgs& a)
     {
-        host.report (rack.replace (a.trackId, a.pluginId, a.plugin));
+        juce::String added;
+        const auto result = rack.replace (a.trackId, a.pluginId, a.plugin, &added);
+        host.report (result);
+
+        if (result.wasOk())
+            announceAdded (host, a.trackId, added);
+    });
+
+    // Takes the plug-in back out: the insert itself undone while it is still
+    // the newest step, else a removal of its own. One undo step either way.
+    registry.add (cmd::pluginUndoInsert, { "Undo Insert" }, [&registry, &rack, &host] (const PluginArgs& a)
+    {
+        if (rack.isNewestStepInsertOf (a.pluginId))
+            registry.invoke (cmd::editUndo);
+        else if (rack.contains (a.pluginId) && ! rack.remove (a.trackId, a.pluginId))
+            reportMessage (host, "Couldn't remove the plug-in");
+    });
+
+    registry.add (cmd::pluginSetWindow, { "Plug-in Window" }, [&rack, &host] (const PluginWindowArgs& a)
+    {
+        host.report (rack.setWindowState (a.pluginId, a.window));
+    });
+
+    registry.add (cmd::pluginReload, { "Reload Plug-in" }, [&rack, &host] (const PluginArgs& a)
+    {
+        host.report (rack.reload (a.pluginId));
+    });
+
+    registry.add (cmd::pluginSelectPreset, { "Select Preset" }, [&rack, &host] (const PluginPresetArgs& a)
+    {
+        host.report (rack.selectPreset (a.pluginId, a.index));
+    });
+
+    registry.add (cmd::pluginSavePreset, { "Save Preset" }, [&rack, &host] (const PluginSavePresetArgs& a)
+    {
+        host.report (rack.savePreset (a.pluginId, a.name));
+    });
+
+    registry.add (cmd::pluginSelectAB, { "A/B Compare" }, [&rack, &host] (const PluginABArgs& a)
+    {
+        host.report (rack.selectABSlot (a.pluginId, a.slot));
+    });
+
+    registry.add (cmd::pluginCopyAToB, { "Copy A to B" }, [&rack, &host] (const PluginArgs& a)
+    {
+        host.report (rack.copyAToB (a.pluginId));
     });
 
     registry.add (cmd::pluginSetPinned, { "Pin Parameter" }, [&rack, &host] (const PluginPinArgs& a)

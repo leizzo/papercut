@@ -57,6 +57,22 @@ struct PluginParameterArgs
     bool continuesGesture = false;
 };
 
+/** Several parameters of one plug-in set as one change (an EQ node's
+    frequency and gain); continuesGesture joins a drag into one undo step. */
+struct PluginParametersArgs
+{
+    juce::String pluginId;
+    std::vector<ParameterValue> values;
+    bool continuesGesture = false;
+};
+
+/** Plays one EQ Eight band alone (band -1: stops). Monitoring, not an Edit change. */
+struct PluginAuditionArgs
+{
+    juce::String pluginId;
+    int band = -1;
+};
+
 /** A new plug-in in pluginId's place. plugin is a type name or a catalogue path. */
 struct PluginReplaceArgs
 {
@@ -80,6 +96,34 @@ struct PluginSizeArgs
     DeviceSize size = DeviceSize::compact;
 };
 
+/** A plug-in window's new state: where it is, pinned, open, its UI scale. */
+struct PluginWindowArgs
+{
+    juce::String pluginId;
+    PluginWindowState window;
+};
+
+/** A preset of the plug-in's menu, by index of PluginRack::getPresetNames. */
+struct PluginPresetArgs
+{
+    juce::String pluginId;
+    int index = 0;
+};
+
+/** The current state of a plug-in, saved as a named preset. */
+struct PluginSavePresetArgs
+{
+    juce::String pluginId;
+    juce::String name;
+};
+
+/** An A/B compare slot: 0 = A, 1 = B. */
+struct PluginABArgs
+{
+    juce::String pluginId;
+    int slot = 0;
+};
+
 /** A catalogue plug-in, by its path (what plugin.insert takes). */
 struct PluginPathArgs
 {
@@ -97,13 +141,25 @@ namespace cmd
     inline constexpr CommandRef<PluginArgs> pluginMoveToDeviceChain { "plugin.moveToDeviceChain" };   ///< a mixer insert
     inline constexpr CommandRef<PluginCopyArgs> pluginCopyInsert { "plugin.copyInsert" };
     inline constexpr CommandRef<PluginParameterArgs> pluginSetParameter { "plugin.setParameter" };
+    inline constexpr CommandRef<PluginParametersArgs> pluginSetParameters { "plugin.setParameters" };
+    inline constexpr CommandRef<PluginAuditionArgs> pluginAudition { "plugin.audition" };   ///< never undoable
     inline constexpr CommandRef<PluginReplaceArgs> pluginReplace { "plugin.replace" };
     inline constexpr CommandRef<PluginPinArgs> pluginSetPinned { "plugin.setPinned" };
     inline constexpr CommandRef<PluginSizeArgs> pluginSetSize { "plugin.setSize" };       ///< a view: never undoable
     inline constexpr CommandRef<PluginArgs> pluginLocate { "plugin.locate" };             ///< asks for the missing plug-in's file
+    inline constexpr CommandRef<PluginArgs> pluginUndoInsert { "plugin.undoInsert" };     ///< the "added" toast's Undo
+    inline constexpr CommandRef<PluginWindowArgs> pluginSetWindow { "plugin.setWindow" }; ///< a view: never undoable
+    inline constexpr CommandRef<PluginArgs> pluginReload { "plugin.reload" };             ///< the window's Retry
+    inline constexpr CommandRef<PluginPresetArgs> pluginSelectPreset { "plugin.selectPreset" };
+    inline constexpr CommandRef<PluginSavePresetArgs> pluginSavePreset { "plugin.savePreset" };
+    inline constexpr CommandRef<PluginABArgs> pluginSelectAB { "plugin.selectAB" };
+    inline constexpr CommandRef<PluginArgs> pluginCopyAToB { "plugin.copyAToB" };
 }
 
-/** Registers the plug-in Commands above. */
+/** Registers the plug-in Commands above. plugin.insert and plugin.replace
+    tell AppCommandHost::pluginAdded about the plug-in they add: the plug-in
+    window's opening rule (PRD §9.6) hangs off that one place, whichever view
+    the insert came from. */
 void registerPluginCommands (CommandRegistry&, PluginRack&, AppCommandHost&);
 
 } // namespace resamper

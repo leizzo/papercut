@@ -1,6 +1,7 @@
 #include "PluginRack.h"
 #include "EditTracks.h"
 #include "PluginScanner.h"
+#include "NativeDevicePlugins.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -35,6 +36,24 @@ namespace
         return value == "folded" ? DeviceSize::folded : value == "expanded" ? DeviceSize::expanded : DeviceSize::compact;
     }
 
+    /** On a plug-in's state: the preset last chosen or saved in its window. */
+    const juce::Identifier presetProperty { "resamperPreset" };
+
+    /** On an external plug-in's state: the A/B slot in use (1 = B; absent is A),
+        and the other slot's plug-in state, base64. */
+    const juce::Identifier abSlotProperty { "resamperABSlot" };
+    const juce::Identifier abOtherProperty { "resamperABOther" };
+
+    /** On a plug-in's state: its window (§20 Plugin.window). Absent x / y: not placed yet. */
+    const juce::Identifier windowOpenProperty { "resamperWindowOpen" };
+    const juce::Identifier windowPinnedProperty { "resamperWindowPinned" };
+    const juce::Identifier windowXProperty { "resamperWindowX" };
+    const juce::Identifier windowYProperty { "resamperWindowY" };
+    const juce::Identifier windowScaleProperty { "resamperWindowScale" };
+
+    /** The file extension of a preset savePreset writes. */
+    const juce::String presetExtension { ".resamperpreset" };
+
     /** A built-in's Mix and Out parameters, by type: the last zone of its card (§9.2.1a). */
     bool isOutputParameter (const juce::String& pluginType, const juce::String& parameterId)
     {
@@ -43,6 +62,8 @@ namespace
             { te::CompressorPlugin::xmlTypeName, { "output gain" } },
             { te::DelayPlugin::xmlTypeName,      { "mix proportion" } },
             { te::FourOscPlugin::xmlTypeName,    { "masterLevel" } },
+            { EqEightPlugin::xmlTypeName,        { "scale", "output" } },
+            { CompressorV2Plugin::xmlTypeName,   { "makeupAuto", "makeup", "mix", "output" } },
         };
 
         auto found = outputs.find (pluginType);
@@ -90,17 +111,27 @@ namespace
         return info;
     }
 
+    /** A v2 native device of Resamper's own (PRD §9.2.1a). */
+    template <typename PluginClass>
+    PluginInfo nativeV2()
+    {
+        auto info = builtIn<PluginClass> (false);
+        info.manufacturer = "Resamper";
+        return info;
+    }
+
     /** The built-ins a user can put on a track. Engine plumbing (the fader,
         meters, aux sends and returns, freeze points, patch bays, text) is added
-        by the app where it belongs, never from the catalogue. */
+        by the app where it belongs, never from the catalogue. EQ Eight and
+        Compressor v2 replace the engine's equaliser and compressor (v1). */
     const juce::Array<PluginInfo>& builtInCatalogue()
     {
         static const auto catalogue = []
         {
             juce::Array<PluginInfo> list;
-            list.add (builtIn<te::EqualiserPlugin> (false));
+            list.add (nativeV2<EqEightPlugin>());
             list.add (builtIn<te::ReverbPlugin> (false));
-            list.add (builtIn<te::CompressorPlugin> (false));
+            list.add (nativeV2<CompressorV2Plugin>());
             list.add (builtIn<te::ChorusPlugin> (false));
             list.add (builtIn<te::DelayPlugin> (false));
             list.add (builtIn<te::PhaserPlugin> (false));
@@ -121,7 +152,9 @@ namespace
             if (info.path == type)
                 return true;
 
-        return false;
+        // The v1 equaliser and compressor are out of the catalogue, but a
+        // project or a Command that names them still gets them.
+        return type == te::EqualiserPlugin::xmlTypeName || type == te::CompressorPlugin::xmlTypeName;
     }
 
     PluginInfo infoFromDescription (const juce::PluginDescription& desc)
@@ -170,6 +203,12 @@ namespace
         info.chain = chainOf (plugin);
         info.enabled = plugin.isEnabled();
         info.missing = plugin.isMissing();
+        info.presetName = plugin.state[presetProperty].toString();
+        info.abSlot = (int) plugin.state[abSlotProperty] == 1 ? 1 : 0;
+
+        if (auto* track = plugin.getOwnerTrack())
+            info.trackId = track->itemID.toString();
+
         info.latencySamples = juce::roundToInt (plugin.getLatencySeconds() * plugin.engine.getDeviceManager().getSampleRate());
         return info;
     }
@@ -538,7 +577,8 @@ juce::StringArray PluginRack::getHostedFormats() const
     return names;
 }
 
-juce::Result PluginRack::insert (const juce::String& trackId, const juce::String& typeOrIdentifier, PluginChain chain)
+juce::Result PluginRack::insert (const juce::String& trackId, const juce::String& typeOrIdentifier, PluginChain chain,
+                                 juce::String* addedId)
 {
     auto& edit = projectManager.getEdit();
     auto* track = findStripTrack (edit, trackId);
@@ -613,10 +653,25 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
     if (track->pluginList.indexOf (plugin.get()) < 0)
         return juce::Result::fail ("Couldn't insert the plug-in");
 
+    lastInsertedId = plugin->itemID.toString();
+    lastInsertDepth = edit.getUndoManager().getUndoDescriptions().size();
+
+    if (addedId != nullptr)
+        *addedId = lastInsertedId;
+
     return juce::Result::ok();
 }
 
-juce::Result PluginRack::replace (const juce::String& trackId, const juce::String& pluginId, const juce::String& typeOrIdentifier)
+bool PluginRack::isNewestStepInsertOf (const juce::String& pluginId) const
+{
+    auto& undo = projectManager.getEdit().getUndoManager();
+    return pluginId.isNotEmpty() && pluginId == lastInsertedId && contains (pluginId)
+        && undo.getUndoDescriptions().size() == lastInsertDepth
+        && undo.getUndoDescription() == "Insert Plug-in";
+}
+
+juce::Result PluginRack::replace (const juce::String& trackId, const juce::String& pluginId, const juce::String& typeOrIdentifier,
+                                  juce::String* addedId)
 {
     auto& edit = projectManager.getEdit();
     auto chains = chainsFor (edit, trackId);
@@ -648,6 +703,10 @@ juce::Result PluginRack::replace (const juce::String& trackId, const juce::Strin
     added->removeFromParent();
     after.track->pluginList.insertPlugin (added, chainsFor (edit, trackId).indexFor (chain, index), nullptr);
     old->deleteFromParent();
+
+    if (addedId != nullptr)
+        *addedId = added->itemID.toString();
+
     return juce::Result::ok();
 }
 
@@ -816,6 +875,38 @@ bool PluginRack::contains (const juce::String& pluginId) const
     return findPlugin (projectManager.getEdit(), pluginId) != nullptr;
 }
 
+std::vector<PluginInfo> PluginRack::getAllPlugins() const
+{
+    std::vector<PluginInfo> result;
+    auto& edit = projectManager.getEdit();
+
+    for (auto* track : te::getAllTracks (edit))
+    {
+        if (! isStripTrack (*track))
+            continue;
+
+        auto chains = chainsFor (edit, track->itemID.toString());
+
+        for (auto* list : { &chains.device, &chains.mixer })
+            for (auto& plugin : *list)
+                result.push_back (infoFromPlugin (*plugin));
+    }
+
+    return result;
+}
+
+std::optional<PluginInfo> PluginRack::getPlugin (const juce::String& pluginId) const
+{
+    auto& edit = projectManager.getEdit();
+
+    // Only a chain member: never the fader, a meter or a send.
+    if (auto plugin = findPlugin (edit, pluginId))
+        if (auto* track = plugin->getOwnerTrack(); track != nullptr && chainsFor (edit, track->itemID.toString()).find (pluginId) != nullptr)
+            return infoFromPlugin (*plugin);
+
+    return std::nullopt;
+}
+
 std::vector<PluginParameter> PluginRack::getParameters (const juce::String& pluginId) const
 {
     std::vector<PluginParameter> result;
@@ -828,7 +919,8 @@ std::vector<PluginParameter> PluginRack::getParameters (const juce::String& plug
             result.push_back ({ parameter->paramID, parameter->getParameterName(), range.getStart(), range.getEnd(),
                                 parameter->getCurrentValue(), parameter->getDefaultValue().value_or (range.getStart()),
                                 parameter->hasAutomationPoints(),
-                                isOutputParameter (plugin->getPluginType(), parameter->paramID) });
+                                isOutputParameter (plugin->getPluginType(), parameter->paramID),
+                                parameter->valueRange });
         }
     }
 
@@ -853,13 +945,51 @@ bool PluginRack::setParameter (const juce::String& pluginId, const juce::String&
     if (parameter == nullptr)
         return false;
 
-    const auto clamped = parameter->getValueRange().clipValue (value);
+    const auto clamped = parameter->valueRange.snapToLegalValue (parameter->getValueRange().clipValue (value));
 
     if (juce::exactlyEqual (clamped, parameter->getCurrentValue()))
         return false;
 
     projectManager.getUndo().beginGestureStep ("Change " + parameter->getParameterName(), pluginId + ":" + parameterId, continuesGesture);
     return edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameterId, parameter->getCurrentValue(), clamped));
+}
+
+bool PluginRack::setParameters (const juce::String& pluginId, const std::vector<ParameterValue>& values, bool continuesGesture)
+{
+    auto& edit = projectManager.getEdit();
+    auto plugin = findPlugin (edit, pluginId);
+
+    if (plugin == nullptr)
+        return false;
+
+    std::vector<std::pair<te::AutomatableParameter::Ptr, float>> changes;
+    juce::StringArray ids;
+
+    for (const auto& v : values)
+    {
+        auto parameter = findParameter (*plugin, v.parameterId);
+
+        if (parameter == nullptr)
+            return false;
+
+        ids.add (v.parameterId);
+        const auto clamped = parameter->valueRange.snapToLegalValue (parameter->getValueRange().clipValue (v.value));
+
+        if (! juce::exactlyEqual (clamped, parameter->getCurrentValue()))
+            changes.emplace_back (parameter, clamped);
+    }
+
+    if (changes.empty())
+        return false;
+
+    // The gesture's key names every parameter it sets, so a drag that only
+    // happens to change one of them for a moment stays one step.
+    projectManager.getUndo().beginGestureStep ("Change " + plugin->getName(), pluginId + ":" + ids.joinIntoString (","), continuesGesture);
+
+    for (auto& [parameter, value] : changes)
+        edit.getUndoManager().perform (new ParameterChange (edit, pluginId, parameter->paramID, parameter->getCurrentValue(), value));
+
+    return true;
 }
 
 juce::Result PluginRack::setPinned (const juce::String& pluginId, const juce::String& parameterId, bool pinned)
@@ -1012,6 +1142,264 @@ std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& p
             return std::unique_ptr<juce::Component> (editor.release());
 
     return {};
+}
+
+//==============================================================================
+PluginWindowState PluginRack::getWindowState (const juce::String& pluginId) const
+{
+    PluginWindowState window;
+
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+    {
+        const auto& state = plugin->state;
+        window.open = state[windowOpenProperty];
+        window.pinned = state[windowPinnedProperty];
+        window.placed = state.hasProperty (windowXProperty) && state.hasProperty (windowYProperty);
+        window.position = { (int) state[windowXProperty], (int) state[windowYProperty] };
+        window.uiScale = (int) state.getProperty (windowScaleProperty, 100);
+    }
+
+    return window;
+}
+
+juce::Result PluginRack::setWindowState (const juce::String& pluginId, const PluginWindowState& window)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (plugin == nullptr)
+        return juce::Result::fail ("No such plug-in");
+
+    if (getWindowState (pluginId) == window)
+        return juce::Result::ok();
+
+    // A view of the plug-in: saved with it, never an undo step.
+    auto& state = plugin->state;
+    state.setProperty (windowOpenProperty, window.open, nullptr);
+    state.setProperty (windowPinnedProperty, window.pinned, nullptr);
+    state.setProperty (windowScaleProperty, window.uiScale, nullptr);
+
+    if (window.placed)
+    {
+        state.setProperty (windowXProperty, window.position.x, nullptr);
+        state.setProperty (windowYProperty, window.position.y, nullptr);
+    }
+    else
+    {
+        state.removeProperty (windowXProperty, nullptr);
+        state.removeProperty (windowYProperty, nullptr);
+    }
+
+    return juce::Result::ok();
+}
+
+bool PluginRack::isLoading (const juce::String& pluginId) const
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (plugin == nullptr)
+        return false;
+
+    if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
+        return external->isInitialisingAsync() || plugin->isInitialising();
+
+    return plugin->isInitialising();
+}
+
+juce::String PluginRack::getLoadError (const juce::String& pluginId) const
+{
+    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
+            return external->getLoadError();
+
+    return {};
+}
+
+juce::Result PluginRack::reload (const juce::String& pluginId)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+
+    if (external == nullptr)
+        return juce::Result::fail ("Only a plug-in can be reloaded");
+
+    external->forceFullReinitialise();
+    return juce::Result::ok();
+}
+
+namespace
+{
+    /** One entry of a plug-in's preset menu: a program of its own, or a saved file. */
+    struct PresetEntry
+    {
+        juce::String name;
+        int program = -1;
+        juce::File file;
+    };
+
+    juce::File presetFolderFor (const juce::File& root, const te::ExternalPlugin& plugin)
+    {
+        const auto base = root != juce::File() ? root
+                                               : juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                                                     .getChildFile ("Resamper").getChildFile ("Presets");
+        return base.getChildFile (juce::File::createLegalFileName (plugin.desc.manufacturerName + " - " + plugin.desc.name));
+    }
+
+    std::vector<PresetEntry> presetsOf (te::ExternalPlugin& plugin, const juce::File& root)
+    {
+        std::vector<PresetEntry> entries;
+        const auto programs = plugin.getNumPrograms();
+
+        // A plug-in without programs still reports one, nameless.
+        for (int i = 0; i < programs; ++i)
+            if (auto name = plugin.getProgramName (i).trim(); name.isNotEmpty())
+                entries.push_back ({ name, i, {} });
+
+        auto files = presetFolderFor (root, plugin).findChildFiles (juce::File::findFiles, false, "*" + presetExtension);
+        std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b)
+        {
+            return a.getFileNameWithoutExtension().compareNatural (b.getFileNameWithoutExtension()) < 0;
+        });
+
+        for (auto& file : files)
+            entries.push_back ({ file.getFileNameWithoutExtension(), -1, file });
+
+        return entries;
+    }
+
+    juce::MemoryBlock stateOf (te::ExternalPlugin& plugin)
+    {
+        juce::MemoryBlock block;
+
+        if (auto* instance = plugin.getAudioPluginInstance())
+            instance->getStateInformation (block);
+
+        return block;
+    }
+
+    void restoreState (te::ExternalPlugin& plugin, const juce::MemoryBlock& block)
+    {
+        if (auto* instance = plugin.getAudioPluginInstance(); instance != nullptr && block.getSize() > 0)
+            instance->setStateInformation (block.getData(), (int) block.getSize());
+    }
+
+    juce::MemoryBlock fromBase64 (const juce::String& text)
+    {
+        juce::MemoryBlock block;
+        block.fromBase64Encoding (text);
+        return block;
+    }
+}
+
+juce::StringArray PluginRack::getPresetNames (const juce::String& pluginId) const
+{
+    juce::StringArray names;
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
+        for (auto& entry : presetsOf (*external, presetFolder))
+            names.add (entry.name);
+
+    return names;
+}
+
+juce::Result PluginRack::selectPreset (const juce::String& pluginId, int index)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+
+    if (external == nullptr || external->getAudioPluginInstance() == nullptr)
+        return juce::Result::fail ("Only a loaded plug-in has presets");
+
+    const auto entries = presetsOf (*external, presetFolder);
+
+    if (! juce::isPositiveAndBelow (index, (int) entries.size()))
+        return juce::Result::fail ("No such preset");
+
+    const auto& entry = entries[(size_t) index];
+
+    if (entry.program >= 0)
+        external->setCurrentProgram (entry.program, true);
+    else
+        restoreState (*external, fromBase64 (entry.file.loadFileAsString()));
+
+    // Not an undo step: the plug-in keeps its own state outside the Edit, so undo couldn't take the preset back.
+    plugin->state.setProperty (presetProperty, entry.name, nullptr);
+    return juce::Result::ok();
+}
+
+juce::Result PluginRack::savePreset (const juce::String& pluginId, const juce::String& name)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+    const auto legalName = juce::File::createLegalFileName (name.trim());
+
+    if (external == nullptr || external->getAudioPluginInstance() == nullptr)
+        return juce::Result::fail ("Only a loaded plug-in saves presets");
+
+    if (legalName.isEmpty())
+        return juce::Result::fail ("A preset needs a name");
+
+    auto folder = presetFolderFor (presetFolder, *external);
+
+    if (auto created = folder.createDirectory(); created.failed())
+        return created;
+
+    if (! folder.getChildFile (legalName + presetExtension).replaceWithText (stateOf (*external).toBase64Encoding()))
+        return juce::Result::fail ("Couldn't write the preset " + legalName);
+
+    // Not an undo step: the preset file stays written, and the name only says which preset is current.
+    plugin->state.setProperty (presetProperty, legalName, nullptr);
+    return juce::Result::ok();
+}
+
+juce::Result PluginRack::selectABSlot (const juce::String& pluginId, int slot)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+
+    if (external == nullptr || external->getAudioPluginInstance() == nullptr)
+        return juce::Result::fail ("Only a loaded plug-in compares A and B");
+
+    if (slot != 0 && slot != 1)
+        return juce::Result::fail ("A/B compare has slots A and B only");
+
+    auto& state = plugin->state;
+    const auto current = (int) state[abSlotProperty] == 1 ? 1 : 0;
+
+    if (slot == current)
+        return juce::Result::ok();
+
+    // The slot left behind is kept; the other comes back (B starts as a copy of A).
+    // Not an undo step: a comparison, and the plug-in's own state lives outside the Edit.
+    const auto leaving = stateOf (*external);
+    const auto other = state[abOtherProperty].toString();
+
+    if (other.isNotEmpty())
+        restoreState (*external, fromBase64 (other));
+
+    state.setProperty (abOtherProperty, leaving.toBase64Encoding(), nullptr);
+    state.setProperty (abSlotProperty, slot, nullptr);
+    return juce::Result::ok();
+}
+
+juce::Result PluginRack::copyAToB (const juce::String& pluginId)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+
+    if (external == nullptr || external->getAudioPluginInstance() == nullptr)
+        return juce::Result::fail ("Only a loaded plug-in compares A and B");
+
+    auto& state = plugin->state;
+
+    // On A, B (the kept slot) becomes A; on B, A (the kept slot) is loaded into B.
+    // Not an undo step, like selectABSlot: the plug-in's own state lives outside the Edit.
+    if ((int) state[abSlotProperty] == 1)
+        restoreState (*external, fromBase64 (state[abOtherProperty].toString()));
+    else
+        state.setProperty (abOtherProperty, stateOf (*external).toBase64Encoding(), nullptr);
+
+    return juce::Result::ok();
 }
 
 } // namespace resamper

@@ -192,7 +192,7 @@ struct DetailView::Chain : juce::Component,
         for (size_t i = 0; i < plugins.size(); ++i)
         {
             cards[i]->setState (plugins[i]);
-            cards[i]->setWindowOpen (plugins[i].id == owner.openEditorId);
+            cards[i]->setWindowOpen (owner.openWindowIds.contains (plugins[i].id));
         }
 
         dropZone.setVisible (trackId.isNotEmpty());
@@ -388,12 +388,12 @@ void DetailView::refreshDeviceWindow()
     deviceWindow.reset();
 }
 
-void DetailView::setOpenEditor (const juce::String& pluginId)
+void DetailView::setOpenWindows (const juce::StringArray& pluginIds)
 {
-    openEditorId = pluginId;
+    openWindowIds = pluginIds;
 
     for (auto& card : chain->cards)
-        card->setWindowOpen (card->getPlugin().id == openEditorId);
+        card->setWindowOpen (openWindowIds.contains (card->getPlugin().id));
 }
 
 void DetailView::insertDevice (const juce::String& trackId, const juce::String& path)
@@ -410,13 +410,9 @@ void DetailView::insertDevice (const juce::String& trackId, const juce::String& 
 
     const auto& added = after.back();
 
+    // A plug-in's window opens by the opening rule (pluginAdded), whichever view inserted it.
     if (added.external)
-    {
-        if (onOpenEditor)
-            onOpenEditor (added.id);
-
         return;
-    }
 
     // The chain shown is the selected track's: show this one, then focus the new card.
     if (model.getSelectedTrackId() != trackId)

@@ -45,7 +45,7 @@ struct Theme
                  border, borderSoft, gridBar, gridBeat,
                  textPrimary, textSecondary, textDim, textOnAccent,
                  accent, accentHover, accentDim, focusRing, rec,
-                 stateWarning, stateMute, statePre, stateSolo, statePolarity,
+                 stateWarning, stateMute, statePre, stateSolo, statePolarity, stateSidechain,
                  playhead, meterLow, meterMid, meterHigh, scrim;
 
     /** clip-drums, clip-bass, clip-chords, clip-pads, clip-arp, clip-vocal, clip-fx. */
@@ -63,8 +63,8 @@ struct Theme
     // Radius scale (§15.3): meter, badge/pad/M-S-R, slot/select, strip/segmented, device/card, popover
     float radiusXs = 0, radiusSm = 0, radiusMd = 0, radiusLg = 0, radiusXl = 0, radius2xl = 0;
 
-    // Elevation (§15.3): L1 control, L2 popover. L0 is flat.
-    std::vector<Shadow> elevation1, elevation2;
+    // Elevation (§15.3): L1 control, L2 popover, L3 floating window. L0 is flat.
+    std::vector<Shadow> elevation1, elevation2, elevation3;
 
     float disabledOpacity = 1;
 
@@ -90,6 +90,7 @@ struct LayoutMetrics
     // Sizing scale (§15.3)
     int controlXs = 0, controlSm = 0, controlMd = 0, controlLg = 0;   ///< control heights 16 / 20 / 22 / 26
     int transportButton = 0;     ///< square transport buttons
+    int iconChip = 0, iconControl = 0, iconSection = 0, iconToolbar = 0;   ///< icon sizes (§15.8) 10 / 12 / 14 / 16
     int toolbarHeight = 0;
     int topBarHeight = 0;
     int inspectorWidth = 0;
@@ -116,6 +117,10 @@ struct LayoutMetrics
     int velocityLaneHeight = 0;      ///< piano roll velocity lane
     int gridEighthPixels = 0;        ///< pixels per beat before the grid shows 1/8
     int gridSixteenthPixels = 0;     ///< pixels per beat before the grid shows 1/16
+    int pluginTitleBarHeight = 0;    ///< a plug-in window's title bar (§9.6)
+    int pluginToolbarHeight = 0;     ///< a plug-in window's host toolbar
+    int pluginFooterHeight = 0;      ///< a plug-in window's host footer
+    int windowCascade = 0;           ///< how far each further floating window steps down-right
 };
 
 /** Loads Theme and Layout Metrics from one JSON file under separate keys

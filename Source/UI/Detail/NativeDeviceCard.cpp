@@ -18,6 +18,9 @@ namespace
 
     // Design: Device/Folded (padding 6 0, gap 8: a 3 px stripe, power, a 100 px name, the Mods indicator).
     constexpr int foldedPadding = 6, foldedGap = 8, stripeHeight = 3, foldedNameHeight = 100, foldedModsSize = 10;
+
+    // Design: the v2 devices' colours, as track palette entries (EQ Eight clip-arp, Compressor clip-pads).
+    constexpr int eqEightPaletteIndex = 4, compressorPaletteIndex = 3;
     const TypeStyle foldedNameStyle { 10.0f, false, 700 };
 
     int zoneWidth (int columns)
@@ -65,11 +68,21 @@ NativeDeviceCard::NativeDeviceCard (CommandRegistry& c, PluginRack& r, ThemeMana
     for (auto* b : std::initializer_list<juce::Component*> { &power, &preset, &ab, &mods, &fold, &expand, &options })
         addAndMakeVisible (b);
 
+    if ((body = DeviceBody::create (c, r, tm, info)))
+        addAndMakeVisible (*body);
+
     rebuild (rack.getParameters (plugin.id));
 }
 
 void NativeDeviceCard::rebuild (const std::vector<PluginParameter>& list)
 {
+    if (body != nullptr)
+    {
+        body->setParameters (list, plugin.enabled, colour);
+        resized();
+        return;
+    }
+
     std::vector<juce::String> ids;
 
     for (auto& p : list)
@@ -119,9 +132,14 @@ void NativeDeviceCard::setState (const PluginInfo& info)
     auto& theme = themeManager.getTheme();
     plugin = info;
     size = floating ? DeviceSize::expanded : plugin.size;
-    // A stable pick from the track palette by device type (the design: EQ Eight is always arp, Saturator bass).
-    colour = theme.trackColour ((int) ((juce::uint32) (plugin.manufacturer + "/" + plugin.name).hashCode()
-                                       % (juce::uint32) theme.trackPalette.size()));
+    // A stable pick from the track palette by device type; the v2 devices take the design's.
+    if (plugin.path == NativeDevices::eqEightType)
+        colour = theme.trackColour (eqEightPaletteIndex);
+    else if (plugin.path == NativeDevices::compressorType)
+        colour = theme.trackColour (compressorPaletteIndex);
+    else
+        colour = theme.trackColour ((int) ((juce::uint32) (plugin.manufacturer + "/" + plugin.name).hashCode()
+                                           % (juce::uint32) theme.trackPalette.size()));
     setTitle (plugin.name);
     setAlpha (plugin.enabled ? 1.0f : 0.5f);
 
@@ -165,6 +183,9 @@ int NativeDeviceCard::getPreferredWidth (int dockedWidth) const
     if (size == DeviceSize::folded)
         return foldedWidth;
 
+    if (body != nullptr)
+        return juce::jmax (minHeaderWidth(), body->getPreferredWidth (size == DeviceSize::expanded, dockedWidth));
+
     int controls = 0, outputs = 0;
 
     for (auto& p : parameters)
@@ -174,12 +195,18 @@ int NativeDeviceCard::getPreferredWidth (int dockedWidth) const
         controls = juce::jmin (controls, maxCompactControls);
 
     const auto divider = controls > 0 && outputs > 0 ? 2 * knobGap + 1 : 0;
-    const auto body = 2 * bodyPaddingX + zoneWidth (columns (controls)) + divider + zoneWidth (columns (outputs));
-    return juce::jmax (minHeaderWidth(), body, size == DeviceSize::expanded ? dockedWidth : 0);
+    const auto zones = 2 * bodyPaddingX + zoneWidth (columns (controls)) + divider + zoneWidth (columns (outputs));
+    return juce::jmax (minHeaderWidth(), zones, size == DeviceSize::expanded ? dockedWidth : 0);
 }
 
 void NativeDeviceCard::focusFirstControl()
 {
+    if (body != nullptr && body->isShowing())
+    {
+        body->focusFirstControl();
+        return;
+    }
+
     // Only a card on screen can take focus.
     for (auto& p : parameters)
         if (p.knob->isShowing())
@@ -232,6 +259,12 @@ void NativeDeviceCard::resized()
 
     dividerX = -1;
 
+    if (body != nullptr)
+    {
+        body->setVisible (! folded);
+        body->setBounds (getLocalBounds().withTrimmedTop (headerHeight));
+    }
+
     if (folded)
     {
         // Device/Folded: stripe, power, name, Mods, top to bottom from the 6 px padding.
@@ -275,7 +308,7 @@ void NativeDeviceCard::resized()
     preset.setBounds (header.withSizeKeepingCentre (header.getWidth(), partHeight));
 
     // Zones: Controls, then the divider and Output.
-    auto body = getLocalBounds().withTrimmedTop (headerHeight).reduced (bodyPaddingX, 0);
+    auto zoneArea = getLocalBounds().withTrimmedTop (headerHeight).reduced (bodyPaddingX, 0);
     const auto rows = size == DeviceSize::expanded ? 2 : 1;
     const auto top = headerHeight + (getHeight() - headerHeight - rows * knobHeight) / 2;
 
@@ -286,11 +319,11 @@ void NativeDeviceCard::resized()
         for (size_t i = 0; i < zone.size(); ++i)
         {
             const auto col = (int) i % juce::jmax (1, cols), row = (int) i / juce::jmax (1, cols);
-            zone[i]->knob->setBounds (body.getX() + col * (knobWidth + knobGap), top + row * knobHeight, knobWidth, knobHeight);
+            zone[i]->knob->setBounds (zoneArea.getX() + col * (knobWidth + knobGap), top + row * knobHeight, knobWidth, knobHeight);
             zone[i]->knob->setVisible (true);
         }
 
-        body.removeFromLeft (zoneWidth (cols));
+        zoneArea.removeFromLeft (zoneWidth (cols));
     };
 
     const auto controls = shownParameters (false), outputs = shownParameters (true);
@@ -299,10 +332,10 @@ void NativeDeviceCard::resized()
     if (! outputs.empty())
     {
         // Output hugs the right edge; the card is always wide enough for the divider's gaps.
-        body.removeFromLeft (juce::jmax (0, body.getWidth() - zoneWidth (columns ((int) outputs.size()))));
+        zoneArea.removeFromLeft (juce::jmax (0, zoneArea.getWidth() - zoneWidth (columns ((int) outputs.size()))));
 
         if (! controls.empty())
-            dividerX = body.getX() - knobGap - 1;
+            dividerX = zoneArea.getX() - knobGap - 1;
 
         placeZone (outputs);
     }

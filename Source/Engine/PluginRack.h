@@ -1,9 +1,12 @@
 #pragma once
 
+#include "NativeDevices.h"
+
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace resamper
@@ -46,6 +49,22 @@ struct PluginInfo
     int latencySamples = 0;                     ///< the latency the plug-in reports
     juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
     DeviceSize size = DeviceSize::compact;      ///< a native device's card
+    juce::String trackId;                       ///< on a track: the track it is on
+    juce::String presetName;                    ///< the preset last chosen or saved in its window; empty for none
+    int abSlot = 0;                             ///< the A/B compare slot in use: 0 = A, 1 = B
+};
+
+/** Where a plug-in's window is and how it shows (PRD §20 Plugin.window).
+    Saved with the project on the plug-in; changing it is never an undo step. */
+struct PluginWindowState
+{
+    bool open = false;
+    bool pinned = false;
+    bool placed = false;          ///< false until the window has a remembered position
+    juce::Point<int> position;    ///< the window's top-left on the desktop, when placed
+    int uiScale = 100;            ///< percent: 100, 150 or 200
+
+    bool operator== (const PluginWindowState&) const = default;
 };
 
 /** One automatable parameter of a plug-in on a track, in its own units. */
@@ -55,6 +74,17 @@ struct PluginParameter
     float minimum = 0, maximum = 1, value = 0, defaultValue = 0;
     bool automated = false;   ///< has an automation curve
     bool output = false;      ///< a native device's Mix / Out: its card's last zone
+
+    /** How a value maps to a control's travel (a frequency's is logarithmic)
+        and which values are legal (a choice steps by 1). */
+    juce::NormalisableRange<float> range { 0.0f, 1.0f };
+};
+
+/** One value of a multi-parameter gesture (PluginRack::setParameters). */
+struct ParameterValue
+{
+    juce::String parameterId;
+    float value = 0;
 };
 
 /** Facade over the current Edit's plug-ins.
@@ -110,13 +140,20 @@ public:
 
     /** Adds a plug-in at the end of a chain. typeOrIdentifier is a built-in type
         name (ReverbPlugin::xmlTypeName, ...) or a catalogue path / identifier.
-        A plug-in that failed to scan can't be inserted. */
+        A plug-in that failed to scan can't be inserted. On success, addedId
+        (if given) receives the new plug-in's id. */
     juce::Result insert (const juce::String& trackId, const juce::String& typeOrIdentifier,
-                         PluginChain = PluginChain::device);
+                         PluginChain = PluginChain::device, juce::String* addedId = nullptr);
 
     /** Puts a new plug-in where pluginId is, on the same chain, removing the
-        old one: one undo step. A mixer insert is still effects only. */
-    juce::Result replace (const juce::String& trackId, const juce::String& pluginId, const juce::String& typeOrIdentifier);
+        old one: one undo step. A mixer insert is still effects only. On
+        success, addedId (if given) receives the new plug-in's id. */
+    juce::Result replace (const juce::String& trackId, const juce::String& pluginId, const juce::String& typeOrIdentifier,
+                          juce::String* addedId = nullptr);
+
+    /** Whether the newest undo step is the insert (or replace) that added
+        pluginId, so undoing it takes back exactly that plug-in. */
+    bool isNewestStepInsertOf (const juce::String& pluginId) const;
 
     /** Removes a plug-in from either chain. */
     bool remove (const juce::String& trackId, const juce::String& pluginId);
@@ -141,6 +178,12 @@ public:
     /** Whether the Edit still holds the plug-in (on any track's chain). */
     bool contains (const juce::String& pluginId) const;
 
+    /** Every plug-in on every track's two chains, track by track. */
+    std::vector<PluginInfo> getAllPlugins() const;
+
+    /** One plug-in on a track's chain, or nothing for an unknown id. */
+    std::optional<PluginInfo> getPlugin (const juce::String& pluginId) const;
+
     /** A plug-in's parameters, in its own order. Empty for an unknown id. */
     std::vector<PluginParameter> getParameters (const juce::String& pluginId) const;
 
@@ -151,6 +194,12 @@ public:
         previous call's undo step when that set the same parameter with nothing
         undoable in between: a knob drag is one step (see EngineUndo). */
     bool setParameter (const juce::String& pluginId, const juce::String& parameterId, float value, bool continuesGesture = false);
+
+    /** Sets several parameters of one plug-in as one change: dragging an EQ
+        node moves its frequency and gain together. continuesGesture joins the
+        previous call's undo step when that set the same parameters with
+        nothing undoable in between. False when nothing changed. */
+    bool setParameters (const juce::String& pluginId, const std::vector<ParameterValue>& values, bool continuesGesture = false);
 
     /** Pins a parameter of an external plug-in to its card (at the end), or
         unpins it. At most maxPinnedParameters; a built-in edits every parameter
@@ -184,11 +233,58 @@ public:
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
     std::unique_ptr<juce::Component> createEditor (const juce::String& pluginId);
 
+    //==============================================================================
+    // The plug-in window (PRD §9.6)
+
+    /** The window's saved state; the default for an unknown id. */
+    PluginWindowState getWindowState (const juce::String& pluginId) const;
+
+    /** Saves the window's state on the plug-in. A view: never an undo step. */
+    juce::Result setWindowState (const juce::String& pluginId, const PluginWindowState&);
+
+    /** Whether an external plug-in is still being instantiated (its window
+        shows the host's loading state meanwhile). */
+    bool isLoading (const juce::String& pluginId) const;
+
+    /** Why an external plug-in couldn't be instantiated; empty if it was, or isn't external. */
+    juce::String getLoadError (const juce::String& pluginId) const;
+
+    /** Instantiates a plug-in again (the window's Retry). */
+    juce::Result reload (const juce::String& pluginId);
+
+    /** The presets the window's menu offers: the plug-in's own programs, then
+        those saved with savePreset, in that order. */
+    juce::StringArray getPresetNames (const juce::String& pluginId) const;
+
+    /** Loads preset index of getPresetNames and remembers its name (saved with
+        the project). Not an undo step: the plug-in keeps its state outside the Edit. */
+    juce::Result selectPreset (const juce::String& pluginId, int index);
+
+    /** Saves the plug-in's state as a named preset, offered by every instance
+        of the same plug-in afterwards, and makes it the current preset. */
+    juce::Result savePreset (const juce::String& pluginId, const juce::String& name);
+
+    /** Where savePreset writes, one folder per plug-in. Defaults to the user's
+        application data folder. */
+    void setPresetFolder (const juce::File& folder)     { presetFolder = folder; }
+
+    /** A/B compare: switches the plug-in to slot (0 = A, 1 = B), keeping the
+        slot it leaves to come back to. B starts as a copy of A. Saved with the
+        project; not an undo step. External plug-ins only. */
+    juce::Result selectABSlot (const juce::String& pluginId, int slot);
+
+    /** Copies A over B (the window's Copy A→B). */
+    juce::Result copyAToB (const juce::String& pluginId);
+
+    /** The v2 native devices' curves, spectra and meters. */
+    NativeDevices& getNativeDevices() noexcept   { return nativeDevices; }
+
 private:
     struct ScanThread;
     friend struct test::PluginRackTests;
 
     ProjectManager& projectManager;
+    NativeDevices nativeDevices { projectManager };
     std::unique_ptr<ScanThread> scanThread;
     std::atomic<bool> scanning { false };
 
@@ -204,6 +300,12 @@ private:
 
     mutable juce::CriticalSection snapshotLock;
     juce::Array<PluginInfo> externalSnapshot;
+
+    juce::File presetFolder;
+
+    /** The plug-in the newest insert added, and the undo history's depth right after it. */
+    juce::String lastInsertedId;
+    int lastInsertDepth = -1;
 
     static constexpr int scanStopTimeoutMs = 120000;
 

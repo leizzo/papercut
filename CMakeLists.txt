@@ -42,6 +42,8 @@ add_library(resamper_engine STATIC
     Source/Engine/Production.cpp
     Source/Engine/PluginRack.cpp
     Source/Engine/PluginScanner.cpp
+    Source/Engine/NativeDevicePlugins.cpp
+    Source/Engine/NativeDevices.cpp
     Source/Engine/Mixer.cpp
     Source/Engine/Session.cpp
     Source/Engine/Automation.cpp
@@ -142,6 +144,7 @@ add_library(resamper_ui STATIC
     Source/UI/State/UIStateStore.cpp
     Source/UI/State/ArrangementViewState.cpp
     Source/UI/State/ShellState.cpp
+    Source/UI/State/Preferences.cpp
     Source/UI/Theme/ThemeManager.cpp
     Source/UI/Theme/Interaction.cpp
     Source/UI/Controls/ValueFormat.cpp
@@ -164,10 +167,14 @@ add_library(resamper_ui STATIC
     Source/UI/Browser/Browser.cpp
     Source/UI/Detail/DeviceCard.cpp
     Source/UI/Detail/NativeDeviceCard.cpp
+    Source/UI/Detail/DeviceBody.cpp
+    Source/UI/Detail/EqEightDevice.cpp
+    Source/UI/Detail/CompressorDevice.cpp
     Source/UI/Detail/PluginDeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
     Source/UI/MainWindow/FloatingWindow.cpp
-    Source/UI/Plugins/PluginEditorWindow.cpp
+    Source/UI/Plugins/PluginWindow.cpp
+    Source/UI/Plugins/PluginWindows.cpp
     Source/UI/Mixer/Metering.cpp
     Source/UI/Mixer/StripParts.cpp
     Source/UI/Mixer/InsertSlot.cpp
@@ -249,10 +256,13 @@ target_sources(ResamperTests PRIVATE
     Tests/AutomationTests.cpp
     Tests/ShaperTests.cpp
     Tests/ThemeTests.cpp
+    Tests/IconTests.cpp
     Tests/ControlTests.cpp
     Tests/ControlViewTests.cpp
     Tests/DeviceChainTests.cpp
     Tests/DeviceCardTests.cpp
+    Tests/PluginWindowTests.cpp
+    Tests/NativeDeviceTests.cpp
     Tests/EngineUndoTests.cpp
     Tests/ShellTests.cpp
     Tests/BrowserTests.cpp

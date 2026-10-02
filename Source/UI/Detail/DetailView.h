@@ -14,10 +14,11 @@ class CommandRegistry;
     Its top edge drags its height (120–420, kept in the shell's UI State).
 
     The chain ends in a drop zone. Browser devices dropped on the chain go to
-    its end: a native device then takes keyboard focus, a plug-in opens its
-    window. A card dragged by its title bar moves within it. A native device's
-    size is saved on the device (plugin.setSize). The whole content can be swapped for another
-    inspector (the Automation and Folder / Bus inspectors, later). */
+    its end through plugin.insert: a native device then takes keyboard focus;
+    a plug-in's window opens by the opening rule (PluginWindows). A card
+    dragged by its title bar moves within it. A native device's size is saved
+    on the device (plugin.setSize). The whole content can be swapped for
+    another inspector (the Automation and Folder / Bus inspectors, later). */
 class DetailView : public juce::Component,
                    private ApplicationModel::Listener
 {
@@ -31,15 +32,16 @@ public:
         follows the device's state and closes when the device goes. */
     void openDeviceWindow (const juce::String& trackId, const juce::String& pluginId);
 
-    /** The plug-in whose window is open (empty: none); its card says so. */
-    void setOpenEditor (const juce::String& pluginId);
+    /** The plug-ins whose windows are open; their cards say so. */
+    void setOpenWindows (const juce::StringArray& pluginIds);
 
     /** Shows this inspector in place of the clip panel and chain; nullptr restores them. */
     void setInspector (juce::Component*);
 
     /** Adds a Browser device to the end of a track's device chain, wherever it
         was dropped: a native device then shows on the track's chain and takes
-        keyboard focus on its first control, a plug-in opens its window. */
+        keyboard focus on its first control; a plug-in's window opens by the
+        opening rule (AppCommandHost::pluginAdded). */
     void insertDevice (const juce::String& trackId, const juce::String& path);
 
     /** Scrolls the device chain to its start (the mixer's Track chain link). */
@@ -67,7 +69,7 @@ private:
     std::unique_ptr<Chain> chain;
     juce::Viewport chainView;
     juce::Component* inspector = nullptr;
-    juce::String openEditorId;
+    juce::StringArray openWindowIds;
     std::unique_ptr<DeviceWindow> deviceWindow;
     int heightAtDragStart = 0;
 

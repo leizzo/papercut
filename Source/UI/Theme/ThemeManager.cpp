@@ -372,6 +372,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "focus-ring", &Theme::focusRing }, { "rec", &Theme::rec },
         { "state-warning", &Theme::stateWarning }, { "state-mute", &Theme::stateMute }, { "state-pre", &Theme::statePre },
         { "state-solo", &Theme::stateSolo }, { "state-polarity", &Theme::statePolarity },
+        { "state-sidechain", &Theme::stateSidechain },
         { "playhead", &Theme::playhead }, { "meter-low", &Theme::meterLow }, { "meter-mid", &Theme::meterMid },
         { "meter-high", &Theme::meterHigh }, { "scrim", &Theme::scrim },
 
@@ -412,6 +413,8 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "h-control-xs", &LayoutMetrics::controlXs }, { "h-control-sm", &LayoutMetrics::controlSm },
         { "h-control-md", &LayoutMetrics::controlMd }, { "h-control-lg", &LayoutMetrics::controlLg },
         { "h-transport", &LayoutMetrics::transportButton }, { "h-toolbar", &LayoutMetrics::toolbarHeight },
+        { "icon-chip", &LayoutMetrics::iconChip }, { "icon-control", &LayoutMetrics::iconControl },
+        { "icon-section", &LayoutMetrics::iconSection }, { "icon-toolbar", &LayoutMetrics::iconToolbar },
         { "h-topbar", &LayoutMetrics::topBarHeight }, { "w-track-header", &LayoutMetrics::trackHeaderWidth },
         { "w-inspector", &LayoutMetrics::inspectorWidth }, { "w-browser", &LayoutMetrics::browserWidth }, { "w-strip", &LayoutMetrics::stripWidth },
         { "w-strip-compact", &LayoutMetrics::stripCompactWidth }, { "w-strip-bus", &LayoutMetrics::stripBusWidth },
@@ -427,6 +430,8 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
         { "pianoBlackKeyWidth", &LayoutMetrics::pianoBlackKeyWidth }, { "pianoScrollMargin", &LayoutMetrics::pianoScrollMargin },
         { "velocityLaneHeight", &LayoutMetrics::velocityLaneHeight },
         { "gridEighthPixels", &LayoutMetrics::gridEighthPixels }, { "gridSixteenthPixels", &LayoutMetrics::gridSixteenthPixels },
+        { "h-plugin-titlebar", &LayoutMetrics::pluginTitleBarHeight }, { "h-plugin-toolbar", &LayoutMetrics::pluginToolbarHeight },
+        { "h-plugin-footer", &LayoutMetrics::pluginFooterHeight }, { "window-cascade", &LayoutMetrics::windowCascade },
     };
 
     Theme newTheme;
@@ -454,6 +459,7 @@ juce::Result ThemeManager::parse (const juce::String& text, Theme& t, LayoutMetr
 
     for (auto r : { readElevation (elevation, colours, "L1", newTheme.elevation1),
                     readElevation (elevation, colours, "L2", newTheme.elevation2),
+                    readElevation (elevation, colours, "L3", newTheme.elevation3),
                     readNumber (style, "style", "cornerRadius", newTheme.cornerRadius),
                     readNumber (style, "style", "fontSize", newTheme.fontSize),
                     readNumber (style, "style", "opacity-disabled", newTheme.disabledOpacity) })
