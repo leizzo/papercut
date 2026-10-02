@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DeviceBody.h"
 #include "DeviceCard.h"
 #include "UI/Controls/ContinuousControl.h"
 
@@ -25,6 +26,10 @@ namespace resamper
     parameter, docked across the detail view or floating in its own window
     (the menu's Open in Window). A device's colour comes from its type, so the same device looks
     the same on every track.
+
+    A v2 device with a display of its own (EQ Eight, Compressor v2) fills the
+    body with its DeviceBody instead: Input, Display, Controls, Output, at the
+    design's width (wider when expanded).
 
     The preset menu, A/B compare and the Mods Drawer come with their own
     tickets; until then those buttons show their state and are disabled. */
@@ -60,6 +65,7 @@ private:
     DevicePowerButton power;
     DeviceHeaderButton preset, ab, mods, fold, expand, options;
     std::vector<Parameter> parameters;
+    std::unique_ptr<DeviceBody> body;   ///< a v2 device's own zones, in place of the knobs
     std::vector<juce::String> parameterIds;   ///< in the device's order, to tell when it changes
     int dividerX = -1;
 

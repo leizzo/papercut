@@ -1,6 +1,6 @@
 # Resamper
 
-A desktop DAW for electronic producers and mix engineers. This glossary pins the project's domain language. The spec is `PRD.md` and the GitHub issues it points to; implementation details live in the code, not here.
+A desktop DAW for electronic producers and mix engineers. This glossary pins the project's domain language. Open product decisions are tracked as GitHub issues; implementation details live in the code, not here.
 
 ## Language
 
@@ -126,7 +126,7 @@ _Avoid_: Comp (compositing Takes is not supported)
 One processor in a Device Chain or a Mixer Insert slot: a Native Device, a Plug-in, or (in a Device Chain only) a Rack.
 
 **Native Device**:
-A Device built into Resamper, edited inline on its card.
+A Device built into Resamper, edited inline on its card with Resamper's own controls, never in a window of its own. Every Native Device follows one contract: the same header, the zones Input → Display → Controls → Output, and three sizes (Folded, Compact, Expanded). Its graphs are controllers: dragging an EQ node or a compressor's threshold line sets the parameter, and the knobs mirror the graph. EQ Eight and Compressor are Resamper's own processors, not wrappers of the engine's equaliser and compressor (those have four bands and no M/S).
 _Avoid_: built-in plug-in, internal plugin
 
 **Plug-in**:

@@ -1,4 +1,5 @@
 #include "EngineManager.h"
+#include "NativeDevicePlugins.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -70,6 +71,8 @@ EngineManager::EngineManager (const juce::String& applicationName, AudioDevice a
     // JUCE runs the shared thumbnail thread at low priority, which on macOS
     // (utility QoS) reads waveforms about 3x slower than normal (#87).
     engine->getAudioFileManager().getAudioThumbnailCache().getTimeSliceThread().addTimeSliceClient (thumbnailPriority.get());
+
+    registerNativeDevices (engine->getPluginManager());
 }
 
 EngineManager::~EngineManager() = default;

@@ -1,4 +1,5 @@
 #include "DeviceCard.h"
+#include "DeviceBody.h"
 #include "NativeDeviceCard.h"
 #include "PluginDeviceCard.h"
 #include "Commands/CommandRegistry.h"
@@ -30,13 +31,7 @@ void DeviceCard::toggleBypass()
 
 ContinuousValue::Spec DeviceCard::specFor (const PluginParameter& p)
 {
-    ContinuousValue::Spec spec;
-    spec.minimum = p.minimum;
-    spec.maximum = p.maximum;
-    spec.defaultValue = p.defaultValue;
-    spec.format.format = [this, id = p.id] (double v) { return rack.getParameterText (plugin.id, id, (float) v); };
-    spec.format.parse = ValueFormat::number (3).parse;
-    return spec;
+    return parameterSpec (rack, plugin.id, p);
 }
 
 std::function<void (double, bool)> DeviceCard::setterFor (const juce::String& parameterId)
