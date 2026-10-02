@@ -276,7 +276,7 @@ struct DeviceMeasurementTests : juce::UnitTest
             expectLessThan (worstDegrees, 0.1, "the phase is the curve: minimum phase, no latency");
         }
 
-        beginTest ("EQ Eight, Linear: the cuts fall 12 dB an octave; near Nyquist a bell cramps");
+        beginTest ("EQ Eight, Linear: the cuts fall 12 dB an octave; near Nyquist a bell keeps its shape");
         {
             Bench<EqEightPlugin> bench (f);
             auto& cut = bench.device.bands[0];
@@ -314,7 +314,10 @@ struct DeviceMeasurementTests : juce::UnitTest
                             + juce::String (at (hz), 2) + " dB (analog " + juce::String (analog (hz), 2) + " dB)");
 
             expectWithinAbsoluteError (at (16000.0), 6.0, 0.05, "the bell peaks at its frequency");
-            expectLessThan (at (20000.0), analog (20000.0) - 1.0, "above the bell the curve is pressed toward Nyquist");
+
+            // Matched at DC, at its frequency and at Nyquist: within a dB of the analog bell between.
+            for (auto hz : { 8000.0, 12000.0, 20000.0 })
+                expectWithinAbsoluteError (at (hz), analog (hz), 1.0, "the bell keeps its analog shape at " + juce::String (hz));
         }
 
         beginTest ("EQ Eight, Linear / M/S: a Side band leaves a centred impulse alone and shapes an anti-phase one");
