@@ -206,7 +206,7 @@ struct PluginSandboxTests : juce::UnitTest
                     "latency " + juce::String (plugin.has_value() ? plugin->latencySamples : -1));
         }
 
-        beginTest ("A slow plug-in loads in the background: the insert returns, the window shows loading within 300 ms, then the plug-in");
+        beginTest ("A slow plug-in loads in the background: the insert returns, the window shows loading, then the plug-in");
         {
             Fixture f;
             TestPlugin sluggish (f, "Sandbox Sluggish", "plugin Sluggish Gain");
@@ -220,7 +220,7 @@ struct PluginSandboxTests : juce::UnitTest
             const auto started = juce::Time::getMillisecondCounterHiRes();
             f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
             const auto took = juce::Time::getMillisecondCounterHiRes() - started;
-            expectLessThan (took, 300.0, "the insert waited for the plug-in to load");
+            expectLessThan (took, TestPluginFormat::sluggishLoadMs / 2.0, "the insert waited for the plug-in to load");
 
             const auto chain = f.plugins.getChain (track, PluginChain::device);
             const auto id = chain.empty() ? juce::String() : chain.back().id;
