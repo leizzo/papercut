@@ -3,7 +3,8 @@
 #include <juce_core/juce_core.h>
 #include <memory>
 
-namespace tracktion::inline engine { class Engine; }
+namespace tracktion::inline engine { class Engine; class ExternalPlugin; }
+namespace juce { class AudioIODeviceCallback; }
 
 namespace resamper
 {
@@ -34,6 +35,12 @@ public:
         Edit that the sandbox can host, unless it runs in-process). */
     PluginSandbox& getPluginSandbox() const noexcept;
 
+    /** Creates a plug-in's instance anew from the state saved on it (Reload, Run
+        in-process): at once if it runs in-process; if sandboxed, once its new host
+        has loaded it in the background, the old instance (bypassed, if it crashed)
+        staying till then. Never an undo step. */
+    void recreatePlugin (tracktion::ExternalPlugin&);
+
     /** Human-readable name of the active output device, or a note that none is open. */
     juce::String describeActiveAudioDevice() const;
 
@@ -43,6 +50,10 @@ private:
 
     // Before the engine, which creates plug-ins through it until it goes.
     std::unique_ptr<PluginSandbox> sandbox;
+
+    // Tells the sandbox when the device has finished a block; on the engine's device while both exist.
+    std::unique_ptr<juce::AudioIODeviceCallback> blockClock;
+
     std::unique_ptr<tracktion::Engine> engine;
 
     JUCE_DECLARE_NON_COPYABLE (EngineManager)

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -21,15 +23,24 @@ namespace resamper
     How the two talk:
     - audio and MIDI go through a block of shared memory (a mapped temp file)
       both processes map. Each audio block the stand-in copies its input in,
-      wakes the host (a named semaphore) and spins until the host is done or
-      the block's time is up: no extra latency, two context switches a block.
-      A late or dead host costs that block only: it passes through (bypassed).
+      wakes the host (a named semaphore) and waits until the host is done or
+      the block's time is up: a short spin, then short sleeps. The plug-ins of
+      a chain share one block's time; the host processes on a real-time thread.
+      No extra latency, two context switches a block. A late or dead host costs
+      that block only: it passes through (bypassed).
     - parameter values the host sets go through the shared block too, read by
       the host at its next audio block; the plug-in's own changes (its UI) and
       the text it shows come back as messages, ten times a second at most.
     - everything else (loading, state, programs, latency, showing its UI) is a
       message on a pipe (juce::ChildProcessCoordinator), the state ones
       answered synchronously with a timeout.
+
+    Loading never holds up the message thread (§19: a plug-in's window shows
+    within 300 ms of its insert). The engine asks loadInBackground before it
+    creates a sandboxed plug-in: a host starts and loads it on a loader thread
+    while the plug-in has no instance yet (it is "loading"), and once it has,
+    the engine creates the plug-in again and createInstance hands the loaded
+    host over at once.
 
     The plug-in's own UI runs in the host process too, in a panel the host
     lays over the stand-in's editor (sandboxdock): the plug-in window shows
@@ -71,22 +82,49 @@ public:
         (a format added through runHost's extraFormats) run sandboxed. */
     void addHostedFormat (const juce::String& formatName);
 
+    /** Plug-ins of the format run in-process from now on (for tests whose double
+        creates a format's plug-ins itself, through the engine's creation hook). */
+    void removeHostedFormat (const juce::String& formatName);
+
     /** Whether a plug-in of this description can run sandboxed. */
     bool canHost (const juce::PluginDescription&) const;
 
-    /** Starts a sandbox host for the plug-in and waits (at most loadTimeoutMs)
-        until it has loaded it. pluginId names the instance to Listeners.
-        nullptr, with error set, if the host crashed, timed out or couldn't
-        load the plug-in. */
-    std::unique_ptr<juce::AudioPluginInstance> createInstance (const juce::PluginDescription&, double sampleRate,
-                                                               int blockSize, const juce::String& pluginId,
+    /** Has a sandbox host of its own load the plug-in on a loader thread, unless
+        one already is (at most loadTimeoutMs). False while it loads; true once
+        it has loaded or failed, when createInstance hands it over at once.
+        onDone runs on the message thread when it has: a load nobody takes
+        there (with createInstance) is dropped, and its host quits. */
+    bool loadInBackground (const juce::PluginDescription&, const juce::String& pluginId, double sampleRate,
+                           int blockSize, std::function<void()> onDone);
+
+    /** Whether the plug-in is loading into its sandbox host. On the message thread. */
+    bool isLoading (const juce::String& pluginId) const;
+
+    /** Runs the message loop until no plug-in is loading into its sandbox host, or
+        a load's time is up: an offline render mustn't leave a loading plug-in out.
+        False if one still is. On the message thread. */
+    bool waitForLoads();
+
+    /** The plug-in loadInBackground loaded, as its stand-in; pluginId names it
+        to Listeners. nullptr, with error set, if its host crashed, timed out or
+        couldn't load it, or it hasn't finished loading. */
+    std::unique_ptr<juce::AudioPluginInstance> createInstance (const juce::PluginDescription&, const juce::String& pluginId,
                                                                juce::String& error);
+
+    /** The audio device has finished a block (on its thread, after the engine's
+        processing): the sandboxed plug-ins of the next block share a fresh share
+        of its time to wait for their hosts in. Wait-free. */
+    static void audioBlockFinished() noexcept;
 
     /** Whether the instance is a sandboxed plug-in's stand-in. */
     static bool isSandboxed (const juce::AudioProcessor*);
 
     /** Whether the instance is a stand-in whose sandbox host has died. */
     static bool hasCrashed (const juce::AudioProcessor*);
+
+    /** The share of a block's time a sandboxed plug-in's host spends processing it, 0 to 1
+        (the plug-in's own cost, not the stand-in's round trip); 0 if it isn't one, or crashed. */
+    static double getHostCpuLoad (const juce::AudioProcessor*);
 
     /** Where a sandboxed plug-in's own UI shows on screen, as its host reports
         it; empty while hidden, or if it isn't one, or crashed. */
@@ -124,6 +162,7 @@ public:
 
 private:
     class Instance;
+    struct Load;
 
     struct Loading
     {
@@ -134,8 +173,12 @@ private:
     juce::StringArray hostedFormats;
     std::mutex loadingLock;
     std::vector<Loading> loading;
+    std::map<juce::String, std::shared_ptr<Load>> loads;   ///< by plug-in id; on the message thread
+    std::unique_ptr<juce::ThreadPool> loaders;
     juce::ListenerList<Listener> listeners;
 
+    void loadFinished (const juce::String& pluginId, const Load* which, const juce::ValueTree& loaded, const juce::String& error);
+    void dropLoad (const juce::String& pluginId, const Load* which);
     void crashed (const juce::String& pluginId);
     void uiClicked (const juce::String& pluginId);
 

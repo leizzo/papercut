@@ -32,6 +32,10 @@ namespace
             if (crash->get())
                 std::_Exit (134);
 
+            // A plug-in named "Slow ..." takes 2 ms a block: a cost the CPU readout must show.
+            if (desc.name.startsWith ("Slow "))
+                juce::Thread::sleep (2);
+
             buffer.applyGain (gain->get());
         }
 
@@ -179,6 +183,10 @@ void TestPluginFormat::createPluginInstance (const juce::PluginDescription& desc
 
     if (inSandboxHost && text.startsWith ("sandboxcrash "))
         std::_Exit (134);
+
+    // A plug-in named "Sluggish ..." takes a while to load in its sandbox: the app mustn't wait for it.
+    if (inSandboxHost && desc.name.startsWith ("Sluggish "))
+        juce::Thread::sleep (sluggishLoadMs);
 
     callback (std::make_unique<TestPlugin> (desc), {});
 }

@@ -56,9 +56,11 @@ public:
     /** Builds the views over the app and registers their Commands in its registry. */
     MainComponent (ResamperApp&, juce::ApplicationCommandManager&);
 
-    /** Dispatches the shortcuts JUCE's key mappings can't: those of one view
-        (fired only while it shows) and those that pass an argument. Add it to
-        the window after the ApplicationCommandManager's key mappings. */
+    /** Resamper's keyboard shortcuts, the one place a key becomes a Command:
+        first those JUCE's key mappings can't dispatch (one view's, fired only
+        while it shows, and those that pass an argument), then the menus' key
+        mappings. Every window's keys end here: the main window's, and those a
+        plug-in window (or its plug-in's own UI) didn't use. */
     juce::KeyListener& getShortcutListener() noexcept   { return shortcuts; }
 
     /** A toast at the bottom centre (PRD §16.7). undoable offers Undo (edit.undo). */
@@ -111,6 +113,11 @@ private:
     {
         explicit ShortcutListener (MainComponent& o) : owner (o) {}
         bool keyPressed (const juce::KeyPress&, juce::Component*) override;
+        bool keyStateChanged (bool isKeyDown, juce::Component*) override;
+
+        /** A view's shortcut, or one with an argument; false if the key is the menus' or nobody's. */
+        bool viewShortcut (const juce::KeyPress&);
+
         MainComponent& owner;
     };
 

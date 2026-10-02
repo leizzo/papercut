@@ -23,7 +23,7 @@ public:
 
     static constexpr const char* formatName = "ResamperTest";
     static constexpr const char* fileExtension = ".resampertest";
-    static constexpr int pluginLatency = 64, editorWidth = 300, editorHeight = 160;
+    static constexpr int pluginLatency = 64, editorWidth = 300, editorHeight = 160, sluggishLoadMs = 1500;
 
     /** The folder the format registerWith adds scans: one per run. */
     static juce::File scanFolder();
