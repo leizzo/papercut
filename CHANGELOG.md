@@ -9,6 +9,56 @@ release is published on GitHub as an alpha pre-release.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-02
+
+Milestone **M1.1 — Devices & Plug-ins**: native devices v2, plug-in hosting in a sandbox, plug-in
+windows and lucide icons.
+
+### Added
+
+- **EQ Eight v2 and Compressor v2** native devices, edited on their graphs (#67). EQ Eight: drag a
+  node for frequency and gain, wheel for Q, double-click to switch a band; eight bands with type
+  and on/off, pre/post spectrum, Q-width shading, St / L-R / M-S, Adaptive Q, audition. Compressor:
+  drag the threshold on the Transfer graph, Transfer / Activity views, IN / GR meters, Lookahead,
+  Peak / RMS / Expand, Makeup Auto / Mix / Out. Each gesture is one undo step.
+- **Device cards** for native devices and plug-ins (#66). A native card can be Folded, Compact or
+  Expanded. A plug-in card shows vendor, format, up to 4 pinned parameters edited inline, and CPU,
+  latency and sandbox state; a missing plug-in offers **Locate** and **Replace**. The chain ends in
+  a drop zone.
+- **Plug-in windows** (#68) with host chrome: Bypass, presets, A/B compare, latency, CPU, sandbox
+  state and UI scale 100 / 150 / 200 %. A plug-in's window opens when it is inserted, with a toast
+  offering **Undo** and an **Auto-open window on insert** switch. One window per instance; position, pin and scale
+  are saved with the Project. `Esc` / `Mod+W` close the focused window, `Mod+Alt+P` shows or hides
+  them all.
+- **Plug-in sandbox** (#69): each plug-in runs in its own process by default. A crashing plug-in
+  bypasses only its own device, playback keeps going, and **Reload** brings it back with its last
+  saved state. **Run in-process** can be set per plug-in and is saved with the Project.
+- **Plug-in scanning out of process** (#78): a plug-in that crashes or hangs the scan is listed as
+  *Failed to scan* with **Retry**, and the rest load. Browser rows show a VST3 / AU / CLAP badge.
+- A native Mixer Insert opens its device in a floating window, like a plug-in insert; plug-in
+  inserts look different from native ones (#70).
+- The lucide icon set, sized and coloured by role (#79).
+
+### Changed
+
+- EQ Eight v2 and Compressor v2 replace the v1 EQ and compressor in the device list. Projects that
+  use the v1 devices still load them.
+
+### Fixed
+
+- Inserting a sandboxed plug-in no longer blocks the app while it loads; export, bounce and freeze
+  wait for plug-ins that are still loading (#134).
+- A sandboxed plug-in's CPU % is the plug-in's own time in its host (#136).
+- Undo right after a new track or a plug-in insert keeps Redo (#133).
+- A plug-in insert that is refused leaves no partial undo step.
+- Shortcuts typed in a plug-in window reach Resamper.
+
+### Known issues
+
+- AUv3 and other plug-ins that load asynchronously run in-process, outside the sandbox.
+- A plug-in that finishes loading during playback can cause a short gap.
+- Moving a plug-in's controls doesn't record automation yet (M3).
+
 ## [0.1.3] - 2026-10-01
 
 Arrangement and control fixes on top of **M1 — Core**.
@@ -121,7 +171,8 @@ basic Mixer, and the Resamper design system.
 - Silent tempo-tagged loops with no waveform.
 - M1 review findings and design parity in lanes, devices and the mixer.
 
-[Unreleased]: https://github.com/leizzo/resamper/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/leizzo/resamper/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/leizzo/resamper/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/leizzo/resamper/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/leizzo/resamper/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/leizzo/resamper/compare/v0.1.0...v0.1.1

@@ -15,9 +15,9 @@ Elektronik müzik prodüktörleri ve miks mühendisleri için koyu temalı, yoğ
 masaüstü DAW.
 
 > **Durum: alfa.** Resamper erken geliştirme aşamasında. Güncel sürüm
-> [v0.1.3 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.3), alfa ön sürümü olarak
-> yayımlandı. Eksik özellikler, pürüzler ve proje formatında değişiklikler olabilir — şarkınızın tek
-> kopyasını henüz ona emanet etmeyin.
+> [v0.2.0 — M1.1 Devices & Plug-ins](https://github.com/leizzo/resamper/releases/tag/v0.2.0),
+> alfa ön sürümü olarak yayımlandı. Eksik özellikler, pürüzler ve proje formatında değişiklikler
+> olabilir — şarkınızın tek kopyasını henüz ona emanet etmeyin.
 
 ## Resamper nedir?
 
@@ -29,7 +29,7 @@ bir sinyal yolu.
 
 > Bu görseller ürün tasarımından ([`design/design.pen`](design/design.pen)) alınmıştır ve
 > Resamper'ın nereye gittiğini gösterir. İçlerindeki bazı özellikler sonraki kilometre taşlarına
-> aittir — v0.1.3'te bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
+> aittir — v0.2.0'da bugün neler olduğunu görmek için [yol haritasına](#yol-haritası) bakın.
 
 ### Liste değil, konsol
 
@@ -43,7 +43,7 @@ bir sinyal yolu.
 
 <img src="docs/images/workflow.png" alt="Gam destekli piano roll, kendi döngüsüne sahip ses klibi zarfları, klasörler ve bus kanalları, arrangement otomasyonu." width="100%">
 
-## Bugün neler yapabilirsiniz (v0.1.3)
+## Bugün neler yapabilirsiniz (v0.2.0)
 
 - **Aranje** — ses ve MIDI kanalları; taşıyabildiğiniz, boyutlandırabildiğiniz, bölebildiğiniz,
   çoğaltabildiğiniz, döngüyle uzatabildiğiniz ve birleştirebildiğiniz klipler; zoom, kanal yüksekliği
@@ -51,7 +51,10 @@ bir sinyal yolu.
 - **Kayıt** — giriş seçimi, canlı dalga formu ve take'lerle ses kaydı; MIDI girişinden MIDI kaydı;
   count-in (atlamak için Rec'e Shift ile tıklayın).
 - **MIDI düzenleme** — piano roll'da nota düzenleme ve quantize.
-- **Ses tasarımı** — detay görünümünde, her kanal için eklentili cihaz zinciri.
+- **Ses tasarımı** — detay görünümünde her kanal için cihaz zinciri: grafikleri üzerinden düzenlenen
+  EQ Eight ve Compressor, kendi pencerelerinde açılan VST3 / AU / CLAP eklentileri.
+- **Güvenli eklenti** — her eklenti kendi sürecinde çalışır: çöken eklenti yalnızca kendi cihazını
+  devre dışı bırakır, **Reload** onu geri getirir; taranamayan bir eklenti yeniden denenebilir.
 - **Miks** — ses seviyesi, pan, mute, solo, stereo metreler; kanal başına bypass ve sıralama destekli
   8 insert slotu; kendi insert'leri ve Send'leri olan Bus kanalları.
 - **Kütüphane** — arama, kategoriler, sample önizleme ve kanala sürükle-bırak içeren kütüphane tarayıcısı.
@@ -64,7 +67,7 @@ Tam liste için [CHANGELOG.md](CHANGELOG.md) dosyasına bakın.
 | Kilometre taşı | Getirdikleri |
 |---|---|
 | **M1 — Core** ✅ | Kabuk, transport, Arrangement, eklentili cihaz zinciri, temel Mixer, tasarım sistemi (v0.1.0) |
-| **M1.1 — Cihazlar ve Eklentiler** | Yerleşik cihazlar (EQ Eight, Compressor), çökme izolasyonlu VST3 / AU / CLAP desteği, eklenince açılan eklenti penceresi |
+| **M1.1 — Cihazlar ve Eklentiler** ✅ | Yerleşik cihazlar (EQ Eight, Compressor), çökme izolasyonlu VST3 / AU / CLAP desteği, eklenince açılan eklenti penceresi (v0.2.0) |
 | **M2 — Miks** | Pre-FX / Pre / Post send'ler, return kanalları, master loudness, klasörler ve bus'lar, sidechain girişleri |
 | **M3 — Otomasyon** | Arrangement otomasyon şeritleri, klip üzeri zarflar, Read / Touch / Latch / Write |
 | **M4 — Editörler** | Gam ve akor destekli, velocity şeritli piano roll; warp ve fade destekli ses editörü; klip zarfları |
@@ -98,6 +101,7 @@ dosyasını (Apple Silicon) indirip açın ve Resamper'ı Applications'a sürük
 | Piano roll: quantize · transpoze | `Q` · `↑↓` (yarım ses), `Shift+↑↓` (oktav) |
 | Yeni · Aç · Projeyi kaydet | `Mod+N` · `Mod+O` · `Mod+S` |
 | Miksi dışa aktar | `Mod+Shift+E` |
+| Eklenti pencereleri: odaktakini kapat · tümünü göster / gizle | `Esc` veya `Mod+W` · `Mod+Alt+P` |
 
 ## Geri bildirim
 

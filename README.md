@@ -14,9 +14,9 @@
 A dark, dense, keyboard-friendly desktop DAW for electronic producers and mix engineers.
 
 > **Status: alpha.** Resamper is in early development. The current release is
-> [v0.1.3 — M1 Core](https://github.com/leizzo/resamper/releases/tag/v0.1.3), published as an alpha
-> pre-release. Expect missing features, rough edges and project-format changes — don't trust it with
-> your only copy of a song yet.
+> [v0.2.0 — M1.1 Devices & Plug-ins](https://github.com/leizzo/resamper/releases/tag/v0.2.0),
+> published as an alpha pre-release. Expect missing features, rough edges and project-format
+> changes — don't trust it with your only copy of a song yet.
 
 ## What is Resamper?
 
@@ -28,7 +28,7 @@ signal path you can always see.
 
 > These images come from the product design ([`design/design.pen`](design/design.pen)) and show
 > where Resamper is heading. Several features in them belong to later milestones — see the
-> [roadmap](#roadmap) for what's in v0.1.3 today.
+> [roadmap](#roadmap) for what's in v0.2.0 today.
 
 ### A console, not a list
 
@@ -42,14 +42,17 @@ signal path you can always see.
 
 <img src="docs/images/workflow.png" alt="Scale-aware piano roll, audio clip envelopes with their own loop, folders and bus channels, and arrangement automation." width="100%">
 
-## What you can do today (v0.1.3)
+## What you can do today (v0.2.0)
 
 - **Arrange** — audio and MIDI tracks, clips you can move, resize, split, duplicate, loop-extend and
   consolidate; zoom, lane height and Follow.
 - **Record** — audio recording with input selection, live waveform and takes; MIDI recording from a
   MIDI input; count-in (Shift-click Rec to skip it).
 - **Edit MIDI** — piano roll note editing and quantize.
-- **Shape sound** — a per-track device chain with plug-ins, shown in the detail view.
+- **Shape sound** — a per-track device chain in the detail view: EQ Eight and Compressor edited on
+  their graphs, and VST3 / AU / CLAP plug-ins in their own windows.
+- **Host plug-ins safely** — each plug-in runs in its own process: a crash bypasses only that device
+  and **Reload** brings it back; a plug-in that fails to scan can be retried.
 - **Mix** — volume, pan, mute, solo, stereo meters, 8 insert slots per channel with bypass and reorder;
   Bus Strips with their own inserts and Sends.
 - **Browse** — a library browser with search, categories, sample preview and drag-to-track.
@@ -62,7 +65,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the full list.
 | Milestone | What it brings |
 |---|---|
 | **M1 — Core** ✅ | Shell, transport, Arrangement, device chain with plug-ins, basic Mixer, design system (v0.1.0) |
-| **M1.1 — Devices & Plug-ins** | Native devices (EQ Eight, Compressor), VST3 / AU / CLAP hosting with crash isolation, plug-in window on insert |
+| **M1.1 — Devices & Plug-ins** ✅ | Native devices (EQ Eight, Compressor), VST3 / AU / CLAP hosting with crash isolation, plug-in window on insert (v0.2.0) |
 | **M2 — Mix** | Pre-FX / Pre / Post sends, returns, master loudness, folders & buses, sidechain inputs |
 | **M3 — Automation** | Arrangement lanes, clip overlays, Read / Touch / Latch / Write |
 | **M4 — Editors** | Scale-aware piano roll with chords and velocity, audio editor with warp and fades, clip envelopes |
@@ -96,6 +99,7 @@ build from source (see [For developers](#for-developers)).
 | Piano roll: quantize · transpose | `Q` · `↑↓` (semitone), `Shift+↑↓` (octave) |
 | New · Open · Save project | `Mod+N` · `Mod+O` · `Mod+S` |
 | Export mix | `Mod+Shift+E` |
+| Plug-in windows: close focused · show / hide all | `Esc` or `Mod+W` · `Mod+Alt+P` |
 
 ## Feedback
 
