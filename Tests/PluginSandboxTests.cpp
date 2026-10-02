@@ -489,6 +489,48 @@ struct PluginSandboxTests : juce::UnitTest
             main.reset();
         }
 
+        beginTest ("Keys the sandboxed UI doesn't use are Resamper's: a menu shortcut, Mod+Alt+P, Mod+W (#129)");
+        {
+            Fixture f;
+            TestPlugin gain (f, "Sandbox Shortcuts", "plugin Shortcuts Gain");
+            f.theme.load();
+            const auto track = addTrack (f);
+            f.invoke (cmd::trackSelect, { track });
+            juce::ApplicationCommandManager commandManager;
+            auto main = std::make_unique<MainComponent> (f.app, commandManager);
+            main->setSize (1400, 900);
+            commandManager.registerAllCommandsForTarget (main.get());
+            commandManager.setFirstCommandTarget (main.get());
+
+            const auto id = insert (f, track, gain.path());
+            auto& windows = main->getPluginWindows();
+            auto* window = windows.getWindow (id);
+            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }));
+            auto* instance = instanceOf (f, id);
+
+            if (window == nullptr || instance == nullptr)
+                return;
+
+            expect (dispatchUntil ([&] { return ! PluginSandbox::getOwnEditorScreenBounds (instance).isEmpty(); }));
+            const auto mod = juce::ModifierKeys::commandModifier;
+
+            // A menu's key mapping (Mod+T adds a track).
+            const auto tracks = f.model.getTracks().size();
+            PluginSandbox::pressKeyInOwnEditor (instance, juce::KeyPress ('T', mod, 't'));
+            expect (dispatchUntil ([&] { return f.model.getTracks().size() == tracks + 1; }), "Mod+T in the sandboxed UI added no track");
+
+            // Mod+Alt+P hides every plug-in window, and shows them again.
+            PluginSandbox::pressKeyInOwnEditor (instance, juce::KeyPress ('P', juce::ModifierKeys (mod | juce::ModifierKeys::altModifier), 'p'));
+            expect (dispatchUntil ([&] { return ! windows.isShowing (id); }), "Mod+Alt+P in the sandboxed UI didn't hide the windows");
+            windows.toggleAll();
+            expect (dispatchUntil ([&] { return windows.isShowing (id) && ! PluginSandbox::getOwnEditorScreenBounds (instance).isEmpty(); }));
+
+            // Mod+W closes its window.
+            PluginSandbox::pressKeyInOwnEditor (instance, juce::KeyPress ('W', mod, 'w'));
+            expect (dispatchUntil ([&] { return ! windows.isOpen (id); }), "Mod+W in the sandboxed UI didn't close its window");
+            main.reset();
+        }
+
         beginTest ("A plug-in that dies loading shows the error state; Run in-process loads it");
         {
             Fixture f;

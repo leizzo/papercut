@@ -95,11 +95,8 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         toasts.show (message, std::move (actions));
     };
 
-    // In MainWindow's order: the view-aware shortcuts, then the menus' key mappings.
-    pluginWindows.onShortcut = [this] (const juce::KeyPress& key)
-    {
-        return shortcuts.keyPressed (key, this) || commandManager.getKeyMappings()->keyPressed (key, this);
-    };
+    // A key a plug-in window didn't use is Resamper's, as in the main window.
+    pluginWindows.onShortcut = [this] (const juce::KeyPress& key) { return shortcuts.keyPressed (key, this); };
 
     // A first window centres over the arrangement (the view in front, while that isn't it).
     pluginWindows.getAnchorArea = [this]
@@ -394,7 +391,17 @@ int MainComponent::currentShortcutContext() const
     return ShortcutContext::anyView;
 }
 
-bool MainComponent::ShortcutListener::keyPressed (const juce::KeyPress& key, juce::Component*)
+bool MainComponent::ShortcutListener::keyPressed (const juce::KeyPress& key, juce::Component* origin)
+{
+    return viewShortcut (key) || owner.commandManager.getKeyMappings()->keyPressed (key, origin);
+}
+
+bool MainComponent::ShortcutListener::keyStateChanged (bool isKeyDown, juce::Component* origin)
+{
+    return owner.commandManager.getKeyMappings()->keyStateChanged (isKeyDown, origin);
+}
+
+bool MainComponent::ShortcutListener::viewShortcut (const juce::KeyPress& key)
 {
     auto* binding = findBinding (key, owner.currentShortcutContext());
 

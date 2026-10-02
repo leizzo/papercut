@@ -13,8 +13,7 @@ MainWindow::MainWindow (const juce::String& title, ResamperApp& app)
 
     commandManager.registerAllCommandsForTarget (content.get());
     commandManager.setFirstCommandTarget (content.get());
-    addKeyListener (commandManager.getKeyMappings());
-    addKeyListener (&content->getShortcutListener());   // added last, so consulted first
+    addKeyListener (&content->getShortcutListener());
 
     for (auto* name : getMenuNames())
         menuNames.add (name);
