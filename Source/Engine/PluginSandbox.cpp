@@ -201,6 +201,8 @@ namespace
         the caller's: the block it last waited in. */
     juce::int64 answerDeadline (int numSamples, double sampleRate, juce::uint64& lastBlock) noexcept
     {
+        // Per thread: a chain runs in order on one thread, and that thread's time is what the block allows.
+        // (A thread's first touch of its thread_locals may set them up, once.)
         thread_local juce::int64 started = 0;
         thread_local juce::uint32 deviceBlock = 0;
         thread_local juce::uint64 block = 0;
@@ -788,6 +790,7 @@ private:
         const auto deadline = isNonRealtime() ? sent + juce::Time::secondsToHighResolutionTicks (offlineDeadlineMs / 1000.0)
                                               : answerDeadline (length, rate, lastWaitBlock);
         const auto spinUntil = sent + juce::Time::secondsToHighResolutionTicks (spinSeconds);
+        const auto pollTicks = juce::Time::secondsToHighResolutionTicks (pollSeconds);
 
         // A short spin catches a quick answer at once; after it, short sleeps leave
         // the core to others (the host among them) instead of burning it.
@@ -798,7 +801,8 @@ private:
             if (remote->dead.load() || now > deadline)
                 return false;
 
-            if (now < spinUntil)
+            // A sleep can overrun: near the deadline, only yield.
+            if (now < spinUntil || deadline - now < pollTicks * 4)
                 std::this_thread::yield();
             else
                 std::this_thread::sleep_for (std::chrono::duration<double> (pollSeconds));
@@ -1785,6 +1789,20 @@ bool PluginSandbox::isLoading (const juce::String& pluginId) const
 {
     const auto found = loads.find (pluginId);
     return found != loads.end() && ! found->second->done;
+}
+
+bool PluginSandbox::waitForLoads()
+{
+    JUCE_ASSERT_MESSAGE_THREAD
+    auto anyLoading = [this] { return std::any_of (loads.begin(), loads.end(), [] (const auto& l) { return ! l.second->done; }); };
+
+    // A load ends by itself within loadTimeoutMs; a little more lets its answer arrive.
+    const auto until = juce::Time::getMillisecondCounter() + (juce::uint32) (loadTimeoutMs + 1000);
+
+    while (anyLoading() && juce::Time::getMillisecondCounter() < until)
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (10);
+
+    return ! anyLoading();
 }
 
 void PluginSandbox::loadFinished (const juce::String& pluginId, const Load* which, const juce::ValueTree& loaded,

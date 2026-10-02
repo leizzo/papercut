@@ -100,6 +100,11 @@ public:
     /** Whether the plug-in is loading into its sandbox host. On the message thread. */
     bool isLoading (const juce::String& pluginId) const;
 
+    /** Runs the message loop until no plug-in is loading into its sandbox host, or
+        a load's time is up: an offline render mustn't leave a loading plug-in out.
+        False if one still is. On the message thread. */
+    bool waitForLoads();
+
     /** The plug-in loadInBackground loaded, as its stand-in; pluginId names it
         to Listeners. nullptr, with error set, if its host crashed, timed out or
         couldn't load it, or it hasn't finished loading. */
@@ -172,8 +177,8 @@ private:
     std::unique_ptr<juce::ThreadPool> loaders;
     juce::ListenerList<Listener> listeners;
 
-    void loadFinished (const juce::String& pluginId, const Load* load, const juce::ValueTree& loaded, const juce::String& error);
-    void dropLoad (const juce::String& pluginId, const Load* load);
+    void loadFinished (const juce::String& pluginId, const Load* which, const juce::ValueTree& loaded, const juce::String& error);
+    void dropLoad (const juce::String& pluginId, const Load* which);
     void crashed (const juce::String& pluginId);
     void uiClicked (const juce::String& pluginId);
 

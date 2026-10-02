@@ -1,5 +1,7 @@
 #include "Production.h"
 #include "EditTracks.h"
+#include "EngineManager.h"
+#include "PluginSandbox.h"
 #include "Render.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -116,6 +118,9 @@ juce::Result Production::freezeTrack (const juce::String& trackId)
     if (dm.getSampleRate() <= 7000.0 || dm.getBlockSize() <= 0)
         return juce::Result::fail ("The engine could not freeze this track headless: no sample rate");
 
+    if (! projects.getEngineManager().getPluginSandbox().waitForLoads())
+        return juce::Result::fail ("A plug-in is still loading: try again once it has");
+
     track->setFrozen (true, te::Track::individualFreeze);
 
     if (! track->isFrozen (te::Track::individualFreeze))
@@ -163,11 +168,18 @@ juce::Result Production::bounceTrack (const juce::String& trackId, const juce::F
     if (track == nullptr)
         return juce::Result::fail ("No track with id " + trackId);
 
+    if (! projects.getEngineManager().getPluginSandbox().waitForLoads())
+        return juce::Result::fail ("A plug-in is still loading: try again once it has");
+
     return render::toWav (projects.getEdit(), destFile, render::bitForTrack (*track));
 }
 
 juce::Result Production::exportMix (const juce::File& destFile)
 {
+    // Rendered now, a plug-in still loading in the background would be left out.
+    if (! projects.getEngineManager().getPluginSandbox().waitForLoads())
+        return juce::Result::fail ("A plug-in is still loading: try again once it has");
+
     auto& edit = projects.getEdit();
     return render::toWav (edit, destFile, te::toBitSet (te::getAllTracks (edit)));
 }
