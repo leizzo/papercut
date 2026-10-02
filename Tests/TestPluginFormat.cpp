@@ -32,6 +32,10 @@ namespace
             if (crash->get())
                 std::_Exit (134);
 
+            // A plug-in named "Slow ..." takes 2 ms a block: a cost the CPU readout must show.
+            if (desc.name.startsWith ("Slow "))
+                juce::Thread::sleep (2);
+
             buffer.applyGain (gain->get());
         }
 

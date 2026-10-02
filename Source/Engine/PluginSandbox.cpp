@@ -34,6 +34,7 @@ namespace
         static constexpr int maxChannels = 32, maxSamples = 2048, maxParameters = 4096, midiBytes = 32768;
 
         std::atomic<juce::uint32> requestSeq, responseSeq, parameterSeq;
+        std::atomic<float> hostLoad;   ///< the host's own time per block as a share of the block's length, smoothed
         juce::int32 numSamples, numChannels, midiInBytes, midiOutBytes;
         std::atomic<juce::uint32> parameterStamps[maxParameters];
         std::atomic<float> parameterValues[maxParameters];
@@ -417,6 +418,9 @@ public:
     }
 
     bool hasCrashed() const noexcept   { return remote->dead.load(); }
+
+    /** The share of a block's time the host spends in the plug-in (not the round trip). */
+    double getHostCpuLoad() const noexcept   { return (double) remote->block().hostLoad.load (std::memory_order_relaxed); }
 
     /** Tells the host something about the plug-in's own UI. */
     void post (const juce::ValueTree& message)   { remote->post (message); }
@@ -1403,12 +1407,28 @@ namespace
                     juce::AudioBuffer<float> buffer (pointers, channels, length);
                     midi.clear();
                     readMidi (block.midiIn, juce::jlimit (0, SharedBlock::midiBytes, (int) block.midiInBytes), midi, 0);
+                    const auto started = juce::Time::getHighResolutionTicks();
                     plugin->processBlock (buffer, midi);
+                    reportLoad (started, length);
                     block.midiOutBytes = writeMidi (midi, 0, length, block.midiOut, SharedBlock::midiBytes);
                 }
             }
 
             block.responseSeq.store (request, std::memory_order_release);
+        }
+
+        /** Folds the block that took from started on into the load the stand-in reads. */
+        void reportLoad (juce::int64 started, int length)
+        {
+            const auto rate = plugin->getSampleRate();
+
+            if (length <= 0 || rate <= 0)
+                return;
+
+            const auto spent = juce::Time::highResolutionTicksToSeconds (juce::Time::getHighResolutionTicks() - started);
+            const auto share = (float) (spent * rate / length);
+            auto& load = shared->hostLoad;
+            load.store (load.load (std::memory_order_relaxed) * 0.9f + share * 0.1f, std::memory_order_relaxed);
         }
 
         /** The values the stand-in set since the last block. */
@@ -1640,6 +1660,17 @@ bool PluginSandbox::hasCrashed (const juce::AudioProcessor* processor)
     juce::ignoreUnused (processor);
     return false;
    #endif
+}
+
+double PluginSandbox::getHostCpuLoad (const juce::AudioProcessor* processor)
+{
+   #if RESAMPER_SANDBOX
+    if (auto* instance = dynamic_cast<const Instance*> (processor); instance != nullptr && ! instance->hasCrashed())
+        return juce::jlimit (0.0, 1.0, instance->getHostCpuLoad());
+   #else
+    juce::ignoreUnused (processor);
+   #endif
+    return 0.0;
 }
 
 void PluginSandbox::pressKeyInOwnEditor (juce::AudioProcessor* processor, const juce::KeyPress& key)

@@ -195,6 +195,35 @@ struct PluginSandboxTests : juce::UnitTest
                     "latency " + juce::String (plugin.has_value() ? plugin->latencySamples : -1));
         }
 
+        beginTest ("A sandboxed plug-in's CPU is its host's time in the plug-in, not the round trip");
+        {
+            Fixture f;
+            TestPlugin quick (f, "Quick Gain", "plugin Quick Gain");
+            TestPlugin slow (f, "Slow Gain", "plugin Slow Gain");
+            const auto track = addTrack (f);
+            const auto quickId = insert (f, track, quick.path());
+            const auto slowId = insert (f, track, slow.path());
+            auto* quickInstance = instanceOf (f, quickId);
+            auto* slowInstance = instanceOf (f, slowId);
+            expect (quickInstance != nullptr && slowInstance != nullptr);
+
+            if (quickInstance == nullptr || slowInstance == nullptr)
+                return;
+
+            for (auto* instance : { quickInstance, slowInstance })
+            {
+                prepare (*instance);
+
+                for (int block = 0; block < 60; ++block)
+                    processOnes (*instance);
+            }
+
+            // 2 ms of a 512-sample block at 44.1 kHz (11.6 ms) is about 17 %.
+            expectGreaterThan (f.plugins.getCpuLoad (slowId), 0.1);
+            expectLessThan (f.plugins.getCpuLoad (slowId), 0.6);
+            expectLessThan (f.plugins.getCpuLoad (quickId), f.plugins.getCpuLoad (slowId) * 0.5);
+        }
+
         beginTest ("A crash bypasses that plug-in only: playback and the other plug-ins go on; Reload restores its saved state");
         {
             Fixture f;

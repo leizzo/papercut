@@ -1173,7 +1173,14 @@ juce::Result PluginRack::locate (const juce::String& pluginId, const juce::File&
 double PluginRack::getCpuLoad (const juce::String& pluginId) const
 {
     if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
+    {
+        // A sandboxed plug-in's own cost: the engine's figure includes the round trip to its host.
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
+            if (auto* instance = external->getAudioPluginInstance(); PluginSandbox::isSandboxed (instance))
+                return PluginSandbox::getHostCpuLoad (instance);
+
         return plugin->getCpuUsage();
+    }
 
     return 0;
 }

@@ -88,6 +88,10 @@ public:
     /** Whether the instance is a stand-in whose sandbox host has died. */
     static bool hasCrashed (const juce::AudioProcessor*);
 
+    /** The share of a block's time a sandboxed plug-in's host spends processing it, 0 to 1
+        (the plug-in's own cost, not the stand-in's round trip); 0 if it isn't one, or crashed. */
+    static double getHostCpuLoad (const juce::AudioProcessor*);
+
     /** Where a sandboxed plug-in's own UI shows on screen, as its host reports
         it; empty while hidden, or if it isn't one, or crashed. */
     static juce::Rectangle<int> getOwnEditorScreenBounds (juce::AudioProcessor*);
