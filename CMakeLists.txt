@@ -41,6 +41,7 @@ add_library(resamper_engine STATIC
     Source/Engine/ClipWaveform.cpp
     Source/Engine/Production.cpp
     Source/Engine/PluginRack.cpp
+    Source/Engine/PluginScanner.cpp
     Source/Engine/Mixer.cpp
     Source/Engine/Session.cpp
     Source/Engine/Automation.cpp
@@ -230,6 +231,7 @@ juce_add_console_app(ResamperTests PRODUCT_NAME "ResamperTests")
 target_sources(ResamperTests PRIVATE
     Tests/TestMain.cpp
     Tests/TestFixture.cpp
+    Tests/TestPluginFormat.cpp
     Tests/EngineManagerTests.cpp
     Tests/ProjectTests.cpp
     Tests/TrackCommandTests.cpp

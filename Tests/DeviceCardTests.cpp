@@ -562,6 +562,28 @@ struct DeviceCardTests : juce::UnitTest
             target->itemDropped ({ dragDescription (item), nullptr, { 2000, 50 } });
             expectEquals (added.size(), 2);
         }
+
+        beginTest ("A device dropped on another track (the arrangement) shows that track's chain; a plug-in reaches the opening rule");
+        {
+            Cards f;
+            ScannedPlugin scanned (f);
+            f.invoke (cmd::trackAdd);
+            const auto other = f.model.getTracks()[1].id;
+            juce::StringArray opened;
+            auto view = f.view();
+            f.host.pluginAdded = [&] (const juce::String&, const juce::String& plugin) { opened.add (plugin); };
+
+            view->insertDevice (other, reverb);
+            expectEquals (f.model.getSelectedTrackId(), other);
+            auto chain = f.plugins.getChain (other, PluginChain::device);
+            expectEquals ((int) chain.size(), 1);
+            expect (findOne (*view, "DeviceCard/Native") != nullptr);
+            opened.clear();
+
+            view->insertDevice (f.trackId(), pinboard);
+            expectEquals ((int) f.plugins.getChain (f.trackId(), PluginChain::device).size(), 1);
+            expectEquals (opened.joinIntoString (","), f.plugins.getChain (f.trackId(), PluginChain::device).back().id);
+        }
     }
 };
 

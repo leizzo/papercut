@@ -1,5 +1,6 @@
 #include "PluginRack.h"
 #include "EditTracks.h"
+#include "PluginScanner.h"
 #include "ProjectManager.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -326,9 +327,21 @@ namespace
         return false;
     }
 
-    bool isScanFormat (const juce::String& formatName)
+    /** A plug-in that failed to scan, as the catalogue lists it: named after its file. */
+    PluginInfo failedInfo (juce::AudioPluginFormat& format, const juce::String& fileOrIdentifier)
     {
-        return formatName == "VST3" || formatName == "AudioUnit";
+        PluginInfo info;
+        info.name = format.getNameOfPluginFromIdentifier (fileOrIdentifier);
+
+        if (info.name.isEmpty() || info.name == fileOrIdentifier)
+            info.name = juce::File::isAbsolutePath (fileOrIdentifier) ? juce::File (fileOrIdentifier).getFileNameWithoutExtension()
+                                                                     : fileOrIdentifier.fromLastOccurrenceOf ("/", false, false);
+
+        info.format = format.getName();
+        info.path = fileOrIdentifier;
+        info.external = true;
+        info.failedScan = true;
+        return info;
     }
 }
 
@@ -344,6 +357,7 @@ struct PluginRack::ScanThread : juce::Thread
 
 PluginRack::PluginRack (ProjectManager& pm) : projectManager (pm)
 {
+    installScanner (PluginScanner::defaultTimeoutMs);
     publishExternalSnapshot();
 }
 
@@ -381,11 +395,22 @@ juce::Array<PluginInfo> PluginRack::getCatalogue() const
     return catalogue;
 }
 
+void PluginRack::installScanner (int timeoutMs)
+{
+    auto& manager = projectManager.getEdit().engine.getPluginManager();
+
+    // Tracktion's own scanner goes, and with it what its abort hook points at.
+    // A scan here is stopped by stopping its thread.
+    manager.abortCurrentPluginScan = [] {};
+    manager.knownPluginList.setCustomScanner (PluginScanner::createScanner (timeoutMs));
+}
+
 void PluginRack::publishExternalSnapshot()
 {
     juce::Array<PluginInfo> scanned;
+    auto& manager = projectManager.getEdit().engine.getPluginManager();
 
-    for (const auto& desc : projectManager.getEdit().engine.getPluginManager().knownPluginList.getTypes())
+    for (const auto& desc : manager.knownPluginList.getTypes())
     {
         if (te::PluginManager::isBuiltInPlugin (desc))
             continue;
@@ -393,17 +418,48 @@ void PluginRack::publishExternalSnapshot()
         scanned.add (infoFromDescription (desc));
     }
 
+    // The list keeps the files whose scan failed in its blacklist.
+    for (const auto& path : manager.knownPluginList.getBlacklistedFiles())
+        for (auto* format : manager.pluginFormatManager.getFormats())
+            if (scanFormats.contains (format->getName()) && format->fileMightContainThisPluginType (path))
+            {
+                scanned.add (failedInfo (*format, path));
+                break;
+            }
+
     const juce::ScopedLock sl (snapshotLock);
     externalSnapshot = std::move (scanned);
 }
 
 void PluginRack::startScan()
 {
-    if (scanning.load())
-        return;
+    if (! scanning.load())
+        startScanThread ({});
+}
 
+juce::Result PluginRack::retryScan (const juce::String& path)
+{
+    if (! failedToScan (path))
+        return juce::Result::fail ("That plug-in didn't fail to scan");
+
+    if (scanning.load())
+        return juce::Result::fail ("A plug-in scan is in progress");
+
+    startScanThread (path);
+    return juce::Result::ok();
+}
+
+bool PluginRack::failedToScan (const juce::String& path) const
+{
+    return path.isNotEmpty()
+        && projectManager.getEdit().engine.getPluginManager().knownPluginList.getBlacklistedFiles().contains (path);
+}
+
+void PluginRack::startScanThread (const juce::String& onlyPath)
+{
     stopScan();
 
+    retryPath = onlyPath;
     scanning.store (true);
     scanBodyRanOffCaller.store (false);
     scanCallerId = juce::Thread::getCurrentThreadId();
@@ -448,10 +504,18 @@ void PluginRack::runScan()
 
         auto* format = formats.getFormat (i);
 
-        if (format == nullptr || ! isScanFormat (format->getName()))
+        if (format == nullptr || ! scanFormats.contains (format->getName()))
             continue;
 
-        const auto files = format->searchPathsForPlugins (format->getDefaultLocationsToSearch(), true, false);
+        // A retry scans its one file, and only with a format that can hold it.
+        if (retryPath.isNotEmpty() && ! format->fileMightContainThisPluginType (retryPath))
+            continue;
+
+        if (retryPath.isNotEmpty())
+            manager.knownPluginList.removeFromBlacklist (retryPath);
+
+        const auto files = retryPath.isNotEmpty() ? juce::StringArray (retryPath)
+                                                  : format->searchPathsForPlugins (format->getDefaultLocationsToSearch(), true, false);
 
         for (const auto& file : files)
         {
@@ -512,10 +576,11 @@ juce::Result PluginRack::insert (const juce::String& trackId, const juce::String
 
     const bool builtIn = isBuiltInType (typeOrIdentifier);
     juce::PluginDescription external;
-    const bool haveExternal = ! builtIn && ! scanning.load() && findExternal (edit.engine, typeOrIdentifier, external);
+    // Each file is scanned in a worker process, so a running scan doesn't stop an insert.
+    const bool haveExternal = ! builtIn && findExternal (edit.engine, typeOrIdentifier, external);
 
-    if (! builtIn && scanning.load())
-        return juce::Result::fail ("A plug-in scan is in progress");
+    if (! builtIn && ! haveExternal && failedToScan (typeOrIdentifier))
+        return juce::Result::fail ("That plug-in failed to scan: retry it in the Browser");
 
     if (! builtIn && ! haveExternal)
         return juce::Result::fail ("Unknown plug-in");
@@ -979,6 +1044,9 @@ juce::Result PluginRack::locate (const juce::String& pluginId, const juce::File&
     auto& formats = manager.pluginFormatManager;
     const auto path = file.getFullPathName();
     bool foundAny = false;
+
+    // Pointing at the file is a retry, even if its scan failed before.
+    manager.knownPluginList.removeFromBlacklist (path);
 
     for (auto* format : formats.getFormats())
     {

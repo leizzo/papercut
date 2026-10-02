@@ -42,6 +42,7 @@ struct PluginInfo
     PluginChain chain = PluginChain::device;   ///< on a track: which chain it is on
     bool enabled = true;                        ///< false when bypassed
     bool missing = false;                       ///< saved in the project but not installed; audio passes through
+    bool failedScan = false;                    ///< in the catalogue: its scan crashed or timed out; it can only be retried
     bool sandboxed = false;                     ///< runs out of process; never yet, plug-ins are hosted in-process
     int latencySamples = 0;                     ///< the latency the plug-in reports
     juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
@@ -101,13 +102,22 @@ public:
     explicit PluginRack (ProjectManager&);
     ~PluginRack();
 
-    /** Built-in engine plug-ins, plus whatever the scan has already found. */
+    /** Built-in engine plug-ins, plus whatever the scan has already found, plus
+        the plug-ins that failed to scan (failedScan; their name is the file's). */
     juce::Array<PluginInfo> getCatalogue() const;
 
-    /** Returns immediately. The disk scan runs on a juce::Thread. No-op if one is
-        running. When it finishes, missing plug-ins it found load (a card's Locate). */
+    /** Returns immediately. The disk scan runs on a juce::Thread, each plug-in
+        file in its own scan worker process (PluginScanner) with a timeout, so
+        one that hangs or crashes fails alone and the scan goes on. No-op if one
+        is running. A file that failed before is not tried again until retried.
+        When it finishes, missing plug-ins it found load (a card's Locate). */
     void startScan();
     bool isScanning() const;
+
+    /** Scans one plug-in that failed to scan again, in the background like
+        startScan; nothing else is rescanned. path is its catalogue path. Fails
+        if it didn't fail to scan or a scan is running. */
+    juce::Result retryScan (const juce::String& path);
 
     /** Names from the engine format manager (VST3, AudioUnit, ...). */
     juce::StringArray getHostedFormats() const;
@@ -117,7 +127,8 @@ public:
 
     /** Adds a plug-in at the end of a chain. typeOrIdentifier is a built-in type
         name (ReverbPlugin::xmlTypeName, ...) or a catalogue path / identifier.
-        On success, addedId (if given) receives the new plug-in's id. */
+        A plug-in that failed to scan can't be inserted. On success, addedId
+        (if given) receives the new plug-in's id. */
     juce::Result insert (const juce::String& trackId, const juce::String& typeOrIdentifier,
                          PluginChain = PluginChain::device, juce::String* addedId = nullptr);
 
@@ -254,6 +265,12 @@ private:
     std::unique_ptr<ScanThread> scanThread;
     std::atomic<bool> scanning { false };
 
+    /** Set: the running scan is a retry of this one file only. */
+    juce::String retryPath;
+
+    /** The formats a scan walks: what the engine hosts, by format name. */
+    juce::StringArray scanFormats { "VST3", "AudioUnit", "CLAP" };
+
     /** Set from the scan thread when its body starts on a thread other than startScan's caller. */
     std::atomic<bool> scanBodyRanOffCaller { false };
     juce::Thread::ThreadID scanCallerId = nullptr;
@@ -270,6 +287,13 @@ private:
     static constexpr int scanStopTimeoutMs = 120000;
 
     void runScan();
+    void startScanThread (const juce::String& onlyPath);
+
+    /** Gives the engine's plug-in list a scanner that times each file out after timeoutMs. */
+    void installScanner (int timeoutMs);
+
+    /** Whether path is in the plug-in list's blacklist: a scan of it failed. */
+    bool failedToScan (const juce::String& path) const;
 
     /** Asks a running scan to stop and waits for it, keeping the message loop
         running meanwhile when called on the message thread. */

@@ -171,7 +171,7 @@ The Native Device that plays many samples, each in a Zone.
 One sample in a Sampler, with the key range and velocity range that trigger it. Zones with the same velocity range form a velocity layer.
 
 **Plugin Catalogue**:
-The scanned list of Devices the user can insert: name, manufacturer, format, category. Native Devices are listed without a scan; engine plumbing (fader, meters, sends and returns) is not listed.
+The scanned list of Devices the user can insert: name, manufacturer, format, category. Native Devices are listed without a scan; engine plumbing (fader, meters, sends and returns) is not listed. A Plug-in whose scan crashed or timed out is listed as *Failed to scan*: it can be retried, never inserted.
 _Avoid_: plugin database
 
 **Mixer Insert**:
