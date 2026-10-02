@@ -2,7 +2,7 @@
 
 #include "TestFixture.h"
 #include "Engine/EngineManager.h"
-#include "Engine/PluginSandbox.h"
+#include "Engine/PluginHosting.h"
 
 #include <tracktion_engine/tracktion_engine.h>
 
@@ -142,10 +142,10 @@ struct FakeFormat : juce::AudioPluginFormat
 struct ScannedPlugin
 {
     explicit ScannedPlugin (Fixture& f)
-        : manager (f.projects.getEdit().engine.getPluginManager()), sandbox (f.app.engine.getPluginSandbox())
+        : manager (f.projects.getEdit().engine.getPluginManager()), hosting (f.app.engine.getPluginHosting())
     {
         // Created here, in-process: the sandbox can't load a VST3 that isn't there.
-        sandbox.removeHostedFormat (FakePlugin::description().pluginFormatName);
+        hosting.removeHostedFormat (FakePlugin::description().pluginFormatName);
         previous = manager.createPluginInstance;
         manager.createPluginInstance = [fallback = previous] (const juce::PluginDescription& d, double rate, int block,
                                                               juce::String& error) -> std::unique_ptr<juce::AudioPluginInstance>
@@ -162,11 +162,11 @@ struct ScannedPlugin
     {
         manager.knownPluginList.removeType (FakePlugin::description());
         manager.createPluginInstance = previous;
-        sandbox.addHostedFormat (FakePlugin::description().pluginFormatName);
+        hosting.addHostedFormat (FakePlugin::description().pluginFormatName);
     }
 
     tracktion::PluginManager& manager;
-    PluginSandbox& sandbox;
+    PluginHosting& hosting;
     decltype (tracktion::PluginManager::createPluginInstance) previous;
 };
 
