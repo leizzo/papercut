@@ -1,6 +1,6 @@
 # Resamper
 
-A desktop DAW for electronic producers and mix engineers. This glossary pins the project's domain language. The spec is `PRD.md` and the GitHub issues it points to; implementation details live in the code, not here.
+A desktop DAW for electronic producers and mix engineers. This glossary pins the project's domain language. Open product decisions are tracked as GitHub issues; implementation details live in the code, not here.
 
 ## Language
 

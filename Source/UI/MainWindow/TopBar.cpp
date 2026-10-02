@@ -62,12 +62,12 @@ TopBar::TopBar (ApplicationModel& m, CommandRegistry& c, ThemeManager& tm, Shell
       tempo (tm, tempoSpec()),
       signature (tm, "4 / 4"),
       prev (tm, "Return to Start", Icon::skipBack),
-      record (tm, "Record (Shift: no count-in)", Icon::record),
+      record (tm, "Record (Shift: no count-in)", Icon::circleDot),
       automationArm (tm, "Automation Arm (arrives with automation recording)", Icon::spline),
       play (tm, "Play", Icon::play),
-      stop (tm, "Stop (twice: return to start)", Icon::stop),
-      metronome (tm, "Metronome (C)", Icon::metronome),
-      follow (tm, "Follow", Icon::follow),
+      stop (tm, "Stop (twice: return to start)", Icon::square),
+      metronome (tm, "Metronome (C)", Icon::timer),
+      follow (tm, "Follow", Icon::crosshair),
       views (tm, { "Session", "Arrange", "Mixer", "Piano Roll", "Editor" }, Segmented::Style::tabs)
 {
     tempo.setTitle ("Tempo");
@@ -181,7 +181,7 @@ void TopBar::paint (juce::Graphics& g)
     auto mark = brand.removeFromLeft (22).withSizeKeepingCentre (22, 22).toFloat();
     g.setColour (theme.accent);
     g.fillRoundedRectangle (mark, 6.0f);
-    drawIcon (g, Icon::audioLines, mark.reduced (4.0f), theme.textOnAccent);
+    drawIcon (g, Icon::audioWaveform, mark.reduced (4.0f), theme.textOnAccent);
     brand.removeFromLeft (8);
     g.setColour (theme.textPrimary);
     g.setFont (themeManager.font (TypeStyle { 15.0f, false, 700 }));
