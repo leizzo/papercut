@@ -137,6 +137,10 @@ _Avoid_: using "plug-in" for Native Devices
 The floating window that shows one Plug-in's own UI inside Resamper's window frame.
 _Avoid_: plug-in editor, vendor window
 
+**Native Device Window**:
+The floating window that shows one Native Device's card, Expanded: opened from the card's Open in Window or by clicking its Mixer Insert. It follows the Plug-in Window's rules (one per Device, Pin, hidden while its track isn't selected unless pinned).
+_Avoid_: native editor popover, device popover
+
 **Sandbox**:
 The separate process a Plug-in runs in by default (one per instance), so a crash takes down only that Plug-in: its audio is bypassed, the rest of the session plays on, and **Reload** starts it again from its last saved state. A Plug-in can be set to run in-process instead (**Run in-process**), per instance, saved with the project.
 _Avoid_: bridge, out-of-process host (for the concept; fine for the mechanism)
@@ -179,7 +183,7 @@ The scanned list of Devices the user can insert: name, manufacturer, format, cat
 _Avoid_: plugin database
 
 **Mixer Insert**:
-One Native Device or effect Plug-in in a track's mixer insert slots: console processing (EQ, compression, limiting) after the Device Chain and before the sends and fader, edited in the mixer strip. Effects only, at most 8 per track. The mixer never lists Device Chain Devices as Mixer Inserts.
+One Native Device or effect Plug-in in a track's mixer insert slots: console processing (EQ, compression, limiting) after the Device Chain and before the sends and fader, edited in the mixer strip. Effects only, at most 8 per track. Clicking one opens its Plug-in Window or Native Device Window. The mixer never lists Device Chain Devices as Mixer Inserts.
 _Avoid_: insert (unqualified), FX slot
 
 **Sidechain**:

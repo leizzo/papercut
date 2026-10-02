@@ -43,6 +43,7 @@ add_library(resamper_engine STATIC
     Source/Engine/PluginRack.cpp
     Source/Engine/PluginSandbox.cpp
     Source/Engine/PluginScanner.cpp
+    Source/Engine/SandboxDock.cpp
     Source/Engine/NativeDevicePlugins.cpp
     Source/Engine/NativeDevices.cpp
     Source/Engine/Mixer.cpp
@@ -84,6 +85,7 @@ set_target_properties(resamper_engine PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(APPLE)
     target_compile_options(resamper_engine PRIVATE -fno-aligned-allocation)
+    target_sources(resamper_engine PRIVATE Source/Engine/SandboxDock_mac.mm)
 endif()
 
 set(resamper_module_includes $<TARGET_PROPERTY:resamper_engine,INCLUDE_DIRECTORIES>)
@@ -173,7 +175,8 @@ add_library(resamper_ui STATIC
     Source/UI/Detail/CompressorDevice.cpp
     Source/UI/Detail/PluginDeviceCard.cpp
     Source/UI/Detail/DetailView.cpp
-    Source/UI/MainWindow/FloatingWindow.cpp
+    Source/UI/Plugins/FloatingDeviceWindow.cpp
+    Source/UI/Plugins/NativeDeviceWindow.cpp
     Source/UI/Plugins/PluginWindow.cpp
     Source/UI/Plugins/PluginWindows.cpp
     Source/UI/Mixer/Metering.cpp

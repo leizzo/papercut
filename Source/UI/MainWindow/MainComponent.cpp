@@ -85,13 +85,20 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         detailView.insertDevice (trackId, path);
     };
 
-    // A card or an insert slot opens its plug-in's window, or brings it forward.
+    // A card or an insert slot opens its device's window, or brings it forward: a plug-in's
+    // window, or a native device floating expanded, under the same window rules (#70).
     detailView.onOpenEditor = mixerView.onOpenPlugin = [this] (const juce::String& id) { pluginWindows.open (id); };
 
     pluginWindows.onOpenWindowsChanged = [this] { detailView.setOpenWindows (pluginWindows.getOpenPluginIds()); };
     pluginWindows.showToast = [this] (const juce::String& message, std::vector<Toasts::Action> actions)
     {
         toasts.show (message, std::move (actions));
+    };
+
+    // In MainWindow's order: the view-aware shortcuts, then the menus' key mappings.
+    pluginWindows.onShortcut = [this] (const juce::KeyPress& key)
+    {
+        return shortcuts.keyPressed (key, this) || commandManager.getKeyMappings()->keyPressed (key, this);
     };
 
     // A first window centres over the arrangement (the view in front, while that isn't it).

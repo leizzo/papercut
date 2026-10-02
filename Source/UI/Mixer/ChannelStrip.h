@@ -71,7 +71,8 @@ public:
     /** An insert slot wants the effects picker: to fill it (replacing empty) or to replace that insert. */
     std::function<void (InsertSlot&, const juce::String& replacing)> onPickInsert;
 
-    /** A filled insert slot was clicked: open the plug-in's window. */
+    /** A filled insert slot was clicked: open its device's window (a
+        plug-in's window, or a native device's floating Expanded editor). */
     std::function<void (const juce::String& pluginId)> onOpenPlugin;
 
     // Mixer inserts (PRD §10.6): drop a Browser effect on an empty slot,

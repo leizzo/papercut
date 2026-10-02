@@ -39,7 +39,8 @@ public:
     /** A strip's Track chain row was clicked. */
     std::function<void (const juce::String& trackId)> onShowDeviceChain;
 
-    /** A filled insert slot was clicked. */
+    /** A filled insert slot was clicked: open its device's window (a
+        plug-in's window, or a native device's floating Expanded editor). */
     std::function<void (const juce::String& pluginId)> onOpenPlugin;
 
     void paint (juce::Graphics&) override;

@@ -1,4 +1,5 @@
 #include "PluginWindows.h"
+#include "NativeDeviceWindow.h"
 
 #include "Commands/CommandRegistry.h"
 #include "Commands/PluginCommands.h"
@@ -36,7 +37,8 @@ void PluginWindows::setLoadTimeoutMs (int ms)
     loadTimeoutMs = ms;
 
     for (auto& [id, entry] : windows)
-        entry.window->setLoadTimeoutMs (ms);
+        if (auto* plugInWindow = dynamic_cast<PluginWindow*> (entry.window.get()))
+            plugInWindow->setLoadTimeoutMs (ms);
 }
 
 juce::String PluginWindows::trackNameOf (const juce::String& trackId) const
@@ -48,11 +50,32 @@ juce::String PluginWindows::trackNameOf (const juce::String& trackId) const
     return "Track";
 }
 
-std::unique_ptr<PluginWindow> PluginWindows::createWindow (const PluginInfo& info)
+std::unique_ptr<FloatingDeviceWindow> PluginWindows::createWindow (const PluginInfo& info)
 {
-    auto window = std::make_unique<PluginWindow> (rack, commands, themeManager, info, trackNameOf (info.trackId));
-    window->setLoadTimeoutMs (loadTimeoutMs);
     const auto id = info.id;
+    std::unique_ptr<FloatingDeviceWindow> window;
+
+    // A plug-in gets its host-chromed window; a native device its card, floating expanded (#70).
+    if (info.external)
+    {
+        auto plugInWindow = std::make_unique<PluginWindow> (rack, commands, themeManager, info, trackNameOf (info.trackId));
+        plugInWindow->setLoadTimeoutMs (loadTimeoutMs);
+
+        // The error state's Run in-process: this instance leaves its sandbox, saved with the project.
+        plugInWindow->onRunInProcess = [this, id]
+        {
+            commands.invoke (cmd::pluginSetSandboxed, { id, false });
+
+            if (auto* w = getWindow (id))
+                w->retryLoading();
+        };
+
+        window = std::move (plugInWindow);
+    }
+    else
+    {
+        window = std::make_unique<NativeDeviceWindow> (rack, commands, themeManager, info, trackNameOf (info.trackId));
+    }
 
     // A window is deleted after the callback that closes it has returned.
     window->onCloseRequested = [this, id]
@@ -66,13 +89,13 @@ std::unique_ptr<PluginWindow> PluginWindows::createWindow (const PluginInfo& inf
 
     window->onActivated = [this, id]
     {
-        if (auto* w = getWindow (id))
+        if (auto* w = getDeviceWindow (id))
             selectTrackOf (*w);
     };
 
     window->onMoved = [this, id]
     {
-        if (auto* w = getWindow (id))
+        if (auto* w = getDeviceWindow (id))
             saveState (*w, true);
     };
 
@@ -80,22 +103,25 @@ std::unique_ptr<PluginWindow> PluginWindows::createWindow (const PluginInfo& inf
 
     window->onUiScaleChanged = [this, id] (int)
     {
-        if (auto* w = getWindow (id))
+        if (auto* w = getDeviceWindow (id))
             saveState (*w, true);
     };
 
     window->onToggleAll = [this] { toggleAll(); };
-
-    // The error state's Run in-process: this instance leaves its sandbox, saved with the project.
-    window->onRunInProcess = [this, id]
-    {
-        commands.invoke (cmd::pluginSetSandboxed, { id, false });
-
-        if (auto* w = getWindow (id))
-            w->retryLoading();
-    };
+    window->onUnhandledKey = [this] (const juce::KeyPress& key) { return onShortcut != nullptr && onShortcut (key); };
 
     return window;
+}
+
+void PluginWindows::addWindow (const PluginInfo& info)
+{
+    auto window = createWindow (info);
+    const auto saved = rack.getWindowState (info.id);
+    window->setPinned (saved.pinned);
+    window->setUiScale (saved.uiScale);
+    window->addToDesktop (0);
+    window->setFramePosition (placementFor (*window, saved));
+    windows[info.id].window = std::move (window);
 }
 
 void PluginWindows::open (const juce::String& pluginId, bool focus)
@@ -121,15 +147,8 @@ void PluginWindows::open (const juce::String& pluginId, bool focus)
         return;
     }
 
-    auto window = createWindow (*info);
-    const auto saved = rack.getWindowState (pluginId);
-    window->setPinned (saved.pinned);
-    window->setUiScale (saved.uiScale);
-    window->addToDesktop (0);
-    window->setFramePosition (placementFor (*window, saved));
-
+    addWindow (*info);
     auto& entry = windows[pluginId];
-    entry.window = std::move (window);
 
     // Its track is selected, so the selected-track rule shows it.
     selectTrackOf (*entry.window);
@@ -143,14 +162,14 @@ void PluginWindows::open (const juce::String& pluginId, bool focus)
     openWindowsChanged();
 }
 
-void PluginWindows::announceAndFocus (PluginWindow& window)
+void PluginWindows::announceAndFocus (FloatingDeviceWindow& window)
 {
     window.grabKeyboardFocus();
     juce::AccessibilityHandler::postAnnouncement (window.getName() + " window opened",
                                                   juce::AccessibilityHandler::AnnouncementPriority::medium);
 }
 
-juce::Point<int> PluginWindows::placementFor (const PluginWindow& window, const PluginWindowState& saved) const
+juce::Point<int> PluginWindows::placementFor (const FloatingDeviceWindow& window, const PluginWindowState& saved) const
 {
     const auto frame = window.getFrameScreenBounds();
     const auto size = juce::Point<int> (frame.getWidth(), frame.getHeight());
@@ -242,12 +261,19 @@ void PluginWindows::toggleAll()
 
 void PluginWindows::setPinned (const juce::String& pluginId, bool pinned)
 {
-    if (auto* window = getWindow (pluginId))
+    if (auto* window = getDeviceWindow (pluginId))
     {
         window->setPinned (pinned);
         saveState (*window, true);
         refresh();
     }
+}
+
+void PluginWindows::pluginUiClicked (const juce::String& pluginId)
+{
+    // A click in a sandboxed plug-in's own UI is a click in its window.
+    if (auto* window = getDeviceWindow (pluginId))
+        selectTrackOf (*window);
 }
 
 void PluginWindows::pluginCrashed (const juce::String& pluginId)
@@ -326,14 +352,19 @@ bool PluginWindows::isOpen (const juce::String& pluginId) const
 
 bool PluginWindows::isShowing (const juce::String& pluginId) const
 {
-    auto* window = getWindow (pluginId);
+    auto* window = getDeviceWindow (pluginId);
     return window != nullptr && window->isVisible();
+}
+
+FloatingDeviceWindow* PluginWindows::getDeviceWindow (const juce::String& pluginId) const
+{
+    auto found = windows.find (pluginId);
+    return found != windows.end() ? found->second.window.get() : nullptr;
 }
 
 PluginWindow* PluginWindows::getWindow (const juce::String& pluginId) const
 {
-    auto found = windows.find (pluginId);
-    return found != windows.end() ? found->second.window.get() : nullptr;
+    return dynamic_cast<PluginWindow*> (getDeviceWindow (pluginId));
 }
 
 bool PluginWindows::shouldShow (const Entry& entry) const
@@ -345,7 +376,7 @@ bool PluginWindows::shouldShow (const Entry& entry) const
         || entry.window->getTrackId() == model.getSelectedTrackId();
 }
 
-void PluginWindows::saveState (const PluginWindow& window, bool open)
+void PluginWindows::saveState (const FloatingDeviceWindow& window, bool open)
 {
     PluginWindowState state;
     state.open = open;
@@ -356,7 +387,7 @@ void PluginWindows::saveState (const PluginWindow& window, bool open)
     commands.invoke (cmd::pluginSetWindow, { window.getPluginId(), state });
 }
 
-void PluginWindows::selectTrackOf (const PluginWindow& window)
+void PluginWindows::selectTrackOf (const FloatingDeviceWindow& window)
 {
     if (window.getTrackId().isNotEmpty() && model.getSelectedTrackId() != window.getTrackId())
         commands.invoke (cmd::trackSelect, { window.getTrackId() });
@@ -401,13 +432,7 @@ void PluginWindows::refresh()
         if (isOpen (info.id) || info.missing || ! rack.getWindowState (info.id).open)
             continue;
 
-        auto window = createWindow (info);
-        const auto saved = rack.getWindowState (info.id);
-        window->setPinned (saved.pinned);
-        window->setUiScale (saved.uiScale);
-        window->addToDesktop (0);
-        window->setFramePosition (placementFor (*window, saved));
-        windows[info.id].window = std::move (window);
+        addWindow (info);
         changed = true;
     }
 

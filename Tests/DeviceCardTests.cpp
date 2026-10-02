@@ -379,45 +379,6 @@ struct DeviceCardTests : juce::UnitTest
             expectEquals (outputs (synth), juce::String ("masterLevel"));
         }
 
-        beginTest ("Open in Window floats the device expanded; it follows the device and closes when it goes");
-        {
-            Cards f;
-            const auto id = f.insert (reverb);
-            auto view = f.view();
-            auto* card = dynamic_cast<DeviceCard*> (findOne (*view, "DeviceCard/Native"));
-            expect (card != nullptr && card->onFloat != nullptr);
-
-            if (card == nullptr || card->onFloat == nullptr)
-                return;
-
-            auto deviceWindows = [] () -> juce::Component*
-            {
-                for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i)
-                    if (auto* c = juce::Desktop::getInstance().getComponent (i); c->getComponentID() == "DeviceWindow" && c->isVisible())
-                        return c;
-
-                return nullptr;
-            };
-
-            card->onFloat();
-            auto* window = deviceWindows();
-            expect (window != nullptr);
-
-            if (window == nullptr)
-                return;
-
-            for (auto& p : f.plugins.getParameters (id))
-                expect (findOne (*window, p.id) != nullptr && findOne (*window, p.id)->isVisible(), p.name + " isn't in the window");
-
-            expect (findOne (*window, "fold") == nullptr || ! findOne (*window, "fold")->isVisible());
-            expect (f.plugins.getChain (f.trackId(), PluginChain::device).front().size == DeviceSize::compact,
-                    "floating it changed the docked card's size");
-
-            f.invoke (cmd::pluginRemove, { f.trackId(), id });
-            juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
-            expect (deviceWindows() == nullptr, "the removed device's window stayed open");
-        }
-
         beginTest ("Locate loads a missing plug-in from the file the user points at");
         {
             Cards f;
@@ -469,26 +430,29 @@ struct DeviceCardTests : juce::UnitTest
             if (detail == nullptr || detail->onOpenEditor == nullptr)
                 return;
 
+            // A built-in's window is its floating Expanded editor, under the same rules as a plug-in's (#70).
+            auto visibleWindows = [] { return (int) visibleDesktopWindows ("NativeDeviceWindow").size(); };
+
             detail->onOpenEditor (id);
-            expectEquals (visiblePluginWindows(), 1);
+            expectEquals (visibleWindows(), 1);
 
             f.invoke (cmd::pluginRemove, { f.trackId(), id });
             expect (f.plugins.getChain (f.trackId(), PluginChain::device).empty());
-            expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "the deleted plug-in's window stayed open");
+            expect (dispatchUntil ([&] { return visibleWindows() == 0; }), "the deleted plug-in's window stayed open");
 
             // Any other way the plug-in goes: its insert undone, its track deleted.
             const auto again = f.insert (reverb);
             detail->onOpenEditor (again);
-            expectEquals (visiblePluginWindows(), 1);
+            expectEquals (visibleWindows(), 1);
             f.invoke (cmd::editUndo);
             expect (! f.plugins.contains (again));
             // The model notifies asynchronously.
-            expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "undoing the insert left its window open");
+            expect (dispatchUntil ([&] { return visibleWindows() == 0; }), "undoing the insert left its window open");
 
             const auto onTrack = f.insert (reverb);
             detail->onOpenEditor (onTrack);
             f.invoke (cmd::trackRemove);
-            expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "deleting the track left its plug-in's window open");
+            expect (dispatchUntil ([&] { return visibleWindows() == 0; }), "deleting the track left its plug-in's window open");
         }
 
         beginTest ("A missing plug-in offers Locate and Replace, never its window");

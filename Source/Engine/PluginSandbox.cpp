@@ -1,4 +1,5 @@
 #include "PluginSandbox.h"
+#include "SandboxDock.h"
 
 #include <algorithm>
 #include <atomic>
@@ -47,9 +48,10 @@ namespace
     namespace msg
     {
         const juce::Identifier load ("load"), prepare ("prepare"), release ("release"), getState ("getState"),
-                               setState ("setState"), program ("program"), showEditor ("showEditor"), reply ("reply"),
-                               hello ("hello"), parameters ("parameters"), parameter ("p"), gesture ("gesture"),
-                               latency ("latency"), programName ("programName");
+                               setState ("setState"), program ("program"), openEditor ("openEditor"), dock ("dock"),
+                               editorSize ("editorSize"), closeEditor ("closeEditor"), dockState ("dockState"),
+                               clicked ("clicked"), key ("key"), pressKey ("pressKey"), reply ("reply"), hello ("hello"), parameters ("parameters"),
+                               parameter ("p"), gesture ("gesture"), latency ("latency"), programName ("programName");
 
         const juce::Identifier id ("id"), error ("error"), description ("description"), shared ("shared"),
                                semaphore ("semaphore"), rate ("rate"), block ("block"), data ("data"), index ("i"),
@@ -58,7 +60,10 @@ namespace
                                discrete ("discrete"), boolean ("boolean"), automatable ("automatable"),
                                parameterId ("parameterId"), inputs ("inputs"), outputs ("outputs"),
                                acceptsMidi ("acceptsMidi"), producesMidi ("producesMidi"), midiEffect ("midiEffect"),
-                               tail ("tail"), current ("current"), pid ("pid");
+                               tail ("tail"), current ("current"), pid ("pid"), hasEditor ("hasEditor"), resizable ("resizable"),
+                               x ("x"), y ("y"), width ("w"), height ("h"), visible ("visible"), window ("window"),
+                               level ("level"), scale ("scale"), code ("code"), modifiers ("modifiers"),
+                               character ("character");
     }
 
     juce::MemoryBlock encode (const juce::ValueTree& message)
@@ -71,6 +76,21 @@ namespace
     juce::ValueTree decode (const juce::MemoryBlock& data)
     {
         return juce::ValueTree::readFromData (data.getData(), data.getSize());
+    }
+
+    juce::ValueTree messageFor (const juce::Identifier& type, const juce::KeyPress& key)
+    {
+        juce::ValueTree message (type);
+        message.setProperty (msg::code, key.getKeyCode(), nullptr);
+        message.setProperty (msg::modifiers, key.getModifiers().getRawFlags(), nullptr);
+        message.setProperty (msg::character, (int) key.getTextCharacter(), nullptr);
+        return message;
+    }
+
+    juce::KeyPress keyIn (const juce::ValueTree& message)
+    {
+        return { (int) message[msg::code], juce::ModifierKeys ((int) message[msg::modifiers]),
+                 (juce::juce_wchar) (int) message[msg::character] };
     }
 
     juce::MemoryBlock binaryOf (const juce::var& value)
@@ -361,7 +381,8 @@ public:
           sandbox (&owner), desc (d), pluginId (id), remote (std::move (r)),
           numIns ((int) loaded[msg::inputs]), numOuts ((int) loaded[msg::outputs]),
           midiIn ((bool) loaded[msg::acceptsMidi]), midiOut ((bool) loaded[msg::producesMidi]),
-          midiEffect ((bool) loaded[msg::midiEffect]), tailSeconds ((double) loaded[msg::tail])
+          midiEffect ((bool) loaded[msg::midiEffect]), ownEditor ((bool) loaded[msg::hasEditor]),
+          tailSeconds ((double) loaded[msg::tail])
     {
         int index = 0;
 
@@ -397,9 +418,20 @@ public:
 
     bool hasCrashed() const noexcept   { return remote->dead.load(); }
 
-    void showOwnEditor()
+    /** Tells the host something about the plug-in's own UI. */
+    void post (const juce::ValueTree& message)   { remote->post (message); }
+
+    /** Has the host's UI handle a key, as if typed in it; waits for it to. */
+    void pressKeyInOwnEditor (const juce::KeyPress& key)
     {
-        remote->post (juce::ValueTree (msg::showEditor));
+        remote->request (messageFor (msg::pressKey, key), stateTimeoutMs);
+    }
+
+    /** Where the host shows the plug-in's own UI; empty while hidden, or if the host doesn't answer. */
+    juce::Rectangle<int> getOwnEditorScreenBounds()
+    {
+        const auto state = remote->request (juce::ValueTree (msg::dockState), stateTimeoutMs);
+        return { (int) state[msg::x], (int) state[msg::y], (int) state[msg::width], (int) state[msg::height] };
     }
 
     //==============================================================================
@@ -450,8 +482,14 @@ public:
     bool producesMidi() const override             { return midiOut; }
     bool isMidiEffect() const override             { return midiEffect; }
 
-    bool hasEditor() const override                { return true; }
+    bool hasEditor() const override                { return ownEditor; }
     juce::AudioProcessorEditor* createEditor() override;
+
+    /** The plug-in resized its own UI: so does the editor. */
+    void ownEditorResized (juce::Point<int> size);
+
+    /** A key typed in the plug-in's own UI that it didn't use: the editor passes it on. */
+    void ownEditorKey (const juce::KeyPress&);
 
     int getNumPrograms() override                  { return juce::jmax (1, programNames.size()); }
     int getCurrentProgram() override               { return currentProgram; }
@@ -586,7 +624,7 @@ private:
     const juce::String pluginId;
     std::unique_ptr<Remote> remote;
     const int numIns, numOuts;
-    const bool midiIn, midiOut, midiEffect;
+    const bool midiIn, midiOut, midiEffect, ownEditor;
     const double tailSeconds;
     std::vector<Parameter*> parameters;
     juce::StringArray programNames;
@@ -722,6 +760,19 @@ private:
             {
                 instance->setLatencySamples ((int) m[msg::samples]);
             }
+            else if (m.hasType (msg::editorSize))
+            {
+                instance->ownEditorResized ({ (int) m[msg::width], (int) m[msg::height] });
+            }
+            else if (m.hasType (msg::key))
+            {
+                instance->ownEditorKey (keyIn (m));
+            }
+            else if (m.hasType (msg::clicked))
+            {
+                if (auto* s = instance->sandbox.get())
+                    s->uiClicked (instance->pluginId);
+            }
         });
     }
 
@@ -740,58 +791,170 @@ private:
 };
 
 //==============================================================================
-/** In the plug-in window's vendor area: the plug-in's parameters, and a button
-    that shows its own UI, which opens in its sandbox host's window. */
-class PluginSandbox::Instance::Editor final : public juce::AudioProcessorEditor
+/** In the plug-in window's vendor area: the place the plug-in's own UI shows.
+    The UI itself runs in the sandbox host, in a panel the host lays over
+    this editor's bounds on screen and keeps just above its window; the editor
+    tells the host where that is whenever it moves, resizes, shows or hides,
+    or its window comes to the front or changes level. The editor has the UI's
+    native size: the plug-in resizing its UI resizes it, and resizing it (the
+    window's grip) resizes the UI. */
+class PluginSandbox::Instance::Editor final : public juce::AudioProcessorEditor,
+                                              private juce::ComponentMovementWatcher,
+                                              private juce::Timer
 {
 public:
-    explicit Editor (Instance& owner)
-        : juce::AudioProcessorEditor (owner), instance (owner), parameters (owner)
+    Editor (Instance& owner, juce::Point<int> size, bool resizable)
+        : juce::AudioProcessorEditor (owner), juce::ComponentMovementWatcher (this), instance (owner), pluginSize (size)
     {
-        note.setText (owner.getName() + " runs in its sandbox. Its own UI opens in a window of its own.",
-                      juce::dontSendNotification);
-        note.setJustificationType (juce::Justification::centredLeft);
-        showOwn.setComponentID ("showOwnEditor");
-        showOwn.onClick = [this] { instance.showOwnEditor(); };
+        setResizable (resizable, false);
+        setWantsKeyboardFocus (true);
+        setSize (size.x, size.y);
 
-        addAndMakeVisible (note);
-        addAndMakeVisible (showOwn);
-        addAndMakeVisible (parameters);
-        setSize (juce::jmax (headerWidth, parameters.getWidth()), headerHeight + juce::jmin (maxBodyHeight, parameters.getHeight()));
+        // A window's level changes (Resamper in front or not) have no callback.
+        startTimer (levelPollMs);
     }
 
     ~Editor() override
     {
+        stopTimer();
+        instance.post (juce::ValueTree (msg::closeEditor));
+
         // Whoever deletes an editor tells its processor; the engine's window doesn't.
         processor.editorBeingDeleted (this);
     }
 
-    void resized() override
+    /** The plug-in resized its own UI. */
+    void pluginResized (juce::Point<int> size)
     {
-        auto area = getLocalBounds();
-        auto header = area.removeFromTop (headerHeight).reduced (8, 6);
-        showOwn.setBounds (header.removeFromRight (buttonWidth));
-        note.setBounds (header.withTrimmedRight (8));
-        parameters.setBounds (area);
+        pluginSize = size;
+        setSize (size.x, size.y);
+    }
+
+    /** A key typed in the plug-in's own UI that it didn't use goes to the
+        window as if typed here, so Resamper's shortcuts work while the UI has
+        the keys. Esc first takes the keys back to Resamper: here, so the
+        window's Esc hands them to its chrome. */
+    void keyFromOwnUi (const juce::KeyPress& key)
+    {
+        if (key == juce::KeyPress::escapeKey)
+            grabKeyboardFocus();
+
+        for (auto* c = getParentComponent(); c != nullptr; c = c->getParentComponent())
+            if (c->keyPressed (key))
+                return;
     }
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+        g.fillAll (juce::Colours::black);
     }
 
 private:
-    static constexpr int headerWidth = 420, headerHeight = 40, buttonWidth = 120, maxBodyHeight = 480;
+    static constexpr int levelPollMs = 100;
+
+    struct Dock
+    {
+        juce::Rectangle<int> area;
+        bool visible = false;
+        sandboxdock::WindowRef window;
+        float scale = 1.0f;
+        int raised = 0;
+
+        bool operator== (const Dock&) const = default;
+    };
 
     Instance& instance;
-    juce::Label note;
-    juce::TextButton showOwn { "Show plug-in UI" };
-    juce::GenericAudioProcessorEditor parameters;
+    juce::Point<int> pluginSize;
+    Dock last;
+    int raised = 0;
+
+    void dock()
+    {
+        Dock now;
+        now.visible = isShowing();
+        now.window = sandboxdock::windowOf (*this);
+        now.raised = raised;
+
+        if (now.visible)
+        {
+            now.area = getScreenBounds();
+            now.scale = getWidth() > 0 ? (float) now.area.getWidth() / (float) getWidth() : 1.0f;
+        }
+
+        if (now == last)
+            return;
+
+        last = now;
+        juce::ValueTree message (msg::dock);
+        message.setProperty (msg::x, now.area.getX(), nullptr);
+        message.setProperty (msg::y, now.area.getY(), nullptr);
+        message.setProperty (msg::width, now.area.getWidth(), nullptr);
+        message.setProperty (msg::height, now.area.getHeight(), nullptr);
+        message.setProperty (msg::visible, now.visible, nullptr);
+        message.setProperty (msg::window, now.window.number, nullptr);
+        message.setProperty (msg::level, now.window.level, nullptr);
+        message.setProperty (msg::scale, now.scale, nullptr);
+        instance.post (message);
+    }
+
+    // The watcher hears every parent, the window too: one brought to the front
+    // goes over the UI, which the host puts back above it.
+    void componentBroughtToFront (juce::Component&) override   { ++raised; dock(); }
+
+    /** Resized here (the window's grip): the plug-in's UI follows. */
+    void componentMovedOrResized (bool, bool wasResized) override
+    {
+        if (wasResized && (getWidth() != pluginSize.x || getHeight() != pluginSize.y))
+        {
+            pluginSize = { getWidth(), getHeight() };
+            juce::ValueTree message (msg::editorSize);
+            message.setProperty (msg::width, pluginSize.x, nullptr);
+            message.setProperty (msg::height, pluginSize.y, nullptr);
+            instance.post (message);
+        }
+
+        dock();
+    }
+
+    // The watcher calls the one above only when this editor moves within its window;
+    // the window itself moving on the desktop (a title-bar drag) moves it too.
+    void componentMovedOrResized (juce::Component& c, bool wasMoved, bool wasResized) override
+    {
+        juce::ComponentMovementWatcher::componentMovedOrResized (c, wasMoved, wasResized);
+        dock();
+    }
+
+    void componentPeerChanged() override                       { dock(); }
+    void componentVisibilityChanged() override                 { dock(); }
+    using juce::ComponentMovementWatcher::componentVisibilityChanged;
+    void timerCallback() override                              { dock(); }
 };
+
+void PluginSandbox::Instance::ownEditorResized (juce::Point<int> size)
+{
+    if (auto* editor = dynamic_cast<Editor*> (getActiveEditor()))
+        editor->pluginResized (size);
+}
+
+void PluginSandbox::Instance::ownEditorKey (const juce::KeyPress& key)
+{
+    if (auto* editor = dynamic_cast<Editor*> (getActiveEditor()))
+        editor->keyFromOwnUi (key);
+}
 
 juce::AudioProcessorEditor* PluginSandbox::Instance::createEditor()
 {
-    return new Editor (*this);
+    if (! ownEditor)
+        return nullptr;
+
+    // The host makes the UI now, hidden; it shows once this editor is on screen.
+    const auto opened = remote->request (juce::ValueTree (msg::openEditor), stateTimeoutMs);
+
+    if (! opened.isValid() || opened.hasProperty (msg::error))
+        return nullptr;
+
+    return new Editor (*this, { juce::jmax (1, (int) opened[msg::width]), juce::jmax (1, (int) opened[msg::height]) },
+                       (bool) opened[msg::resizable]);
 }
 
 //==============================================================================
@@ -800,6 +963,8 @@ namespace
     /** A sandbox host: this executable run again, serving one plug-in to its stand-in. */
     class Host final : public juce::ChildProcessWorker,
                        private juce::Timer,
+                       private juce::ComponentListener,
+                       private juce::KeyListener,
                        private juce::AudioProcessorListener,
                        private juce::AudioProcessorParameter::Listener
     {
@@ -816,7 +981,7 @@ namespace
         {
             stopTimer();
             stopAudio();
-            window.reset();
+            closeEditor();
 
             if (plugin != nullptr)
             {
@@ -848,21 +1013,6 @@ namespace
             Host& host;
         };
 
-        /** The plug-in's own UI. Closing it only hides it. */
-        struct Window final : juce::DocumentWindow
-        {
-            Window (const juce::String& name, juce::AudioProcessorEditor* editor)
-                : juce::DocumentWindow (name, juce::Colours::black, closeButton | minimiseButton)
-            {
-                setUsingNativeTitleBar (true);
-                setContentOwned (editor, true);
-                setResizable (editor->isResizable(), false);
-                centreWithSize (getWidth(), getHeight());
-            }
-
-            void closeButtonPressed() override   { setVisible (false); }
-        };
-
         enum Dirty : juce::uint8 { byPlugin = 1, byHost = 2 };
 
         juce::AudioPluginFormatManager formats;
@@ -879,7 +1029,10 @@ namespace
         juce::uint32 seenParameterSeq = 0;
         juce::MidiBuffer midi;
         int reportedLatency = 0;
-        std::unique_ptr<Window> window;
+        std::unique_ptr<juce::AudioProcessorEditor> editor;   ///< the plug-in's own UI, while the stand-in has an editor
+        std::unique_ptr<sandboxdock::Panel> panel;          ///< where it shows, once docked
+        float editorScale = 1.0f;
+        bool resizingForStandIn = false;
         std::atomic<bool> finished { false };
 
         //==============================================================================
@@ -972,9 +1125,38 @@ namespace
             {
                 plugin->changeProgramName ((int) m[msg::index], m[msg::name].toString());
             }
-            else if (m.hasType (msg::showEditor))
+            else if (m.hasType (msg::openEditor))
             {
-                showWindow();
+                openEditor (m);
+            }
+            else if (m.hasType (msg::dock))
+            {
+                dock (m);
+            }
+            else if (m.hasType (msg::editorSize))
+            {
+                resizeEditor ({ (int) m[msg::width], (int) m[msg::height] });
+            }
+            else if (m.hasType (msg::closeEditor))
+            {
+                closeEditor();
+            }
+            else if (m.hasType (msg::pressKey))
+            {
+                if (auto* peer = editor != nullptr ? editor->getPeer() : nullptr)
+                    peer->handleKeyPress (keyIn (m));
+
+                reply (m);
+            }
+            else if (m.hasType (msg::dockState))
+            {
+                const auto bounds = panel != nullptr ? panel->getScreenBounds() : juce::Rectangle<int>();
+                juce::ValueTree answer (msg::reply);
+                answer.setProperty (msg::x, bounds.getX(), nullptr);
+                answer.setProperty (msg::y, bounds.getY(), nullptr);
+                answer.setProperty (msg::width, bounds.getWidth(), nullptr);
+                answer.setProperty (msg::height, bounds.getHeight(), nullptr);
+                reply (m, answer);
             }
         }
 
@@ -1040,6 +1222,7 @@ namespace
             answer.setProperty (msg::tail, plugin->getTailLengthSeconds(), nullptr);
             answer.setProperty (msg::latency, reportedLatency, nullptr);
             answer.setProperty (msg::current, plugin->getCurrentProgram(), nullptr);
+            answer.setProperty (msg::hasEditor, plugin->hasEditor(), nullptr);
 
             for (int i = 0; i < parameters.size(); ++i)
             {
@@ -1089,21 +1272,103 @@ namespace
                 dirty[(size_t) i].fetch_or (how);
         }
 
-        void showWindow()
+        /** Makes the plug-in's own UI, hidden until the stand-in docks it; answers with its size. */
+        void openEditor (const juce::ValueTree& request)
         {
-            if (window == nullptr)
+            if (editor == nullptr)
             {
-                auto* editor = plugin->createEditorAndMakeActive();
+                editor.reset (plugin->createEditorAndMakeActive());
 
                 if (editor == nullptr)
-                    editor = new juce::GenericAudioProcessorEditor (*plugin);
+                    return fail (request, "The plug-in has no editor");
 
-                window = std::make_unique<Window> (plugin->getName(), editor);
+                editor->addComponentListener (this);
+                editor->addKeyListener (this);
             }
 
-            window->setVisible (true);
-            juce::Process::makeForegroundProcess();
-            window->toFront (true);
+            juce::ValueTree answer (msg::reply);
+            answer.setProperty (msg::width, editor->getWidth(), nullptr);
+            answer.setProperty (msg::height, editor->getHeight(), nullptr);
+            answer.setProperty (msg::resizable, editor->isResizable(), nullptr);
+            reply (request, answer);
+        }
+
+        /** Lays the UI over the stand-in editor's place on screen, or hides it. */
+        void dock (const juce::ValueTree& m)
+        {
+            if (editor == nullptr)
+                return;
+
+            if (panel == nullptr)
+                panel = std::make_unique<sandboxdock::Panel> (*editor, [this]
+                {
+                    sendMessageToCoordinator (encode (juce::ValueTree (msg::clicked)));
+                });
+
+            if (const auto scale = (float) m[msg::scale]; scale > 0 && ! juce::approximatelyEqual (scale, editorScale))
+            {
+                editorScale = scale;
+                editor->setScaleFactor (scale);
+            }
+
+            panel->place ({ (int) m[msg::x], (int) m[msg::y], (int) m[msg::width], (int) m[msg::height] },
+                          (bool) m[msg::visible], { (juce::int64) m[msg::window], (int) m[msg::level] });
+        }
+
+        /** The stand-in's editor was resized (the window's grip): the UI follows, within its own limits. */
+        void resizeEditor (juce::Point<int> size)
+        {
+            if (editor == nullptr || size.x <= 0 || size.y <= 0)
+                return;
+
+            {
+                const juce::ScopedValueSetter<bool> standIn (resizingForStandIn, true);
+                editor->setSize (size.x, size.y);
+            }
+
+            // It kept a size of its own: the stand-in takes that.
+            if (editor->getWidth() != size.x || editor->getHeight() != size.y)
+                reportEditorSize();
+        }
+
+        void reportEditorSize()
+        {
+            juce::ValueTree message (msg::editorSize);
+            message.setProperty (msg::width, editor->getWidth(), nullptr);
+            message.setProperty (msg::height, editor->getHeight(), nullptr);
+            sendMessageToCoordinator (encode (message));
+        }
+
+        void closeEditor()
+        {
+            panel.reset();
+
+            if (editor != nullptr)
+            {
+                editor->removeComponentListener (this);
+                editor->removeKeyListener (this);
+                plugin->editorBeingDeleted (editor.get());
+                editor.reset();
+            }
+
+            editorScale = 1.0f;
+        }
+
+        /** A key nothing in the plug-in's UI used, the editor itself last: Resamper's. */
+        bool keyPressed (const juce::KeyPress& key, juce::Component*) override
+        {
+            if (editor == nullptr || editor->keyPressed (key))
+                return true;
+
+            sendMessageToCoordinator (encode (messageFor (msg::key, key)));
+            return true;
+        }
+
+        /** The plug-in resized its own UI. */
+        void componentMovedOrResized (juce::Component&, bool, bool wasResized) override
+        {
+            if (wasResized && ! resizingForStandIn)
+                reportEditorSize();
         }
 
         //==============================================================================
@@ -1377,20 +1642,25 @@ bool PluginSandbox::hasCrashed (const juce::AudioProcessor* processor)
    #endif
 }
 
-bool PluginSandbox::showOwnEditor (juce::AudioProcessor* processor)
+void PluginSandbox::pressKeyInOwnEditor (juce::AudioProcessor* processor, const juce::KeyPress& key)
 {
    #if RESAMPER_SANDBOX
-    auto* instance = dynamic_cast<Instance*> (processor);
+    if (auto* instance = dynamic_cast<Instance*> (processor); instance != nullptr && ! instance->hasCrashed())
+        instance->pressKeyInOwnEditor (key);
+   #else
+    juce::ignoreUnused (processor, key);
+   #endif
+}
 
-    if (instance == nullptr || instance->hasCrashed())
-        return false;
-
-    instance->showOwnEditor();
-    return true;
+juce::Rectangle<int> PluginSandbox::getOwnEditorScreenBounds (juce::AudioProcessor* processor)
+{
+   #if RESAMPER_SANDBOX
+    if (auto* instance = dynamic_cast<Instance*> (processor); instance != nullptr && ! instance->hasCrashed())
+        return instance->getOwnEditorScreenBounds();
    #else
     juce::ignoreUnused (processor);
-    return false;
    #endif
+    return {};
 }
 
 void PluginSandbox::willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed)
@@ -1432,6 +1702,11 @@ void PluginSandbox::removeListener (Listener* l)   { listeners.remove (l); }
 void PluginSandbox::crashed (const juce::String& pluginId)
 {
     listeners.call ([&] (Listener& l) { l.pluginCrashed (pluginId); });
+}
+
+void PluginSandbox::uiClicked (const juce::String& pluginId)
+{
+    listeners.call ([&] (Listener& l) { l.pluginUiClicked (pluginId); });
 }
 
 } // namespace resamper

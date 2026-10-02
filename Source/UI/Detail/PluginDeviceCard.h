@@ -70,9 +70,6 @@ private:
 
     juce::Rectangle<int> body() const;
     juce::Rectangle<int> pinnedHeader() const;
-
-    /** VST3, AU or CLAP: the badge's text. */
-    juce::String formatBadge() const;
 };
 
 } // namespace resamper
