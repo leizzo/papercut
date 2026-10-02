@@ -395,6 +395,23 @@ struct PluginWindowTests : juce::UnitTest
             expect (dispatchUntil ([] { return visiblePluginWindows() == 0; }), "Mod+W didn't close the window");
         }
 
+        beginTest ("Space in a plug-in window plays, as in the main window");
+        {
+            Windows f;
+            f.commandManager.registerAllCommandsForTarget (f.main.get());
+            f.commandManager.setFirstCommandTarget (f.main.get());
+            const auto id = f.insert (pinboard);
+            auto* window = f.windows().getWindow (id);
+            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }));
+
+            if (window == nullptr || window->getPeer() == nullptr)
+                return;
+
+            expect (! f.model.isPlaying());
+            window->getPeer()->handleKeyPress (juce::KeyPress (juce::KeyPress::spaceKey));
+            expect (dispatchUntil ([&] { return f.model.isPlaying(); }), "space in the plug-in window didn't play");
+        }
+
         beginTest ("A/B compare keeps both settings; Copy A to B; a saved preset loads");
         {
             Windows f;

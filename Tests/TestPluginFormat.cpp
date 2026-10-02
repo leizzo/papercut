@@ -38,8 +38,8 @@ namespace
         double getTailLengthSeconds() const override                 { return 0; }
         bool acceptsMidi() const override                            { return false; }
         bool producesMidi() const override                           { return false; }
-        juce::AudioProcessorEditor* createEditor() override          { return nullptr; }
-        bool hasEditor() const override                              { return false; }
+        juce::AudioProcessorEditor* createEditor() override          { return new Editor (*this); }
+        bool hasEditor() const override                              { return true; }
         int getNumPrograms() override                                { return 1; }
         int getCurrentProgram() override                             { return 0; }
         void setCurrentProgram (int) override {}
@@ -60,6 +60,16 @@ namespace
         }
 
     private:
+        struct Editor final : juce::AudioProcessorEditor
+        {
+            explicit Editor (TestPlugin& p) : juce::AudioProcessorEditor (p)
+            {
+                setSize (TestPluginFormat::editorWidth, TestPluginFormat::editorHeight);
+            }
+
+            void paint (juce::Graphics& g) override   { g.fillAll (juce::Colours::darkorange); }
+        };
+
         juce::PluginDescription desc;
         juce::AudioParameterFloat* gain = nullptr;
         juce::AudioParameterBool* crash = nullptr;

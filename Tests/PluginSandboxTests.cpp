@@ -295,6 +295,91 @@ struct PluginSandboxTests : juce::UnitTest
             expect (info (reopened, inProcess).has_value() && info (reopened, inProcess)->sandboxed);
         }
 
+        beginTest ("A sandboxed plug-in's own UI shows in its window's vendor area; Parameters swaps in its parameters");
+        {
+            Fixture f;
+            TestPlugin gain (f, "Sandbox Own UI", "plugin OwnUi Gain");
+            f.theme.load();
+            const auto track = addTrack (f);
+            f.invoke (cmd::trackSelect, { track });
+            juce::ApplicationCommandManager commandManager;
+            auto main = std::make_unique<MainComponent> (f.app, commandManager);
+            main->setSize (1400, 900);
+
+            const auto id = insert (f, track, gain.path());
+            auto* window = main->getPluginWindows().getWindow (id);
+            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }));
+            auto* instance = instanceOf (f, id);
+            expect (instance != nullptr && PluginSandbox::isSandboxed (instance));
+
+            if (window == nullptr || instance == nullptr || window->getVendorComponent() == nullptr)
+                return;
+
+            auto& vendor = *window->getVendorComponent();
+            expectEquals (vendor.getWidth(), TestPluginFormat::editorWidth, "the vendor area isn't the UI's native size");
+            expectEquals (vendor.getHeight(), TestPluginFormat::editorHeight);
+            expect (findOne (*window, "showOwnEditor") == nullptr, "the UI still opens in a window of its own");
+            expect (findType<juce::GenericAudioProcessorEditor> (*window) == nullptr, "parameters show without asking");
+
+            auto ownUi = [&] { return PluginSandbox::getOwnEditorScreenBounds (instance); };
+            expect (dispatchUntil ([&] { return ownUi() == vendor.getScreenBounds(); }),
+                    "the sandbox doesn't lay the UI over the vendor area: " + ownUi().toString()
+                        + " vs " + vendor.getScreenBounds().toString());
+
+            window->setFramePosition (window->getFrameScreenBounds().getPosition() + juce::Point<int> (40, 30));
+            expect (dispatchUntil ([&] { return ownUi() == vendor.getScreenBounds(); }), "the UI doesn't follow its window");
+
+            auto* parametersButton = findOne (*window, "parameters");
+            expect (parametersButton != nullptr && parametersButton->isEnabled());
+            click (parametersButton);
+            expect (dispatchUntil ([&] { return window->isShowingParameters(); }), "Parameters doesn't toggle");
+            auto* parameters = findType<juce::GenericAudioProcessorEditor> (*window);
+            expect (parameters != nullptr && parameters->isShowing(), "Parameters shows no parameters");
+            expect (! vendor.isVisible());
+            expect (dispatchUntil ([&] { return ownUi().isEmpty(); }), "the UI stays over the parameters");
+
+            click (parametersButton);
+            expect (dispatchUntil ([&] { return ! window->isShowingParameters(); }) && vendor.isVisible());
+            expect (findType<juce::GenericAudioProcessorEditor> (*window) == nullptr);
+            expect (dispatchUntil ([&] { return ownUi() == vendor.getScreenBounds(); }), "the UI doesn't come back");
+
+            main->getPluginWindows().close (id);
+            expect (dispatchUntil ([&] { return ownUi().isEmpty(); }), "the UI outlives its window");
+            main.reset();
+        }
+
+        beginTest ("Space the sandboxed UI doesn't use plays; Esc hands focus back to the window");
+        {
+            Fixture f;
+            TestPlugin gain (f, "Sandbox Keys", "plugin Keys Gain");
+            f.theme.load();
+            const auto track = addTrack (f);
+            f.invoke (cmd::trackSelect, { track });
+            juce::ApplicationCommandManager commandManager;
+            auto main = std::make_unique<MainComponent> (f.app, commandManager);
+            main->setSize (1400, 900);
+            commandManager.registerAllCommandsForTarget (main.get());
+            commandManager.setFirstCommandTarget (main.get());
+
+            const auto id = insert (f, track, gain.path());
+            auto* window = main->getPluginWindows().getWindow (id);
+            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }));
+            auto* instance = instanceOf (f, id);
+
+            if (window == nullptr || instance == nullptr)
+                return;
+
+            expect (dispatchUntil ([&] { return ! PluginSandbox::getOwnEditorScreenBounds (instance).isEmpty(); }));
+            expect (! f.model.isPlaying());
+            PluginSandbox::pressKeyInOwnEditor (instance, juce::KeyPress (juce::KeyPress::spaceKey, {}, ' '));
+            expect (dispatchUntil ([&] { return f.model.isPlaying(); }), "space in the sandboxed UI didn't play");
+
+            PluginSandbox::pressKeyInOwnEditor (instance, juce::KeyPress (juce::KeyPress::escapeKey));
+            expect (dispatchUntil ([&] { return window->hasFocusInside(); }), "Esc in the sandboxed UI didn't hand focus back");
+            expect (main->getPluginWindows().isOpen (id), "Esc in the sandboxed UI closed its window");
+            main.reset();
+        }
+
         beginTest ("A plug-in that dies loading shows the error state; Run in-process loads it");
         {
             Fixture f;

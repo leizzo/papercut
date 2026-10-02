@@ -237,6 +237,10 @@ public:
     /** Hosted JUCE editor for an inserted plug-in. Empty if it has none, or the id is unknown. */
     std::unique_ptr<juce::Component> createEditor (const juce::String& pluginId);
 
+    /** A host-drawn panel of an external plug-in's parameters (the window's
+        Parameters). Empty if the id is unknown or isn't an external plug-in. */
+    std::unique_ptr<juce::Component> createParameterEditor (const juce::String& pluginId);
+
     //==============================================================================
     // The plug-in window (PRD §9.6)
 
@@ -263,13 +267,16 @@ public:
         plug-in whose format can't be sandboxed runs in-process either way. */
     juce::Result setSandboxed (const juce::String& pluginId, bool sandboxed);
 
-    /** Told when a plug-in's sandbox dies (PluginInfo::crashed). */
+    /** Told when a plug-in's sandbox dies (PluginInfo::crashed), or its own UI there is clicked. */
     struct Listener
     {
         virtual ~Listener() = default;
 
         /** A plug-in of this rack's Edit crashed. On the message thread. */
         virtual void pluginCrashed (const juce::String& pluginId) = 0;
+
+        /** The own UI of a plug-in of this rack's Edit, shown by its sandbox, was clicked. On the message thread. */
+        virtual void pluginUiClicked (const juce::String& /*pluginId*/) {}
     };
 
     void addListener (Listener*);

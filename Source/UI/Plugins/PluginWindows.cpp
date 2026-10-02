@@ -108,6 +108,7 @@ std::unique_ptr<FloatingDeviceWindow> PluginWindows::createWindow (const PluginI
     };
 
     window->onToggleAll = [this] { toggleAll(); };
+    window->onUnhandledKey = [this] (const juce::KeyPress& key) { return onShortcut != nullptr && onShortcut (key); };
 
     return window;
 }
@@ -266,6 +267,13 @@ void PluginWindows::setPinned (const juce::String& pluginId, bool pinned)
         saveState (*window, true);
         refresh();
     }
+}
+
+void PluginWindows::pluginUiClicked (const juce::String& pluginId)
+{
+    // A click in a sandboxed plug-in's own UI is a click in its window.
+    if (auto* window = getDeviceWindow (pluginId))
+        selectTrackOf (*window);
 }
 
 void PluginWindows::pluginCrashed (const juce::String& pluginId)

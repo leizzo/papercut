@@ -95,6 +95,12 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
         toasts.show (message, std::move (actions));
     };
 
+    // In MainWindow's order: the view-aware shortcuts, then the menus' key mappings.
+    pluginWindows.onShortcut = [this] (const juce::KeyPress& key)
+    {
+        return shortcuts.keyPressed (key, this) || commandManager.getKeyMappings()->keyPressed (key, this);
+    };
+
     // A first window centres over the arrangement (the view in front, while that isn't it).
     pluginWindows.getAnchorArea = [this]
     {

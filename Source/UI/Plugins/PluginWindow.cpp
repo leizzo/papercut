@@ -16,7 +16,7 @@ namespace
     constexpr int toolbarPadding = 10, footerPaddingLeft = 12, footerPaddingRight = 8, bypassWidth = 46, controlHeight = 22,
                   presetStepWidth = 18, presetNameWidth = 120, slotWidth = 22, slotHeight = 16, copyWidth = 66,
                   statsWidth = 92, sandboxWidth = 16, scaleWidth = 120, scaleHeight = 18, gripSize = 14,
-                  minFrameWidth = 540, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20, footerGap = 8,
+                  minFrameWidth = 566, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20, footerGap = 8,
                   slotWellPadding = 2, slotsGap = 6;
 
     // The format badge in the title: 12 px plug, the badge pads 0 5 inside a 1 px border and is 13 high.
@@ -195,6 +195,7 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
     copyAToB = std::make_unique<ChromeButton> (tm, "Copy A" + rightArrow + "B", Kind::text);
     undo = std::make_unique<ChromeButton> (tm, "Undo", Kind::icon, Icon::undo2);
     redo = std::make_unique<ChromeButton> (tm, "Redo", Kind::icon, Icon::redo2);
+    parameters = std::make_unique<ChromeButton> (tm, "Parameters", Kind::icon, Icon::slidersHorizontal);
     retry = std::make_unique<ChromeButton> (tm, "Retry", Kind::text);
     runInProcess = std::make_unique<ChromeButton> (tm, "Run in-process", Kind::text);
     stats = std::make_unique<Readout> (tm, Readout::Kind::stats);
@@ -212,6 +213,8 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
     slotA->setComponentID ("slotA");
     slotB->setComponentID ("slotB");
     copyAToB->setComponentID ("copyAToB");
+    parameters->setComponentID ("parameters");
+    parameters->accentWhenOn = true;
     retry->setComponentID ("retry");
     runInProcess->setComponentID ("runInProcess");
     scale->setComponentID ("uiScale");
@@ -227,6 +230,7 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
     copyAToB->onClick = [this] { commands.invoke (cmd::pluginCopyAToB, { plugin.trackId, plugin.id }); };
     undo->onClick = [this] { commands.invoke (cmd::editUndo); };
     redo->onClick = [this] { commands.invoke (cmd::editRedo); };
+    parameters->onClick = [this] { showParameters (! isShowingParameters()); };
     retry->onClick = [this]
     {
         // A load that failed starts again; one still under way is waited for afresh.
@@ -248,7 +252,8 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
                                     (juce::Component*) previousPreset.get(), (juce::Component*) presetName.get(),
                                     (juce::Component*) nextPreset.get(), (juce::Component*) savePreset.get(),
                                     (juce::Component*) slotA.get(), (juce::Component*) slotB.get(), (juce::Component*) copyAToB.get(),
-                                    (juce::Component*) undo.get(), (juce::Component*) redo.get(), (juce::Component*) stats.get(),
+                                    (juce::Component*) undo.get(), (juce::Component*) redo.get(), (juce::Component*) parameters.get(),
+                                    (juce::Component*) stats.get(),
                                     (juce::Component*) sandbox.get(), (juce::Component*) footerInfo.get(), (juce::Component*) scale.get() })
         addAndMakeVisible (child);
 
@@ -313,8 +318,29 @@ bool PluginWindow::hasResizeGrip() const
     return status == Status::ready && editor != nullptr && editor->isResizable();
 }
 
+void PluginWindow::showParameters (bool shouldShow)
+{
+    parameterPanel.reset();
+
+    if (shouldShow && status == Status::ready)
+        parameterPanel = rack.createParameterEditor (plugin.id);
+
+    if (parameterPanel != nullptr)
+        addAndMakeVisible (*parameterPanel);
+
+    // The vendor UI hides behind the panel: a sandboxed one is another process's window, which nothing here can cover.
+    if (vendor != nullptr)
+        vendor->setVisible (parameterPanel == nullptr);
+
+    parameters->setToggleState (parameterPanel != nullptr, juce::dontSendNotification);
+    parameters->setTitle (parameterPanel != nullptr ? "Parameters (shown)" : "Parameters");
+    resized();
+}
+
 void PluginWindow::retryLoading()
 {
+    showParameters (false);
+
     if (vendor != nullptr)
     {
         vendor->removeComponentListener (this);
@@ -322,6 +348,7 @@ void PluginWindow::retryLoading()
     }
 
     status = Status::loading;
+    parameters->setEnabled (false);
     loadStartedAt = juce::Time::getMillisecondCounter();
     retry->setVisible (false);
     runInProcess->setVisible (false);
@@ -340,6 +367,7 @@ void PluginWindow::loadVendor()
         vendor = std::make_unique<NoEditor> (themeManager);
 
     status = Status::ready;
+    parameters->setEnabled (true);
     addAndMakeVisible (*vendor);
     vendor->addComponentListener (this);
     updateSize();
@@ -398,6 +426,9 @@ void PluginWindow::resized()
         vendor->setTopLeftPosition (juce::roundToInt ((float) x / s), juce::roundToInt ((float) area.getY() / s));
     }
 
+    if (parameterPanel != nullptr)
+        parameterPanel->setBounds (area);
+
     auto buttons = area.withSizeKeepingCentre (juce::jmin (area.getWidth(), stateButtonsWidth), controlHeight)
                        .translated (0, stateButtonsOffset);
     retry->setBounds (buttons.removeFromLeft ((buttons.getWidth() - stateButtonsGap) / 2));
@@ -431,6 +462,7 @@ void PluginWindow::layoutToolbar (juce::Rectangle<int> bar)
     copyAToB->setBounds (take (copyWidth));
     undo->setBounds (take (presetStepWidth));
     redo->setBounds (take (presetStepWidth));
+    parameters->setBounds (take (presetStepWidth));
 
     sandbox->setBounds (bar.removeFromRight (sandboxWidth));
     bar.removeFromRight (gap);

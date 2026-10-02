@@ -59,6 +59,9 @@ public:
     /** Called after windows open or close (the cards' "Window open · focus"). */
     std::function<void()> onOpenWindowsChanged;
 
+    /** A key a window didn't use: Resamper's shortcuts, as the main window has them. True if one took it. */
+    std::function<bool (const juce::KeyPress&)> onShortcut;
+
     /** Opens the device's window (a plug-in's window, a native device
         floating expanded), or brings it forward; focused unless focus is
         false. Does nothing for an unknown or missing plug-in. */
@@ -124,6 +127,7 @@ private:
 
     void modelChanged() override;
     void pluginCrashed (const juce::String& pluginId) override;
+    void pluginUiClicked (const juce::String& pluginId) override;
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void timerCallback() override;
 

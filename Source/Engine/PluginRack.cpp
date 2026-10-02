@@ -392,7 +392,7 @@ struct PluginRack::ScanThread : juce::Thread
     PluginRack& rack;
 };
 
-/** Hears the engine's sandbox, and passes on the crashes of this rack's plug-ins. */
+/** Hears the engine's sandbox, and passes on the crashes and UI clicks of this rack's plug-ins. */
 struct PluginRack::CrashWatch : PluginSandbox::Listener
 {
     CrashWatch (PluginRack& r, PluginSandbox& s) : rack (r), sandbox (s)   { sandbox.addListener (this); }
@@ -402,6 +402,12 @@ struct PluginRack::CrashWatch : PluginSandbox::Listener
     {
         if (rack.contains (pluginId))
             rack.listeners.call ([&] (PluginRack::Listener& l) { l.pluginCrashed (pluginId); });
+    }
+
+    void pluginUiClicked (const juce::String& pluginId) override
+    {
+        if (rack.contains (pluginId))
+            rack.listeners.call ([&] (PluginRack::Listener& l) { l.pluginUiClicked (pluginId); });
     }
 
     PluginRack& rack;
@@ -1180,6 +1186,20 @@ std::unique_ptr<juce::Component> PluginRack::createEditor (const juce::String& p
     if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
         if (auto editor = plugin->createEditor())
             return std::unique_ptr<juce::Component> (editor.release());
+
+    return {};
+}
+
+std::unique_ptr<juce::Component> PluginRack::createParameterEditor (const juce::String& pluginId)
+{
+    if (pluginId.isEmpty())
+        return {};
+
+    const auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
+        if (auto* instance = external->getAudioPluginInstance())
+            return std::make_unique<juce::GenericAudioProcessorEditor> (*instance);
 
     return {};
 }

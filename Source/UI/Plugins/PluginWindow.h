@@ -15,10 +15,12 @@ class CommandRegistry;
     - title bar: plug icon, Track › Plug-in, vendor, format badge, a drag
       area, Pin and Close;
     - host toolbar: Bypass, the preset menu (prev / next, name, save), A/B and
-      Copy A→B, undo / redo, latency, CPU and the sandbox status;
-    - the vendor UI at its native size (times the UI scale), never restyled or
-      overlaid; while the plug-in instantiates, a host-drawn loading state,
-      and after loadTimeoutMs an error state with Retry and Run in-process;
+      Copy A→B, undo / redo, Parameters, latency, CPU and the sandbox status;
+    - the vendor UI at its native size (times the UI scale), never restyled;
+      the toolbar's Parameters swaps it for a host-drawn panel of the
+      plug-in's parameters in the same place, and back. While the plug-in
+      instantiates, a host-drawn loading state, and after loadTimeoutMs an
+      error state with Retry and Run in-process;
     - footer: who renders the UI, its format and version, in- or
       out-of-process, the UI scale and, if the plug-in resizes, a grip.
 
@@ -58,6 +60,10 @@ public:
     /** The vendor UI, once loaded; nullptr while loading or failed. */
     juce::Component* getVendorComponent() const noexcept   { return vendor.get(); }
 
+    /** Shows the plug-in's parameters in place of its vendor UI, or the vendor UI again. */
+    void showParameters (bool);
+    bool isShowingParameters() const noexcept        { return parameterPanel != nullptr; }
+
     std::function<void()> onRunInProcess;            ///< the error state's Run in-process
 
     void resized() override;
@@ -74,9 +80,9 @@ private:
     juce::uint32 loadStartedAt = 0;
     juce::String cpuText;
 
-    std::unique_ptr<juce::Component> vendor;
+    std::unique_ptr<juce::Component> vendor, parameterPanel;
     std::unique_ptr<ChromeButton> bypass, previousPreset, presetName, nextPreset, savePreset,
-                                  slotA, slotB, copyAToB, undo, redo, retry, runInProcess;
+                                  slotA, slotB, copyAToB, undo, redo, parameters, retry, runInProcess;
     std::unique_ptr<Readout> stats, sandbox, footerInfo;
     std::unique_ptr<Segmented> scale;
     std::unique_ptr<Grip> grip;

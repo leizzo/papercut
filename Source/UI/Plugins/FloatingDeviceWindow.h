@@ -22,7 +22,9 @@ namespace resamper
     - pinned windows stay on top; unpinned ones float while Resamper is the
       front app, so the main window never buries them and they never cover
       another app;
-    - Esc and Mod+W close, Mod+Alt+P shows / hides every window.
+    - Esc and Mod+W close, Mod+Alt+P shows / hides every window; any other
+      key its content doesn't use goes on (onUnhandledKey), so Resamper's
+      shortcuts (Space plays) work with a device window in front.
 
     The window reports through its callbacks; where it goes, whether it
     shows and what closing does are PluginWindows' rules. */
@@ -62,6 +64,7 @@ public:
     std::function<void (bool pinned)> onPinChanged;
     std::function<void (int percent)> onUiScaleChanged;
     std::function<void()> onToggleAll;               ///< Mod+Alt+P
+    std::function<bool (const juce::KeyPress&)> onUnhandledKey;   ///< a key neither its content nor the window used
 
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;

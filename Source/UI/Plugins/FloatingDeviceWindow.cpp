@@ -319,7 +319,7 @@ bool FloatingDeviceWindow::keyPressed (const juce::KeyPress& key)
         return true;
     }
 
-    return false;
+    return onUnhandledKey != nullptr && onUnhandledKey (key);
 }
 
 void FloatingDeviceWindow::mouseDown (const juce::MouseEvent& e)

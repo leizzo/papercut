@@ -31,9 +31,10 @@ namespace resamper
       message on a pipe (juce::ChildProcessCoordinator), the state ones
       answered synchronously with a timeout.
 
-    The plug-in's own UI opens in the host process, in its own window; the
-    stand-in's editor is a host-drawn panel of its parameters with a button
-    that shows it.
+    The plug-in's own UI runs in the host process too, in a panel the host
+    lays over the stand-in's editor (sandboxdock): the plug-in window shows
+    it in its vendor area as if it were in-process. The stand-in's editor
+    tells the host where it is on screen, and the two keep the UI's size.
 
     Which plug-ins: those of a format the host process knows (the default
     formats, plus any added with addHostedFormat), unless the instance runs
@@ -87,8 +88,13 @@ public:
     /** Whether the instance is a stand-in whose sandbox host has died. */
     static bool hasCrashed (const juce::AudioProcessor*);
 
-    /** Shows a sandboxed plug-in's own UI, in its host's window. False if it isn't one, or crashed. */
-    static bool showOwnEditor (juce::AudioProcessor*);
+    /** Where a sandboxed plug-in's own UI shows on screen, as its host reports
+        it; empty while hidden, or if it isn't one, or crashed. */
+    static juce::Rectangle<int> getOwnEditorScreenBounds (juce::AudioProcessor*);
+
+    /** Has a sandboxed plug-in's own UI handle a key as if typed in it, and
+        waits until it has (for tests: keys typed there reach no other way). */
+    static void pressKeyInOwnEditor (juce::AudioProcessor*, const juce::KeyPress&);
 
     //==============================================================================
     // Which instance the engine is about to create (set by the engine
@@ -108,6 +114,9 @@ public:
 
         /** A sandboxed plug-in's host died. On the message thread. */
         virtual void pluginCrashed (const juce::String& pluginId) = 0;
+
+        /** A sandboxed plug-in's own UI was clicked. On the message thread. */
+        virtual void pluginUiClicked (const juce::String& /*pluginId*/) {}
     };
 
     void addListener (Listener*);
@@ -128,6 +137,7 @@ private:
     juce::ListenerList<Listener> listeners;
 
     void crashed (const juce::String& pluginId);
+    void uiClicked (const juce::String& pluginId);
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (PluginSandbox)
     JUCE_DECLARE_NON_COPYABLE (PluginSandbox)
