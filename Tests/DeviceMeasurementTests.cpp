@@ -417,7 +417,7 @@ struct DeviceMeasurementTests : juce::UnitTest
                 logMessage ("  Compressor " + name + ", ramp -40..0 dB at 1 kHz: worst " + juce::String (worst, 2)
                             + " dB off the curve, at " + juce::String (worstAt, 0) + " dBFS in");
 
-                expectLessThan (std::abs (worst), mode == dsp::DetectMode::peak ? 1.0 : 0.25, name);
+                expectLessThan (std::abs (worst), 0.25, name);
             }
         }
 
@@ -458,11 +458,30 @@ struct DeviceMeasurementTests : juce::UnitTest
                         + " dB (curve " + juce::String (dsp::transferDb (loud, -20.0, 10.0, 0.0, false) - loud, 2)
                         + "), attack " + juce::String (attackTook, 1) + " ms, release " + juce::String (releaseTook, 1) + " ms to 63 %");
 
-            // The peak detector has no hold: between the tone's crests it releases, so on a
-            // sine the attack runs slower than set and the gain settles short of the curve.
-            expectGreaterThan (attackTook, (double) attackMs);
-            expectLessThan (attackTook, attackMs * 2.0);
-            expectWithinAbsoluteError (releaseTook, (double) releaseMs, releaseMs * 0.05);
+            expectWithinAbsoluteError (settled, dsp::transferDb (loud, -20.0, 10.0, 0.0, false) - loud, 0.2, "the gain settles on the curve");
+            expectWithinAbsoluteError (attackTook, (double) attackMs, attackMs * 0.15);
+            expectWithinAbsoluteError (releaseTook, (double) releaseMs, releaseMs * 0.15);
+        }
+
+        beginTest ("Compressor, Expand: a tone above the threshold passes untouched");
+        {
+            for (auto k : { 19, 372 })
+            {
+                Bench<CompressorV2Plugin> bench (f);
+                shapeCompressor (bench.device, -30.0f, 4.0f, 1.0f, 80.0f);
+                set (bench.device.detect, (float) dsp::DetectMode::expand);
+                auto tone = sine (k, -6.0, 1.0);
+                bench.process (tone);
+
+                const auto gain = toDb (peakIn (tone, 0.9, 0.1)) + 6.0;
+                const auto d = distortion (tone, k);
+                logMessage ("  Expand, " + juce::String (binHz (k), 0) + " Hz at -6 dBFS, 24 dB over the threshold: gain "
+                            + juce::String (gain, 2) + " dB, THD " + juce::String (d.thdDb, 1) + " dB");
+                expectWithinAbsoluteError (gain, 0.0, 0.1);
+                // A low tone spends longer under the threshold at each zero crossing, where
+                // the held gain releases a little toward the expander's: a residue there.
+                expectLessThan (d.thdDb, k < 100 ? -70.0 : -80.0);
+            }
         }
 
         beginTest ("Compressor, Linear / Delta: the lookahead is the latency it reports, and Mix doesn't comb");

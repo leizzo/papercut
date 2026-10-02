@@ -431,7 +431,7 @@ void CompressorV2Plugin::initialise (const te::PluginInitialisationInfo& info)
     delaySize = juce::jmax (1, (int) std::ceil (info.sampleRate * dsp::lookaheadMs (2) / 1000.0) + 1);
     delayLine.assign ((size_t) delaySize * 2, 0.0f);
     delayWrite = 0;
-    envelopeDb = 0;
+    heldDb = envelopeDb = 0;
     meanSquare = 0;
     glideFromSettings = true;
 }
@@ -506,10 +506,16 @@ void CompressorV2Plugin::applyToBuffer (const te::PluginRenderContext& fc)
         loudest = juce::jmax (loudest, (float) level);
         const auto levelDb = gainToDb (level);
 
-        // The gain the curve wants, smoothed: attack while reduction grows, release while it shrinks.
+        // The gain the curve wants, through a smooth decoupled peak detector (Giannoulis,
+        // Massberg & Reiss, JAES 2012): the first stage jumps to the gain of a louder input
+        // and releases toward a quieter one, so it holds a waveform across its zero
+        // crossings; the second smooths that by the attack. Louder means less gain when
+        // compressing and more when expanding: Attack follows a rising input, Release a falling one.
         const auto targetDb = dsp::transferDb (levelDb, thresholdDb, ratioValue, kneeDb, expand) - levelDb;
-        const auto coeff = targetDb < envelopeDb ? attackCoeff : releaseCoeff;
-        envelopeDb = targetDb + coeff * (envelopeDb - targetDb);
+        const auto released = targetDb + releaseCoeff * (heldDb - targetDb);
+        heldDb = expand ? juce::jmax (targetDb, released) : juce::jmin (targetDb, released);
+        envelopeDb = heldDb + attackCoeff * (envelopeDb - heldDb);
+        JUCE_UNDENORMALISE (heldDb);
         JUCE_UNDENORMALISE (envelopeDb);
         mostReduction = juce::jmax (mostReduction, (float) -envelopeDb);
 

@@ -176,7 +176,7 @@ public:
 private:
     std::vector<float> delayLine;   ///< two channels interleaved; sized in initialise
     int delayWrite = 0, delaySize = 0;
-    double envelopeDb = 0, meanSquare = 0;
+    double heldDb = 0, envelopeDb = 0, meanSquare = 0;   ///< the detector's two stages, in dB of gain
     double makeupGlideDb = 0, wetGlide = 1, outGlideDb = 0;   ///< Makeup, Mix and Out on their way to their settings
     bool glideFromSettings = true;
 
