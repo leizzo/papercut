@@ -241,6 +241,9 @@ void EqEightPlugin::initialise (const te::PluginInitialisationInfo&)
 
     for (auto& s : auditionStates)
         s.reset();
+
+    for (auto& d : designed)
+        d.first = {};   // the rate may have changed: design every band afresh
 }
 
 void EqEightPlugin::restorePluginStateFromValueTree (const juce::ValueTree& v)
@@ -252,19 +255,19 @@ void EqEightPlugin::restorePluginStateFromValueTree (const juce::ValueTree& v)
 dsp::Biquad EqEightPlugin::sectionFor (int band) const
 {
     const auto& b = bands[(size_t) band];
-    return sectionFor (band, b.frequency.getCurrentValue(), b.gain.getCurrentValue(), b.q.getCurrentValue());
+    const auto d = designFor (band, b.frequency.getCurrentValue(), b.gain.getCurrentValue(), b.q.getCurrentValue());
+    return dsp::designBand ((dsp::EqBandType) d.type, d.hz, d.gainDb, d.q, sampleRate);
 }
 
-dsp::Biquad EqEightPlugin::sectionFor (int band, double hz, double gainDb, double q) const
+EqEightPlugin::Design EqEightPlugin::designFor (int band, double hz, double gainDb, double q) const
 {
-    const auto type = (dsp::EqBandType) juce::jlimit (0, dsp::numEqBandTypes - 1,
-                                                      juce::roundToInt (bands[(size_t) band].type.getCurrentValue()));
+    const auto type = juce::jlimit (0, dsp::numEqBandTypes - 1, juce::roundToInt (bands[(size_t) band].type.getCurrentValue()));
     gainDb *= scale.getCurrentValue();
 
-    if (adaptive.getCurrentValue() >= 0.5f && type == dsp::EqBandType::bell)
+    if (adaptive.getCurrentValue() >= 0.5f && type == (int) dsp::EqBandType::bell)
         q = dsp::adaptiveQ (q, gainDb);
 
-    return dsp::designBand (type, hz, gainDb, q, sampleRate);
+    return { type, hz, gainDb, q };
 }
 
 void EqEightPlugin::glideBands (int numSamples, bool jump) noexcept
@@ -276,9 +279,18 @@ void EqEightPlugin::glideBands (int numSamples, bool jump) noexcept
     {
         const auto& b = bands[i];
         auto& glide = glides[i];
-        glide.log2Hz += (std::log2 ((double) b.frequency.getCurrentValue()) - glide.log2Hz) * k;
-        glide.gainDb += ((double) b.gain.getCurrentValue() - glide.gainDb) * k;
-        glide.q += ((double) b.q.getCurrentValue() - glide.q) * k;
+        // Within a hair of its setting a glide lands on it, so a settled band stops changing.
+        const auto move = [k] (double& value, double target)
+        {
+            value += (target - value) * k;
+
+            if (std::abs (target - value) < 1.0e-6)
+                value = target;
+        };
+
+        move (glide.log2Hz, std::log2 ((double) b.frequency.getCurrentValue()));
+        move (glide.gainDb, (double) b.gain.getCurrentValue());
+        move (glide.q, (double) b.q.getCurrentValue());
     }
 }
 
@@ -329,7 +341,7 @@ void EqEightPlugin::applyToBuffer (const te::PluginRenderContext& fc)
     }
     else
     {
-        // The bands glide to new settings, their sections redesigned every
+        // The bands glide to new settings, a moving band's section redesigned every
         // glideBlock samples, so a moved node or knob never clicks.
         for (int done = 0; done < n; done += glideBlock)
         {
@@ -342,7 +354,13 @@ void EqEightPlugin::applyToBuffer (const te::PluginRenderContext& fc)
                     continue;
 
                 const auto& glide = glides[(size_t) band];
-                const auto section = sectionFor (band, std::exp2 (glide.log2Hz), glide.gainDb, glide.q);
+                auto& [design, section] = designed[(size_t) band];
+
+                if (const auto wanted = designFor (band, std::exp2 (glide.log2Hz), glide.gainDb, glide.q); wanted != design)
+                {
+                    design = wanted;
+                    section = dsp::designBand ((dsp::EqBandType) design.type, design.hz, design.gainDb, design.q, sampleRate);
+                }
 
                 for (int ch = 0; ch < channels; ++ch)
                 {

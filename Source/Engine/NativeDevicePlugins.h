@@ -121,11 +121,25 @@ private:
     std::array<std::array<dsp::BiquadState, 2>, numBands> states;
     std::array<dsp::BiquadState, 2> auditionStates;
     std::array<Glide, numBands> glides;
+
+    /** What a band's section is designed from: its type, and its frequency, gain and
+        Q with Scale and Adaptive Q applied. */
+    struct Design
+    {
+        int type = -1;
+        double hz = 0, gainDb = 0, q = 0;
+
+        bool operator== (const Design&) const = default;
+    };
+
+    /** Per band, the section the audio thread runs and what it was designed from:
+        a band is redesigned only when that changes. */
+    std::array<std::pair<Design, dsp::Biquad>, numBands> designed;
     bool glideFromSettings = true;   ///< the first block starts at the settings, not a glide toward them
     float outputGain = 1.0f;
 
     /** The section for band at these values, with the band's type, Scale and Adaptive Q. */
-    dsp::Biquad sectionFor (int band, double hz, double gainDb, double q) const;
+    Design designFor (int band, double hz, double gainDb, double q) const;
 
     /** Moves every band's glide numSamples further, or straight to its settings. */
     void glideBands (int numSamples, bool jump) noexcept;
