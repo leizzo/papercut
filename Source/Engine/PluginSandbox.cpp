@@ -1,0 +1,1400 @@
+#include "PluginSandbox.h"
+
+#include <algorithm>
+#include <atomic>
+#include <map>
+#include <new>
+#include <thread>
+
+#if JUCE_MAC || JUCE_LINUX
+ #include <csignal>
+ #include <fcntl.h>
+ #include <semaphore.h>
+ #include <sys/wait.h>
+ #include <unistd.h>
+ #define RESAMPER_SANDBOX 1
+#else
+ #define RESAMPER_SANDBOX 0
+#endif
+
+namespace resamper
+{
+
+namespace
+{
+    /** The memory both sides of a sandbox map: one audio block in flight, the
+        parameter values the stand-in sets, and the block's MIDI. The stand-in
+        fills a block in, then publishes requestSeq; the host processes it in
+        place and answers with responseSeq. */
+    struct SharedBlock
+    {
+        static constexpr int maxChannels = 32, maxSamples = 2048, maxParameters = 4096, midiBytes = 32768;
+
+        std::atomic<juce::uint32> requestSeq, responseSeq, parameterSeq;
+        juce::int32 numSamples, numChannels, midiInBytes, midiOutBytes;
+        std::atomic<juce::uint32> parameterStamps[maxParameters];
+        std::atomic<float> parameterValues[maxParameters];
+        float audio[maxChannels][maxSamples];
+        juce::uint8 midiIn[midiBytes], midiOut[midiBytes];
+    };
+
+    static_assert (std::atomic<juce::uint32>::is_always_lock_free && std::atomic<float>::is_always_lock_free,
+                   "the shared block's atomics must work across processes");
+
+    /** Message types and properties of the pipe between stand-in and host. */
+    namespace msg
+    {
+        const juce::Identifier load ("load"), prepare ("prepare"), release ("release"), getState ("getState"),
+                               setState ("setState"), program ("program"), showEditor ("showEditor"), reply ("reply"),
+                               hello ("hello"), parameters ("parameters"), parameter ("p"), gesture ("gesture"),
+                               latency ("latency"), programName ("programName");
+
+        const juce::Identifier id ("id"), error ("error"), description ("description"), shared ("shared"),
+                               semaphore ("semaphore"), rate ("rate"), block ("block"), data ("data"), index ("i"),
+                               value ("v"), text ("t"), fromPlugin ("plugin"), starting ("starting"), samples ("samples"),
+                               name ("name"), label ("label"), defaultValue ("default"), steps ("steps"),
+                               discrete ("discrete"), boolean ("boolean"), automatable ("automatable"),
+                               parameterId ("parameterId"), inputs ("inputs"), outputs ("outputs"),
+                               acceptsMidi ("acceptsMidi"), producesMidi ("producesMidi"), midiEffect ("midiEffect"),
+                               tail ("tail"), current ("current"), pid ("pid");
+    }
+
+    juce::MemoryBlock encode (const juce::ValueTree& message)
+    {
+        juce::MemoryOutputStream out;
+        message.writeToStream (out);
+        return out.getMemoryBlock();
+    }
+
+    juce::ValueTree decode (const juce::MemoryBlock& data)
+    {
+        return juce::ValueTree::readFromData (data.getData(), data.getSize());
+    }
+
+    juce::MemoryBlock binaryOf (const juce::var& value)
+    {
+        if (auto* block = value.getBinaryData())
+            return *block;
+
+        return {};
+    }
+
+    /** Writes the events of [start, start + length) to dest, positions made relative to start. Returns the bytes used. */
+    int writeMidi (const juce::MidiBuffer& midi, int start, int length, juce::uint8* dest, int capacity)
+    {
+        int used = 0;
+
+        for (const auto meta : midi)
+        {
+            if (meta.samplePosition < start || meta.samplePosition >= start + length)
+                continue;
+
+            const auto needed = (int) (sizeof (juce::int32) + sizeof (juce::uint16)) + meta.numBytes;
+
+            if (used + needed > capacity)
+                break;
+
+            const auto position = (juce::int32) (meta.samplePosition - start);
+            const auto size = (juce::uint16) meta.numBytes;
+            std::memcpy (dest + used, &position, sizeof (position));
+            std::memcpy (dest + used + sizeof (position), &size, sizeof (size));
+            std::memcpy (dest + used + sizeof (position) + sizeof (size), meta.data, (size_t) meta.numBytes);
+            used += needed;
+        }
+
+        return used;
+    }
+
+    /** Adds the events writeMidi wrote to out, offset by start. */
+    void readMidi (const juce::uint8* source, int bytes, juce::MidiBuffer& out, int start)
+    {
+        constexpr auto header = (int) (sizeof (juce::int32) + sizeof (juce::uint16));
+        int read = 0;
+
+        while (read + header <= bytes)
+        {
+            juce::int32 position;
+            juce::uint16 size;
+            std::memcpy (&position, source + read, sizeof (position));
+            std::memcpy (&size, source + read + sizeof (position), sizeof (size));
+
+            if (read + header + size > bytes)
+                break;
+
+            out.addEvent (source + read + header, size, start + position);
+            read += header + size;
+        }
+    }
+
+   #if RESAMPER_SANDBOX
+    /** A named POSIX semaphore: the stand-in posts it to wake the host's audio thread. */
+    struct Semaphore
+    {
+        Semaphore() = default;
+        ~Semaphore()   { if (handle != SEM_FAILED) sem_close (handle); }
+
+        /** A name short enough for macOS (31 characters at most). */
+        static juce::String createName()   { return "/rsmp" + juce::String::toHexString (juce::Random().nextInt()); }
+
+        bool create (const juce::String& name)
+        {
+            handle = sem_open (name.toRawUTF8(), O_CREAT | O_EXCL, 0600, 0);
+            return handle != SEM_FAILED;
+        }
+
+        bool open (const juce::String& name)
+        {
+            handle = sem_open (name.toRawUTF8(), 0);
+            return handle != SEM_FAILED;
+        }
+
+        void post()   { sem_post (handle); }
+        bool wait()   { return sem_wait (handle) == 0; }
+
+        sem_t* handle = SEM_FAILED;
+        JUCE_DECLARE_NON_COPYABLE (Semaphore)
+    };
+   #endif
+
+    juce::File executable()
+    {
+        return juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+    }
+
+    constexpr int stateTimeoutMs = 3000, prepareTimeoutMs = 5000, offlineDeadlineMs = 5000, reportMs = 100,
+                  quitGraceMs = 2000, hostSetGraceMs = 300, dispatchMs = 50;
+}
+
+#if RESAMPER_SANDBOX
+namespace
+{
+/** The stand-in's end of one sandbox host: the process, the pipe, the shared block. */
+class Remote final : public juce::ChildProcessCoordinator
+{
+public:
+    Remote() = default;
+
+    ~Remote() override
+    {
+        closing.store (true);
+        killWorkerProcess();
+        releaseNames();
+
+        // Nothing of the host is worth waiting for: its plug-in's state lives in the Edit.
+        if (const auto id = pid.load(); id > 0)
+        {
+            ::kill (id, SIGKILL);
+
+            for (int i = 0; i < 50 && ::waitpid (id, nullptr, WNOHANG) == 0; ++i)
+                juce::Thread::sleep (2);
+        }
+    }
+
+    /** Creates the shared block and the semaphore. */
+    bool createShared()
+    {
+        sharedFile = juce::File::createTempFile (".resampersandbox");
+        juce::MemoryBlock zeros (sizeof (SharedBlock), true);
+
+        if (! sharedFile.replaceWithData (zeros.getData(), zeros.getSize()))
+            return false;
+
+        mapped = std::make_unique<juce::MemoryMappedFile> (sharedFile, juce::MemoryMappedFile::readWrite);
+
+        if (mapped->getData() == nullptr || mapped->getSize() < sizeof (SharedBlock))
+            return false;
+
+        shared = new (mapped->getData()) SharedBlock();
+        semaphoreName = Semaphore::createName();
+        return wake.create (semaphoreName);
+    }
+
+    /** Once the host has opened them, nobody else needs their names. */
+    void releaseNames()
+    {
+        if (semaphoreName.isNotEmpty())
+            sem_unlink (semaphoreName.toRawUTF8());
+
+        semaphoreName.clear();
+        sharedFile.deleteFile();
+    }
+
+    juce::File getSharedFile() const          { return sharedFile; }
+    const juce::String& getSemaphoreName() const   { return semaphoreName; }
+    SharedBlock& block() const noexcept       { return *shared; }
+    void wakeHost()                           { wake.post(); }
+
+    /** Sends a message and waits for its reply; invalid on timeout, or if the host died. */
+    juce::ValueTree request (juce::ValueTree message, int timeoutMs)
+    {
+        if (dead.load())
+            return {};
+
+        auto waiter = std::make_shared<Waiter>();
+        const auto id = nextId.fetch_add (1) + 1;
+
+        {
+            const std::scoped_lock lock (waitersLock);
+            waiters[id] = waiter;
+        }
+
+        message.setProperty (msg::id, id, nullptr);
+        const auto sent = sendMessageToWorker (encode (message));
+        const auto answered = sent && waiter->done.wait (timeoutMs);
+
+        const std::scoped_lock lock (waitersLock);
+        waiters.erase (id);
+        return answered ? waiter->reply : juce::ValueTree();
+    }
+
+    void post (const juce::ValueTree& message)
+    {
+        if (! dead.load())
+            sendMessageToWorker (encode (message));
+    }
+
+    /** Messages that answer no request, on the pipe's thread; set once its receiver exists. */
+    void setReceiver (std::function<void (const juce::ValueTree&)> onMessage, std::function<void()> onDied)
+    {
+        const std::scoped_lock lock (receiverLock);
+        receiveMessage = std::move (onMessage);
+        hostDied = std::move (onDied);
+    }
+
+    std::atomic<bool> dead { false };
+
+private:
+    struct Waiter
+    {
+        juce::WaitableEvent done;
+        juce::ValueTree reply;
+    };
+
+    juce::File sharedFile;
+    std::unique_ptr<juce::MemoryMappedFile> mapped;
+    SharedBlock* shared = nullptr;
+    Semaphore wake;
+    juce::String semaphoreName;
+
+    std::atomic<int> nextId { 0 }, pid { 0 };
+    std::atomic<bool> closing { false };
+    std::mutex waitersLock, receiverLock;
+    std::map<int, std::shared_ptr<Waiter>> waiters;
+    std::function<void (const juce::ValueTree&)> receiveMessage;
+    std::function<void()> hostDied;
+
+    void handleMessageFromWorker (const juce::MemoryBlock& data) override
+    {
+        const auto message = decode (data);
+
+        if (message.hasType (msg::hello))
+        {
+            pid.store ((int) message[msg::pid]);
+            return;
+        }
+
+        if (message.hasType (msg::reply))
+        {
+            const std::scoped_lock lock (waitersLock);
+
+            if (auto found = waiters.find ((int) message[msg::id]); found != waiters.end())
+            {
+                found->second->reply = message;
+                found->second->done.signal();
+            }
+
+            return;
+        }
+
+        const std::scoped_lock lock (receiverLock);
+
+        if (receiveMessage)
+            receiveMessage (message);
+    }
+
+    void handleConnectionLost() override
+    {
+        dead.store (true);
+
+        {
+            const std::scoped_lock lock (waitersLock);
+
+            for (auto& [id, waiter] : waiters)
+                waiter->done.signal();
+        }
+
+        if (closing.load())
+            return;
+
+        const std::scoped_lock lock (receiverLock);
+
+        if (hostDied)
+            hostDied();
+    }
+
+    JUCE_DECLARE_NON_COPYABLE (Remote)
+};
+} // namespace
+
+//==============================================================================
+/** A sandboxed plug-in's stand-in: what the engine holds in its place. */
+class PluginSandbox::Instance final : public juce::AudioPluginInstance
+{
+public:
+    Instance (PluginSandbox& owner, const juce::PluginDescription& d, const juce::String& id,
+              std::unique_ptr<Remote> r, const juce::ValueTree& loaded)
+        : juce::AudioPluginInstance (busesFor (loaded)),
+          sandbox (&owner), desc (d), pluginId (id), remote (std::move (r)),
+          numIns ((int) loaded[msg::inputs]), numOuts ((int) loaded[msg::outputs]),
+          midiIn ((bool) loaded[msg::acceptsMidi]), midiOut ((bool) loaded[msg::producesMidi]),
+          midiEffect ((bool) loaded[msg::midiEffect]), tailSeconds ((double) loaded[msg::tail])
+    {
+        int index = 0;
+
+        for (const auto& child : loaded)
+        {
+            if (child.hasType (msg::parameter) && index < SharedBlock::maxParameters)
+            {
+                auto parameter = std::make_unique<Parameter> (*this, index++, child);
+                parameters.push_back (parameter.get());
+                addHostedParameter (std::move (parameter));
+            }
+            else if (child.hasType (msg::programName))
+            {
+                programNames.add (child[msg::name].toString());
+            }
+        }
+
+        currentProgram = (int) loaded[msg::current];
+        setLatencySamples ((int) loaded[msg::latency]);
+
+        // Created here, on the message thread, so later copies from other threads are only reference counts.
+        self = this;
+
+        remote->setReceiver ([this] (const juce::ValueTree& m) { received (m); }, [this] { hostDied(); });
+    }
+
+    ~Instance() override
+    {
+        remote->setReceiver ({}, {});
+        remote.reset();
+        masterReference.clear();
+    }
+
+    bool hasCrashed() const noexcept   { return remote->dead.load(); }
+
+    void showOwnEditor()
+    {
+        remote->post (juce::ValueTree (msg::showEditor));
+    }
+
+    //==============================================================================
+    void fillInPluginDescription (juce::PluginDescription& d) const override   { d = desc; }
+    const juce::String getName() const override                              { return desc.name; }
+
+    void prepareToPlay (double rate, int block) override
+    {
+        juce::ValueTree message (msg::prepare);
+        message.setProperty (msg::rate, rate, nullptr);
+        message.setProperty (msg::block, block, nullptr);
+        prepared.store (remote->request (message, prepareTimeoutMs).isValid());
+        outMidi.ensureSize (SharedBlock::midiBytes);
+    }
+
+    void releaseResources() override
+    {
+        prepared.store (false);
+        remote->post (juce::ValueTree (msg::release));
+    }
+
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
+    {
+        juce::ScopedNoDenormals noDenormals;
+        outMidi.clear();
+
+        for (int start = 0; start < buffer.getNumSamples(); start += SharedBlock::maxSamples)
+        {
+            const auto length = juce::jmin (SharedBlock::maxSamples, buffer.getNumSamples() - start);
+
+            if (! processInHost (buffer, midi, start, length))
+                bypass (buffer, midi, start, length);
+        }
+
+        midi.swapWith (outMidi);
+    }
+
+    bool isBusesLayoutSupported (const BusesLayout& layout) const override
+    {
+        // The plug-in in the host keeps the layout it loaded with.
+        return layout.getMainInputChannels() == numIns && layout.getMainOutputChannels() == numOuts;
+    }
+
+    double getTailLengthSeconds() const override   { return tailSeconds; }
+    bool acceptsMidi() const override              { return midiIn; }
+    bool producesMidi() const override             { return midiOut; }
+    bool isMidiEffect() const override             { return midiEffect; }
+
+    bool hasEditor() const override                { return true; }
+    juce::AudioProcessorEditor* createEditor() override;
+
+    int getNumPrograms() override                  { return juce::jmax (1, programNames.size()); }
+    int getCurrentProgram() override               { return currentProgram; }
+    const juce::String getProgramName (int index) override   { return programNames[index]; }
+    void changeProgramName (int, const juce::String&) override {}
+
+    void setCurrentProgram (int index) override
+    {
+        currentProgram = index;
+        juce::ValueTree message (msg::program);
+        message.setProperty (msg::index, index, nullptr);
+        remote->post (message);
+    }
+
+    void getStateInformation (juce::MemoryBlock& dest) override
+    {
+        // A host that died keeps its last state: what Reload starts again from.
+        if (auto reply = remote->request (juce::ValueTree (msg::getState), stateTimeoutMs); reply.isValid())
+        {
+            const std::scoped_lock lock (stateLock);
+            lastState = binaryOf (reply[msg::data]);
+        }
+
+        const std::scoped_lock lock (stateLock);
+        dest = lastState;
+    }
+
+    void setStateInformation (const void* data, int size) override
+    {
+        {
+            const std::scoped_lock lock (stateLock);
+            lastState = juce::MemoryBlock (data, (size_t) size);
+        }
+
+        juce::ValueTree message (msg::setState);
+        message.setProperty (msg::data, juce::MemoryBlock (data, (size_t) size), nullptr);
+
+        // The reply carries every parameter as the new state left it.
+        if (auto reply = remote->request (message, stateTimeoutMs); reply.isValid())
+            for (const auto& p : reply)
+                applyFromHost (p);
+    }
+
+private:
+    /** One of the plug-in's parameters, mirrored. */
+    class Parameter final : public juce::HostedAudioProcessorParameter
+    {
+    public:
+        Parameter (Instance& o, int i, const juce::ValueTree& info)
+            : owner (o), index (i),
+              name (info[msg::name].toString()), label (info[msg::label].toString()), id (info[msg::parameterId].toString()),
+              defaultValue ((float) info[msg::defaultValue]), steps ((int) info[msg::steps]),
+              discrete ((bool) info[msg::discrete]), boolean ((bool) info[msg::boolean]),
+              automatable ((bool) info[msg::automatable]),
+              value ((float) info[msg::value]), text (info[msg::text].toString()), textValue ((float) info[msg::value])
+        {
+        }
+
+        float getValue() const override   { return value.load(); }
+
+        void setValue (float newValue) override
+        {
+            value.store (newValue);
+            lastHostSet.store (juce::Time::getMillisecondCounter());
+            auto& block = owner.remote->block();
+            block.parameterValues[index].store (newValue, std::memory_order_relaxed);
+            block.parameterStamps[index].fetch_add (1, std::memory_order_release);
+            block.parameterSeq.fetch_add (1, std::memory_order_release);
+        }
+
+        float getDefaultValue() const override                 { return defaultValue; }
+        juce::String getName (int maximumLength) const override { return name.substring (0, maximumLength); }
+        juce::String getLabel() const override                 { return label; }
+        int getNumSteps() const override                       { return steps; }
+        bool isDiscrete() const override                       { return discrete; }
+        bool isBoolean() const override                        { return boolean; }
+        bool isAutomatable() const override                    { return automatable; }
+        juce::String getParameterID() const override           { return id; }
+
+        /** The plug-in's own text for the value it last reported; a number for any other. */
+        juce::String getText (float v, int maximumLength) const override
+        {
+            const juce::SpinLock::ScopedLockType lock (textLock);
+            return (juce::approximatelyEqual (v, textValue) ? text : juce::String (v, 2)).substring (0, maximumLength);
+        }
+
+        float getValueForText (const juce::String& t) const override   { return juce::jlimit (0.0f, 1.0f, t.getFloatValue()); }
+
+        void setText (float v, const juce::String& t)
+        {
+            const juce::SpinLock::ScopedLockType lock (textLock);
+            textValue = v;
+            text = t;
+        }
+
+        /** Whether the host set this value lately: a report of an older value from the plug-in is stale then. */
+        bool setByHostLately() const
+        {
+            return juce::Time::getMillisecondCounter() - lastHostSet.load() < (juce::uint32) hostSetGraceMs;
+        }
+
+    private:
+        Instance& owner;
+        const int index;
+        const juce::String name, label, id;
+        const float defaultValue;
+        const int steps;
+        const bool discrete, boolean, automatable;
+        std::atomic<float> value;
+        std::atomic<juce::uint32> lastHostSet { 0 };
+        juce::SpinLock textLock;
+        juce::String text;
+        float textValue;
+    };
+
+    class Editor;
+
+    juce::WeakReference<PluginSandbox> sandbox;
+    const juce::PluginDescription desc;
+    const juce::String pluginId;
+    std::unique_ptr<Remote> remote;
+    const int numIns, numOuts;
+    const bool midiIn, midiOut, midiEffect;
+    const double tailSeconds;
+    std::vector<Parameter*> parameters;
+    juce::StringArray programNames;
+    int currentProgram = 0;
+    std::atomic<bool> prepared { false };
+    juce::MidiBuffer outMidi;
+    std::mutex stateLock;
+    juce::MemoryBlock lastState;
+    juce::WeakReference<Instance> self;
+
+    static BusesProperties busesFor (const juce::ValueTree& loaded)
+    {
+        BusesProperties buses;
+        const int ins = loaded[msg::inputs], outs = loaded[msg::outputs];
+
+        if (ins > 0)
+            buses.addBus (true, "Input", juce::AudioChannelSet::canonicalChannelSet (ins), true);
+
+        if (outs > 0)
+            buses.addBus (false, "Output", juce::AudioChannelSet::canonicalChannelSet (outs), true);
+
+        return buses;
+    }
+
+    /** One block through the host. False (the caller bypasses it) when the host is dead, busy or late. */
+    bool processInHost (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int start, int length)
+    {
+        auto& block = remote->block();
+        const auto previous = block.requestSeq.load (std::memory_order_relaxed);
+
+        // A host still on an earlier block (late, hung or dead) can't take this one.
+        if (remote->dead.load() || ! prepared.load() || block.responseSeq.load (std::memory_order_acquire) != previous)
+            return false;
+
+        const auto channels = juce::jmin (buffer.getNumChannels(), SharedBlock::maxChannels);
+
+        for (int c = 0; c < channels; ++c)
+            std::memcpy (block.audio[c], buffer.getReadPointer (c, start), sizeof (float) * (size_t) length);
+
+        block.numSamples = length;
+        block.numChannels = channels;
+        block.midiInBytes = writeMidi (midi, start, length, block.midiIn, SharedBlock::midiBytes);
+        block.midiOutBytes = 0;
+
+        const auto request = previous + 1;
+        block.requestSeq.store (request, std::memory_order_release);
+        remote->wakeHost();
+
+        // Realtime, the host gets most of the block's time; offline (a render), as long as it needs.
+        const auto rate = getSampleRate() > 0 ? getSampleRate() : 44100.0;
+        const auto allowedSeconds = isNonRealtime() ? offlineDeadlineMs / 1000.0 : 0.75 * length / rate;
+        const auto deadline = juce::Time::getHighResolutionTicks()
+                            + juce::Time::secondsToHighResolutionTicks (allowedSeconds);
+
+        while (block.responseSeq.load (std::memory_order_acquire) != request)
+        {
+            if (remote->dead.load() || juce::Time::getHighResolutionTicks() > deadline)
+                return false;
+
+            std::this_thread::yield();
+        }
+
+        for (int c = 0; c < channels; ++c)
+            std::memcpy (buffer.getWritePointer (c, start), block.audio[c], sizeof (float) * (size_t) length);
+
+        readMidi (block.midiOut, juce::jlimit (0, SharedBlock::midiBytes, block.midiOutBytes), outMidi, start);
+        return true;
+    }
+
+    /** A block the host didn't process: an effect's input passes through; an instrument is silent. */
+    void bypass (juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi, int start, int length)
+    {
+        if (numIns == 0)
+            buffer.clear (start, length);
+
+        for (const auto meta : midi)
+            if (meta.samplePosition >= start && meta.samplePosition < start + length)
+                outMidi.addEvent (meta.getMessage(), meta.samplePosition);
+    }
+
+    /** A parameter as the host reported it: its text always, its value when the plug-in itself changed it. */
+    void applyFromHost (const juce::ValueTree& p)
+    {
+        const int index = p[msg::index];
+
+        if (! juce::isPositiveAndBelow (index, (int) parameters.size()))
+            return;
+
+        auto* parameter = parameters[(size_t) index];
+        const auto v = (float) p[msg::value];
+        parameter->setText (v, p[msg::text].toString());
+
+        if ((bool) p[msg::fromPlugin] && ! parameter->setByHostLately() && ! juce::approximatelyEqual (v, parameter->getValue()))
+            parameter->setValueNotifyingHost (v);
+    }
+
+    /** On the pipe's thread: what the host tells unasked. */
+    void received (const juce::ValueTree& m)
+    {
+        if (m.hasType (msg::parameters))
+        {
+            for (const auto& p : m)
+                if (! (bool) p[msg::fromPlugin])
+                    if (const int i = p[msg::index]; juce::isPositiveAndBelow (i, (int) parameters.size()))
+                        parameters[(size_t) i]->setText ((float) p[msg::value], p[msg::text].toString());
+        }
+
+        // The rest touches the engine: on the message thread, while this stand-in lives.
+        juce::MessageManager::callAsync ([weak = self, m]
+        {
+            auto* instance = weak.get();
+
+            if (instance == nullptr)
+                return;
+
+            if (m.hasType (msg::parameters))
+            {
+                for (const auto& p : m)
+                    if ((bool) p[msg::fromPlugin])
+                        instance->applyFromHost (p);
+            }
+            else if (m.hasType (msg::gesture))
+            {
+                if (const int i = m[msg::index]; juce::isPositiveAndBelow (i, (int) instance->parameters.size()))
+                {
+                    if ((bool) m[msg::starting])
+                        instance->parameters[(size_t) i]->beginChangeGesture();
+                    else
+                        instance->parameters[(size_t) i]->endChangeGesture();
+                }
+            }
+            else if (m.hasType (msg::latency))
+            {
+                instance->setLatencySamples ((int) m[msg::samples]);
+            }
+        });
+    }
+
+    /** On the pipe's thread (or the message thread): the host is gone. */
+    void hostDied()
+    {
+        juce::MessageManager::callAsync ([sandboxRef = sandbox, id = pluginId]
+        {
+            if (auto* s = sandboxRef.get())
+                s->crashed (id);
+        });
+    }
+
+    JUCE_DECLARE_WEAK_REFERENCEABLE (Instance)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Instance)
+};
+
+//==============================================================================
+/** In the plug-in window's vendor area: the plug-in's parameters, and a button
+    that shows its own UI, which opens in its sandbox host's window. */
+class PluginSandbox::Instance::Editor final : public juce::AudioProcessorEditor
+{
+public:
+    explicit Editor (Instance& owner)
+        : juce::AudioProcessorEditor (owner), instance (owner), parameters (owner)
+    {
+        note.setText (owner.getName() + " runs in its sandbox. Its own UI opens in a window of its own.",
+                      juce::dontSendNotification);
+        note.setJustificationType (juce::Justification::centredLeft);
+        showOwn.setComponentID ("showOwnEditor");
+        showOwn.onClick = [this] { instance.showOwnEditor(); };
+
+        addAndMakeVisible (note);
+        addAndMakeVisible (showOwn);
+        addAndMakeVisible (parameters);
+        setSize (juce::jmax (headerWidth, parameters.getWidth()), headerHeight + juce::jmin (maxBodyHeight, parameters.getHeight()));
+    }
+
+    ~Editor() override
+    {
+        // Whoever deletes an editor tells its processor; the engine's window doesn't.
+        processor.editorBeingDeleted (this);
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds();
+        auto header = area.removeFromTop (headerHeight).reduced (8, 6);
+        showOwn.setBounds (header.removeFromRight (buttonWidth));
+        note.setBounds (header.withTrimmedRight (8));
+        parameters.setBounds (area);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+    }
+
+private:
+    static constexpr int headerWidth = 420, headerHeight = 40, buttonWidth = 120, maxBodyHeight = 480;
+
+    Instance& instance;
+    juce::Label note;
+    juce::TextButton showOwn { "Show plug-in UI" };
+    juce::GenericAudioProcessorEditor parameters;
+};
+
+juce::AudioProcessorEditor* PluginSandbox::Instance::createEditor()
+{
+    return new Editor (*this);
+}
+
+//==============================================================================
+namespace
+{
+    /** A sandbox host: this executable run again, serving one plug-in to its stand-in. */
+    class Host final : public juce::ChildProcessWorker,
+                       private juce::Timer,
+                       private juce::AudioProcessorListener,
+                       private juce::AudioProcessorParameter::Listener
+    {
+    public:
+        explicit Host (std::vector<std::unique_ptr<juce::AudioPluginFormat>> extraFormats)
+        {
+            juce::addDefaultFormatsToManager (formats);
+
+            for (auto& format : extraFormats)
+                formats.addFormat (std::move (format));
+        }
+
+        ~Host() override
+        {
+            stopTimer();
+            stopAudio();
+            window.reset();
+
+            if (plugin != nullptr)
+                plugin->removeListener (this);
+
+            plugin.reset();
+        }
+
+        /** Whether the stand-in has gone: runHost returns. */
+        bool isFinished() const noexcept   { return finished.load(); }
+
+    private:
+        /** Waits for a block from the stand-in, processes it, answers. */
+        struct AudioThread final : juce::Thread
+        {
+            explicit AudioThread (Host& h) : juce::Thread ("Sandbox Audio"), host (h) {}
+
+            void run() override
+            {
+                while (! threadShouldExit())
+                    if (host.wake.wait() && ! threadShouldExit())
+                        host.processRequest();
+            }
+
+            Host& host;
+        };
+
+        /** The plug-in's own UI. Closing it only hides it. */
+        struct Window final : juce::DocumentWindow
+        {
+            Window (const juce::String& name, juce::AudioProcessorEditor* editor)
+                : juce::DocumentWindow (name, juce::Colours::black, closeButton | minimiseButton)
+            {
+                setUsingNativeTitleBar (true);
+                setContentOwned (editor, true);
+                setResizable (editor->isResizable(), false);
+                centreWithSize (getWidth(), getHeight());
+            }
+
+            void closeButtonPressed() override   { setVisible (false); }
+        };
+
+        enum Dirty : juce::uint8 { byPlugin = 1, byHost = 2 };
+
+        juce::AudioPluginFormatManager formats;
+        std::unique_ptr<juce::AudioPluginInstance> plugin;
+        std::unique_ptr<juce::MemoryMappedFile> mapped;
+        SharedBlock* shared = nullptr;
+        Semaphore wake;
+        std::unique_ptr<AudioThread> audioThread;
+        juce::CriticalSection processLock;
+        bool prepared = false;
+        juce::Array<juce::AudioProcessorParameter*> parameters;
+        std::unique_ptr<std::atomic<juce::uint8>[]> dirty;
+        std::vector<juce::uint32> seenStamps;
+        juce::uint32 seenParameterSeq = 0;
+        juce::MidiBuffer midi;
+        int reportedLatency = 0;
+        std::unique_ptr<Window> window;
+        std::atomic<bool> finished { false };
+
+        //==============================================================================
+        void handleConnectionMade() override
+        {
+            juce::ValueTree hello (msg::hello);
+            hello.setProperty (msg::pid, (int) ::getpid(), nullptr);
+            sendMessageToCoordinator (encode (hello));
+        }
+
+        void handleConnectionLost() override
+        {
+            // The stand-in went, or the app died: nothing is left to serve. A plug-in
+            // that won't let go is not waited for.
+            std::thread ([] { std::this_thread::sleep_for (std::chrono::milliseconds (quitGraceMs)); std::_Exit (0); }).detach();
+            finished.store (true);
+        }
+
+        void handleMessageFromCoordinator (const juce::MemoryBlock& data) override
+        {
+            // The plug-in is only touched on the message thread (the audio aside).
+            juce::MessageManager::callAsync ([this, message = decode (data)] { handle (message); });
+        }
+
+        void reply (const juce::ValueTree& request, juce::ValueTree answer = juce::ValueTree (msg::reply))
+        {
+            answer.setProperty (msg::id, request[msg::id], nullptr);
+            sendMessageToCoordinator (encode (answer));
+        }
+
+        void handle (const juce::ValueTree& m)
+        {
+            if (m.hasType (msg::load))
+            {
+                load (m);
+                return;
+            }
+
+            if (plugin == nullptr)
+            {
+                reply (m);
+                return;
+            }
+
+            // Values set since the last audio block come first: a state saved now
+            // has them, and one restored now isn't overwritten by them later.
+            applyPendingParameters();
+
+            if (m.hasType (msg::prepare))
+            {
+                const juce::ScopedLock lock (processLock);
+                plugin->setRateAndBufferSizeDetails ((double) m[msg::rate], (int) m[msg::block]);
+                plugin->prepareToPlay ((double) m[msg::rate], (int) m[msg::block]);
+                midi.ensureSize (SharedBlock::midiBytes);
+                prepared = true;
+                reply (m);
+            }
+            else if (m.hasType (msg::release))
+            {
+                const juce::ScopedLock lock (processLock);
+                plugin->releaseResources();
+                prepared = false;
+            }
+            else if (m.hasType (msg::getState))
+            {
+                juce::MemoryBlock state;
+                plugin->getStateInformation (state);
+                juce::ValueTree answer (msg::reply);
+                answer.setProperty (msg::data, state, nullptr);
+                reply (m, answer);
+            }
+            else if (m.hasType (msg::setState))
+            {
+                const auto state = binaryOf (m[msg::data]);
+                plugin->setStateInformation (state.getData(), (int) state.getSize());
+
+                juce::ValueTree answer (msg::reply);
+
+                for (int i = 0; i < parameters.size(); ++i)
+                    answer.appendChild (describeValue (i, true), nullptr);
+
+                reply (m, answer);
+            }
+            else if (m.hasType (msg::program))
+            {
+                plugin->setCurrentProgram ((int) m[msg::index]);
+                markAll (byPlugin);
+            }
+            else if (m.hasType (msg::showEditor))
+            {
+                showWindow();
+            }
+        }
+
+        void load (const juce::ValueTree& m)
+        {
+            juce::PluginDescription desc;
+
+            if (auto xml = juce::parseXML (m[msg::description].toString()); xml == nullptr || ! desc.loadFromXml (*xml))
+                return fail (m, "The sandbox couldn't read the plug-in's description");
+
+            mapped = std::make_unique<juce::MemoryMappedFile> (juce::File (m[msg::shared].toString()),
+                                                               juce::MemoryMappedFile::readWrite);
+
+            if (mapped->getData() == nullptr || mapped->getSize() < sizeof (SharedBlock) || ! wake.open (m[msg::semaphore].toString()))
+                return fail (m, "The sandbox couldn't share memory with Resamper");
+
+            shared = static_cast<SharedBlock*> (mapped->getData());
+
+            formats.createPluginInstanceAsync (desc, (double) m[msg::rate], (int) m[msg::block],
+                                               [this, m] (std::unique_ptr<juce::AudioPluginInstance> instance, const juce::String& error)
+            {
+                if (instance == nullptr)
+                    return fail (m, error.isNotEmpty() ? error : juce::String ("The plug-in didn't load"));
+
+                loaded (m, std::move (instance));
+            });
+        }
+
+        void fail (const juce::ValueTree& request, const juce::String& error)
+        {
+            juce::ValueTree answer (msg::reply);
+            answer.setProperty (msg::error, error, nullptr);
+            reply (request, answer);
+        }
+
+        void loaded (const juce::ValueTree& request, std::unique_ptr<juce::AudioPluginInstance> instance)
+        {
+            plugin = std::move (instance);
+            plugin->enableAllBuses();
+            plugin->addListener (this);
+            parameters = plugin->getParameters();
+
+            if (parameters.size() > SharedBlock::maxParameters)
+                parameters.resize (SharedBlock::maxParameters);
+
+            dirty = std::make_unique<std::atomic<juce::uint8>[]> ((size_t) juce::jmax (1, parameters.size()));
+            seenStamps.assign ((size_t) parameters.size(), 0);
+
+            for (int i = 0; i < parameters.size(); ++i)
+            {
+                dirty[(size_t) i].store (0);
+                parameters[i]->addListener (this);
+            }
+
+            reportedLatency = plugin->getLatencySamples();
+
+            juce::ValueTree answer (msg::reply);
+            answer.setProperty (msg::inputs, plugin->getMainBusNumInputChannels(), nullptr);
+            answer.setProperty (msg::outputs, plugin->getMainBusNumOutputChannels(), nullptr);
+            answer.setProperty (msg::acceptsMidi, plugin->acceptsMidi(), nullptr);
+            answer.setProperty (msg::producesMidi, plugin->producesMidi(), nullptr);
+            answer.setProperty (msg::midiEffect, plugin->isMidiEffect(), nullptr);
+            answer.setProperty (msg::tail, plugin->getTailLengthSeconds(), nullptr);
+            answer.setProperty (msg::latency, reportedLatency, nullptr);
+            answer.setProperty (msg::current, plugin->getCurrentProgram(), nullptr);
+
+            for (int i = 0; i < parameters.size(); ++i)
+            {
+                auto* p = parameters[i];
+                auto info = describeValue (i, false);
+                info.setProperty (msg::name, p->getName (1024), nullptr);
+                info.setProperty (msg::label, p->getLabel(), nullptr);
+                info.setProperty (msg::defaultValue, p->getDefaultValue(), nullptr);
+                info.setProperty (msg::steps, p->getNumSteps(), nullptr);
+                info.setProperty (msg::discrete, p->isDiscrete(), nullptr);
+                info.setProperty (msg::boolean, p->isBoolean(), nullptr);
+                info.setProperty (msg::automatable, p->isAutomatable(), nullptr);
+
+                if (auto* hosted = dynamic_cast<juce::HostedAudioProcessorParameter*> (p))
+                    info.setProperty (msg::parameterId, hosted->getParameterID(), nullptr);
+
+                answer.appendChild (info, nullptr);
+            }
+
+            for (int i = 0; i < plugin->getNumPrograms(); ++i)
+            {
+                juce::ValueTree program (msg::programName);
+                program.setProperty (msg::name, plugin->getProgramName (i), nullptr);
+                answer.appendChild (program, nullptr);
+            }
+
+            audioThread = std::make_unique<AudioThread> (*this);
+            audioThread->startThread (juce::Thread::Priority::highest);
+            startTimer (reportMs);
+            reply (request, answer);
+        }
+
+        juce::ValueTree describeValue (int index, bool fromPlugin) const
+        {
+            auto* p = parameters[index];
+            juce::ValueTree info (msg::parameter);
+            info.setProperty (msg::index, index, nullptr);
+            info.setProperty (msg::value, p->getValue(), nullptr);
+            info.setProperty (msg::text, (p->getText (p->getValue(), 1024) + " " + p->getLabel()).trim(), nullptr);
+            info.setProperty (msg::fromPlugin, fromPlugin, nullptr);
+            return info;
+        }
+
+        void markAll (Dirty how)
+        {
+            for (int i = 0; i < parameters.size(); ++i)
+                dirty[(size_t) i].fetch_or (how);
+        }
+
+        void showWindow()
+        {
+            if (window == nullptr)
+            {
+                auto* editor = plugin->createEditorAndMakeActive();
+
+                if (editor == nullptr)
+                    editor = new juce::GenericAudioProcessorEditor (*plugin);
+
+                window = std::make_unique<Window> (plugin->getName(), editor);
+            }
+
+            window->setVisible (true);
+            juce::Process::makeForegroundProcess();
+            window->toFront (true);
+        }
+
+        //==============================================================================
+        /** On the audio thread: the block the stand-in published. */
+        void processRequest()
+        {
+            auto& block = *shared;
+            const auto request = block.requestSeq.load (std::memory_order_acquire);
+
+            if (request == block.responseSeq.load (std::memory_order_relaxed))
+                return;
+
+            {
+                const juce::ScopedLock lock (processLock);
+                applyParameters();
+
+                if (prepared)
+                {
+                    const auto length = juce::jlimit (0, SharedBlock::maxSamples, (int) block.numSamples);
+                    const auto needed = juce::jmax (plugin->getTotalNumInputChannels(), plugin->getTotalNumOutputChannels());
+                    const auto channels = juce::jlimit (0, SharedBlock::maxChannels, juce::jmax ((int) block.numChannels, needed));
+                    float* pointers[SharedBlock::maxChannels];
+
+                    for (int c = 0; c < channels; ++c)
+                    {
+                        pointers[c] = block.audio[c];
+
+                        if (c >= block.numChannels)
+                            juce::FloatVectorOperations::clear (pointers[c], length);
+                    }
+
+                    juce::AudioBuffer<float> buffer (pointers, channels, length);
+                    midi.clear();
+                    readMidi (block.midiIn, juce::jlimit (0, SharedBlock::midiBytes, (int) block.midiInBytes), midi, 0);
+                    plugin->processBlock (buffer, midi);
+                    block.midiOutBytes = writeMidi (midi, 0, length, block.midiOut, SharedBlock::midiBytes);
+                }
+            }
+
+            block.responseSeq.store (request, std::memory_order_release);
+        }
+
+        /** The values the stand-in set since the last block. */
+        void applyParameters()
+        {
+            auto& block = *shared;
+            const auto seq = block.parameterSeq.load (std::memory_order_acquire);
+
+            if (seq == seenParameterSeq)
+                return;
+
+            seenParameterSeq = seq;
+
+            for (int i = 0; i < parameters.size(); ++i)
+            {
+                const auto stamp = block.parameterStamps[i].load (std::memory_order_acquire);
+
+                if (stamp != seenStamps[(size_t) i])
+                {
+                    seenStamps[(size_t) i] = stamp;
+                    parameters[i]->setValue (block.parameterValues[i].load (std::memory_order_relaxed));
+                    dirty[(size_t) i].fetch_or (byHost);
+                }
+            }
+        }
+
+        /** Off the audio thread: the values the stand-in set, applied now rather than at the next block. */
+        void applyPendingParameters()
+        {
+            const juce::ScopedLock lock (processLock);
+            applyParameters();
+        }
+
+        void stopAudio()
+        {
+            if (audioThread != nullptr)
+            {
+                audioThread->signalThreadShouldExit();
+                wake.post();
+                audioThread->stopThread (quitGraceMs);
+            }
+        }
+
+        //==============================================================================
+        /** Reports what changed: values the plug-in changed itself, and every changed value's text. */
+        void timerCallback() override
+        {
+            // Stopped, no audio blocks come: what the stand-in set still reaches the plug-in.
+            applyPendingParameters();
+
+            juce::ValueTree report (msg::parameters);
+
+            for (int i = 0; i < parameters.size(); ++i)
+                if (const auto how = dirty[(size_t) i].exchange (0); how != 0)
+                    report.appendChild (describeValue (i, (how & byPlugin) != 0), nullptr);
+
+            if (report.getNumChildren() > 0)
+                sendMessageToCoordinator (encode (report));
+        }
+
+        void parameterValueChanged (int index, float) override
+        {
+            if (juce::isPositiveAndBelow (index, parameters.size()))
+                dirty[(size_t) index].fetch_or (byPlugin);
+        }
+
+        void parameterGestureChanged (int index, bool starting) override
+        {
+            juce::ValueTree gesture (msg::gesture);
+            gesture.setProperty (msg::index, index, nullptr);
+            gesture.setProperty (msg::starting, starting, nullptr);
+            sendMessageToCoordinator (encode (gesture));
+        }
+
+        void audioProcessorParameterChanged (juce::AudioProcessor*, int, float) override {}
+
+        void audioProcessorChanged (juce::AudioProcessor* processor, const ChangeDetails& details) override
+        {
+            if (! details.latencyChanged || processor == nullptr || processor->getLatencySamples() == reportedLatency)
+                return;
+
+            reportedLatency = processor->getLatencySamples();
+            juce::ValueTree latency (msg::latency);
+            latency.setProperty (msg::samples, reportedLatency, nullptr);
+            sendMessageToCoordinator (encode (latency));
+        }
+
+        JUCE_DECLARE_NON_COPYABLE (Host)
+    };
+}
+#endif
+
+//==============================================================================
+PluginSandbox::PluginSandbox()
+{
+   #if RESAMPER_SANDBOX
+    // What a sandbox host knows: the default formats (runHost adds its extra ones).
+    juce::AudioPluginFormatManager defaults;
+    juce::addDefaultFormatsToManager (defaults);
+
+    for (auto* format : defaults.getFormats())
+        hostedFormats.addIfNotAlreadyThere (format->getName());
+   #endif
+}
+
+PluginSandbox::~PluginSandbox()
+{
+    masterReference.clear();
+}
+
+bool PluginSandbox::isHost (int argc, const char* const* argv)
+{
+    return argc >= 2 && juce::String (argv[1]).startsWith ("--" + juce::String (hostId) + ":");
+}
+
+int PluginSandbox::runHost (int argc, const char* const* argv, std::vector<std::unique_ptr<juce::AudioPluginFormat>> extraFormats)
+{
+   #if RESAMPER_SANDBOX
+    if (! isHost (argc, argv))
+        return 2;
+
+   #if JUCE_MAC
+    juce::Process::setDockIconVisible (false);
+   #endif
+
+    Host host (std::move (extraFormats));
+
+    if (! host.initialiseFromCommandLine (argv[1], hostId))
+        return 3;
+
+    // Not runDispatchLoop: run outside an app bundle, [NSApp run] can return at once.
+    auto* messages = juce::MessageManager::getInstance();
+
+    while (! host.isFinished())
+        messages->runDispatchLoopUntil (dispatchMs);
+
+    return 0;
+   #else
+    juce::ignoreUnused (argc, argv, extraFormats);
+    return 2;
+   #endif
+}
+
+void PluginSandbox::addHostedFormat (const juce::String& formatName)
+{
+   #if RESAMPER_SANDBOX
+    hostedFormats.addIfNotAlreadyThere (formatName);
+   #else
+    juce::ignoreUnused (formatName);
+   #endif
+}
+
+bool PluginSandbox::canHost (const juce::PluginDescription& desc) const
+{
+    return hostedFormats.contains (desc.pluginFormatName);
+}
+
+std::unique_ptr<juce::AudioPluginInstance> PluginSandbox::createInstance (const juce::PluginDescription& desc, double sampleRate,
+                                                                           int blockSize, const juce::String& pluginId,
+                                                                           juce::String& error)
+{
+   #if RESAMPER_SANDBOX
+    auto remote = std::make_unique<Remote>();
+
+    if (! remote->createShared())
+    {
+        error = "The sandbox couldn't share memory with its host";
+        return {};
+    }
+
+    // No output streams: an unread pipe fills up and stalls the host.
+    if (! remote->launchWorkerProcess (executable(), hostId, 0, 0))
+    {
+        error = "The plug-in's sandbox didn't start";
+        return {};
+    }
+
+    juce::ValueTree load (msg::load);
+
+    if (auto xml = desc.createXml())
+        load.setProperty (msg::description, xml->toString(), nullptr);
+
+    load.setProperty (msg::shared, remote->getSharedFile().getFullPathName(), nullptr);
+    load.setProperty (msg::semaphore, remote->getSemaphoreName(), nullptr);
+    load.setProperty (msg::rate, sampleRate, nullptr);
+    load.setProperty (msg::block, blockSize, nullptr);
+
+    const auto loaded = remote->request (load, loadTimeoutMs);
+    remote->releaseNames();
+
+    if (! loaded.isValid())
+    {
+        error = remote->dead.load() ? desc.name + " crashed while loading in its sandbox"
+                                    : desc.name + " didn't load in its sandbox within "
+                                          + juce::String (loadTimeoutMs / 1000) + " s";
+        return {};
+    }
+
+    if (loaded.hasProperty (msg::error))
+    {
+        error = loaded[msg::error].toString();
+        return {};
+    }
+
+    return std::make_unique<Instance> (*this, desc, pluginId, std::move (remote), loaded);
+   #else
+    juce::ignoreUnused (desc, sampleRate, blockSize, pluginId);
+    error = "Plug-ins can't run sandboxed on this platform";
+    return {};
+   #endif
+}
+
+bool PluginSandbox::isSandboxed (const juce::AudioProcessor* processor)
+{
+   #if RESAMPER_SANDBOX
+    return dynamic_cast<const Instance*> (processor) != nullptr;
+   #else
+    juce::ignoreUnused (processor);
+    return false;
+   #endif
+}
+
+bool PluginSandbox::hasCrashed (const juce::AudioProcessor* processor)
+{
+   #if RESAMPER_SANDBOX
+    auto* instance = dynamic_cast<const Instance*> (processor);
+    return instance != nullptr && instance->hasCrashed();
+   #else
+    juce::ignoreUnused (processor);
+    return false;
+   #endif
+}
+
+bool PluginSandbox::showOwnEditor (juce::AudioProcessor* processor)
+{
+   #if RESAMPER_SANDBOX
+    auto* instance = dynamic_cast<Instance*> (processor);
+
+    if (instance == nullptr || instance->hasCrashed())
+        return false;
+
+    instance->showOwnEditor();
+    return true;
+   #else
+    juce::ignoreUnused (processor);
+    return false;
+   #endif
+}
+
+void PluginSandbox::willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed)
+{
+    constexpr size_t maxRemembered = 64;
+    const std::scoped_lock lock (loadingLock);
+
+    loading.erase (std::remove_if (loading.begin(), loading.end(), [&] (const Loading& l) { return l.identifier == identifier; }),
+                   loading.end());
+
+    // A load the engine took elsewhere (asynchronously) never comes back for its entry.
+    if (loading.size() >= maxRemembered)
+        loading.erase (loading.begin());
+
+    loading.push_back ({ identifier, pluginId, sandboxed });
+}
+
+bool PluginSandbox::takeLoading (const juce::String& identifier, juce::String& pluginId, bool& sandboxed)
+{
+    const std::scoped_lock lock (loadingLock);
+
+    for (auto it = loading.begin(); it != loading.end(); ++it)
+    {
+        if (it->identifier == identifier)
+        {
+            pluginId = it->pluginId;
+            sandboxed = it->sandboxed;
+            loading.erase (it);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void PluginSandbox::addListener (Listener* l)      { listeners.add (l); }
+void PluginSandbox::removeListener (Listener* l)   { listeners.remove (l); }
+
+void PluginSandbox::crashed (const juce::String& pluginId)
+{
+    listeners.call ([&] (Listener& l) { l.pluginCrashed (pluginId); });
+}
+
+} // namespace resamper

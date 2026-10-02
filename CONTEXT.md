@@ -137,6 +137,10 @@ _Avoid_: using "plug-in" for Native Devices
 The floating window that shows one Plug-in's own UI inside Resamper's window frame.
 _Avoid_: plug-in editor, vendor window
 
+**Sandbox**:
+The separate process a Plug-in runs in by default (one per instance), so a crash takes down only that Plug-in: its audio is bypassed, the rest of the session plays on, and **Reload** starts it again from its last saved state. A Plug-in can be set to run in-process instead (**Run in-process**), per instance, saved with the project.
+_Avoid_: bridge, out-of-process host (for the concept; fine for the mechanism)
+
 **Device Chain**:
 A track's sound: its instrument (on a MIDI track), Racks and creative effects, in order, edited only in the Detail View. It runs before the Mixer Inserts. A MIDI track has one instrument; adding an instrument replaces the current one. A Bus's chain and the Master's rack are also Device Chains.
 _Avoid_: Track chain (only the mixer strip's read-only label for it), bus chain, master rack, insert chain

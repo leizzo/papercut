@@ -118,6 +118,11 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         host.report (rack.reload (a.pluginId));
     });
 
+    registry.add (cmd::pluginSetSandboxed, { "Run Plug-in Sandboxed" }, [&rack, &host] (const PluginSandboxArgs& a)
+    {
+        host.report (rack.setSandboxed (a.pluginId, a.sandboxed));
+    });
+
     registry.add (cmd::pluginSelectPreset, { "Select Preset" }, [&rack, &host] (const PluginPresetArgs& a)
     {
         host.report (rack.selectPreset (a.pluginId, a.index));

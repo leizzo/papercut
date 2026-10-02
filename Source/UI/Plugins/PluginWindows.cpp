@@ -19,6 +19,7 @@ PluginWindows::PluginWindows (ApplicationModel& m, PluginRack& r, CommandRegistr
     : model (m), rack (r), commands (c), themeManager (tm), preferences (p)
 {
     model.addListener (this);
+    rack.addListener (this);
     preferences.getState().addListener (this);
     startTimer (displayCheckMs);
 }
@@ -26,6 +27,7 @@ PluginWindows::PluginWindows (ApplicationModel& m, PluginRack& r, CommandRegistr
 PluginWindows::~PluginWindows()
 {
     preferences.getState().removeListener (this);
+    rack.removeListener (this);
     model.removeListener (this);
 }
 
@@ -84,20 +86,13 @@ std::unique_ptr<PluginWindow> PluginWindows::createWindow (const PluginInfo& inf
 
     window->onToggleAll = [this] { toggleAll(); };
 
+    // The error state's Run in-process: this instance leaves its sandbox, saved with the project.
     window->onRunInProcess = [this, id]
     {
-        if (onRunInProcess)
-        {
-            onRunInProcess (id);
-        }
-        else
-        {
-            // Every plug-in is in-process until the sandbox lands: a fresh start is all there is.
-            commands.invoke (cmd::pluginReload, { {}, id });
+        commands.invoke (cmd::pluginSetSandboxed, { id, false });
 
-            if (auto* w = getWindow (id))
-                w->retryLoading();
-        }
+        if (auto* w = getWindow (id))
+            w->retryLoading();
     };
 
     return window;
@@ -107,7 +102,8 @@ void PluginWindows::open (const juce::String& pluginId, bool focus)
 {
     const auto info = rack.getPlugin (pluginId);
 
-    if (! info.has_value() || info->missing)
+    // A missing plug-in has nothing to show; a crashed one is reloaded from its card first.
+    if (! info.has_value() || info->missing || info->crashed)
         return;
 
     if (auto existing = windows.find (pluginId); existing != windows.end())
@@ -252,6 +248,31 @@ void PluginWindows::setPinned (const juce::String& pluginId, bool pinned)
         saveState (*window, true);
         refresh();
     }
+}
+
+void PluginWindows::pluginCrashed (const juce::String& pluginId)
+{
+    const auto info = rack.getPlugin (pluginId);
+
+    if (! info.has_value())
+        return;
+
+    // Its window goes (§9.6 Crash); the card turns red with Reload.
+    if (isOpen (pluginId))
+        close (pluginId);
+
+    if (! showToast)
+        return;
+
+    std::vector<Toasts::Action> actions;
+    actions.push_back ({ "Reload", [this, trackId = info->trackId, pluginId] (bool)
+    {
+        commands.invoke (cmd::pluginReload, { trackId, pluginId });
+    }, std::nullopt });
+
+    showToast (info->name + " crashed on " + trackNameOf (info->trackId) + " " + middleDot
+                   + " its audio is bypassed; the rest plays on",
+               std::move (actions));
 }
 
 void PluginWindows::pluginAdded (const juce::String& trackId, const juce::String& pluginId)

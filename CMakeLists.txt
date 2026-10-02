@@ -41,6 +41,7 @@ add_library(resamper_engine STATIC
     Source/Engine/ClipWaveform.cpp
     Source/Engine/Production.cpp
     Source/Engine/PluginRack.cpp
+    Source/Engine/PluginSandbox.cpp
     Source/Engine/PluginScanner.cpp
     Source/Engine/Mixer.cpp
     Source/Engine/Session.cpp
@@ -246,6 +247,7 @@ target_sources(ResamperTests PRIVATE
     Tests/ComponentFactoryTests.cpp
     Tests/ProductionTests.cpp
     Tests/PluginRackTests.cpp
+    Tests/PluginSandboxTests.cpp
     Tests/MixerTests.cpp
     Tests/SessionTests.cpp
     Tests/AutomationTests.cpp

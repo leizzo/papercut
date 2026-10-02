@@ -1,5 +1,7 @@
 #include "PluginRack.h"
 #include "EditTracks.h"
+#include "EngineManager.h"
+#include "PluginSandbox.h"
 #include "PluginScanner.h"
 #include "ProjectManager.h"
 
@@ -156,6 +158,24 @@ namespace
         return info;
     }
 
+    /** Whether the catalogue knows the plug-in (by its identifier or its file). */
+    bool isKnown (te::ExternalPlugin& plugin)
+    {
+        auto& known = plugin.engine.getPluginManager().knownPluginList;
+        return known.getTypeForIdentifierString (plugin.desc.createIdentifierString()) != nullptr
+            || known.getTypeForFile (plugin.desc.fileOrIdentifier) != nullptr;
+    }
+
+    /** Missing: no instance, and not installed. One the catalogue knows that
+        failed to load (its sandbox died or timed out) isn't: it has a load error. */
+    bool isMissing (te::Plugin& plugin)
+    {
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (&plugin))
+            return external->isMissing() && ! isKnown (*external);
+
+        return plugin.isMissing();
+    }
+
     PluginInfo infoFromPlugin (te::Plugin& plugin)
     {
         PluginInfo info;
@@ -176,6 +196,8 @@ namespace
             info.external = true;
             info.pinnedParameters = pinsOf (plugin);
             info.pinnedParameters.removeEmptyStrings();
+            info.sandboxed = PluginSandbox::isSandboxed (external->getAudioPluginInstance());
+            info.crashed = PluginSandbox::hasCrashed (external->getAudioPluginInstance());
         }
         else
         {
@@ -187,7 +209,7 @@ namespace
         info.midiEffect = isMidiEffect (plugin);
         info.chain = chainOf (plugin);
         info.enabled = plugin.isEnabled();
-        info.missing = plugin.isMissing();
+        info.missing = isMissing (plugin);
         info.presetName = plugin.state[presetProperty].toString();
         info.abSlot = (int) plugin.state[abSlotProperty] == 1 ? 1 : 0;
 
@@ -355,7 +377,25 @@ struct PluginRack::ScanThread : juce::Thread
     PluginRack& rack;
 };
 
-PluginRack::PluginRack (ProjectManager& pm) : projectManager (pm)
+/** Hears the engine's sandbox, and passes on the crashes of this rack's plug-ins. */
+struct PluginRack::CrashWatch : PluginSandbox::Listener
+{
+    CrashWatch (PluginRack& r, PluginSandbox& s) : rack (r), sandbox (s)   { sandbox.addListener (this); }
+    ~CrashWatch() override                                                { sandbox.removeListener (this); }
+
+    void pluginCrashed (const juce::String& pluginId) override
+    {
+        if (rack.contains (pluginId))
+            rack.listeners.call ([&] (PluginRack::Listener& l) { l.pluginCrashed (pluginId); });
+    }
+
+    PluginRack& rack;
+    PluginSandbox& sandbox;
+};
+
+PluginRack::PluginRack (ProjectManager& pm)
+    : projectManager (pm),
+      crashWatch (std::make_unique<CrashWatch> (*this, pm.getEngineManager().getPluginSandbox()))
 {
     installScanner (PluginScanner::defaultTimeoutMs);
     publishExternalSnapshot();
@@ -363,8 +403,12 @@ PluginRack::PluginRack (ProjectManager& pm) : projectManager (pm)
 
 PluginRack::~PluginRack()
 {
+    crashWatch.reset();
     stopScan();
 }
+
+void PluginRack::addListener (Listener* l)      { listeners.add (l); }
+void PluginRack::removeListener (Listener* l)   { listeners.remove (l); }
 
 void PluginRack::stopScan()
 {
@@ -540,14 +584,10 @@ void PluginRack::runScan()
 
 void PluginRack::reloadMissing()
 {
-    auto& edit = projectManager.getEdit();
-    auto& known = edit.engine.getPluginManager().knownPluginList;
-
-    for (auto* plugin : te::getAllPlugins (edit, false))
-        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin); external != nullptr && external->isMissing())
-            if (known.getTypeForIdentifierString (external->desc.createIdentifierString()) != nullptr
-                || known.getTypeForFile (external->desc.fileOrIdentifier) != nullptr)
-                external->forceFullReinitialise();
+    for (auto* plugin : te::getAllPlugins (projectManager.getEdit(), false))
+        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin);
+            external != nullptr && external->isMissing() && isKnown (*external))
+            external->forceFullReinitialise();
 }
 
 juce::StringArray PluginRack::getHostedFormats() const
@@ -1168,8 +1208,42 @@ juce::Result PluginRack::reload (const juce::String& pluginId)
     if (external == nullptr)
         return juce::Result::fail ("Only a plug-in can be reloaded");
 
-    external->forceFullReinitialise();
+    // An instance (a crashed one too) goes first: processing off and on again
+    // creates a new one from the state saved on the plug-in. Neither is an undo
+    // step. The plug-in may hear the property before its cached value follows,
+    // so it is told again once the value has.
+    if (external->getAudioPluginInstance() != nullptr)
+    {
+        for (auto processing : { false, true })
+        {
+            external->state.setProperty (te::IDs::process, processing, nullptr);
+            external->processingChanged();
+        }
+    }
+    else
+    {
+        external->forceFullReinitialise();
+    }
+
     return juce::Result::ok();
+}
+
+juce::Result PluginRack::setSandboxed (const juce::String& pluginId, bool sandboxed)
+{
+    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
+
+    if (dynamic_cast<te::ExternalPlugin*> (plugin.get()) == nullptr)
+        return juce::Result::fail ("Only a plug-in runs in a sandbox");
+
+    // Saved on the plug-in, as how it runs, not what it is: never an undo step.
+    const juce::Identifier inProcess (PluginSandbox::inProcessProperty);
+
+    if (sandboxed)
+        plugin->state.removeProperty (inProcess, nullptr);
+    else
+        plugin->state.setProperty (inProcess, true, nullptr);
+
+    return reload (pluginId);
 }
 
 namespace
