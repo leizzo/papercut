@@ -188,6 +188,41 @@ namespace
 
     constexpr int stateTimeoutMs = 3000, prepareTimeoutMs = 5000, offlineDeadlineMs = 5000, reportMs = 100,
                   quitGraceMs = 2000, hostSetGraceMs = 300, dispatchMs = 50, maxLoaders = 8;
+
+    /** Audio blocks the device has finished (PluginSandbox::audioBlockFinished). */
+    std::atomic<juce::uint32> blocksFinished { 0 };
+
+    /** When the host's answer to a block is due, on the audio thread: 75 % of the
+        block's time from the first sandboxed plug-in this thread runs in the block.
+        The plug-ins after it in a chain share what is left, so a chain waits for a
+        block's time at most, not that much for each of its plug-ins (#135). A new
+        block starts with the device's next one, or when a plug-in comes round again
+        (each runs once a block), or once a block's time has passed. lastBlock is
+        the caller's: the block it last waited in. */
+    juce::int64 answerDeadline (int numSamples, double sampleRate, juce::uint64& lastBlock) noexcept
+    {
+        thread_local juce::int64 started = 0;
+        thread_local juce::uint32 deviceBlock = 0;
+        thread_local juce::uint64 block = 0;
+
+        const auto now = juce::Time::getHighResolutionTicks();
+        const auto length = juce::Time::secondsToHighResolutionTicks (numSamples / sampleRate);
+        const auto finished = blocksFinished.load (std::memory_order_relaxed);
+
+        if (finished != deviceBlock || lastBlock == block || now - started >= length)
+        {
+            deviceBlock = finished;
+            started = now;
+            ++block;
+        }
+
+        lastBlock = block;
+        return started + length * 3 / 4;
+    }
+
+    /** How long a stand-in spins for the host's answer before it polls it in short sleeps
+        instead: most hosts answer a light plug-in's block within this. */
+    constexpr double spinSeconds = 0.0002, pollSeconds = 0.00005;
 }
 
 #if RESAMPER_SANDBOX
@@ -703,6 +738,7 @@ private:
     int currentProgram = 0;
     std::atomic<bool> prepared { false };
     juce::MidiBuffer outMidi;
+    juce::uint64 lastWaitBlock = 0;   ///< on the audio thread: the block it last waited for its host in (answerDeadline)
     std::mutex stateLock;
     juce::MemoryBlock lastState;
     juce::WeakReference<Instance> self;
@@ -745,18 +781,27 @@ private:
         block.requestSeq.store (request, std::memory_order_release);
         remote->wakeHost();
 
-        // Realtime, the host gets most of the block's time; offline (a render), as long as it needs.
+        // Realtime, the host gets most of the block's time (shared along a chain);
+        // offline (a render), as long as it needs.
         const auto rate = getSampleRate() > 0 ? getSampleRate() : 44100.0;
-        const auto allowedSeconds = isNonRealtime() ? offlineDeadlineMs / 1000.0 : 0.75 * length / rate;
-        const auto deadline = juce::Time::getHighResolutionTicks()
-                            + juce::Time::secondsToHighResolutionTicks (allowedSeconds);
+        const auto sent = juce::Time::getHighResolutionTicks();
+        const auto deadline = isNonRealtime() ? sent + juce::Time::secondsToHighResolutionTicks (offlineDeadlineMs / 1000.0)
+                                              : answerDeadline (length, rate, lastWaitBlock);
+        const auto spinUntil = sent + juce::Time::secondsToHighResolutionTicks (spinSeconds);
 
+        // A short spin catches a quick answer at once; after it, short sleeps leave
+        // the core to others (the host among them) instead of burning it.
         while (block.responseSeq.load (std::memory_order_acquire) != request)
         {
-            if (remote->dead.load() || juce::Time::getHighResolutionTicks() > deadline)
+            const auto now = juce::Time::getHighResolutionTicks();
+
+            if (remote->dead.load() || now > deadline)
                 return false;
 
-            std::this_thread::yield();
+            if (now < spinUntil)
+                std::this_thread::yield();
+            else
+                std::this_thread::sleep_for (std::chrono::duration<double> (pollSeconds));
         }
 
         for (int c = 0; c < channels; ++c)
@@ -1321,8 +1366,14 @@ namespace
                 answer.appendChild (program, nullptr);
             }
 
+            // A real-time thread, as the app's audio thread is: a normal one, however high its
+            // priority, can be put aside on a busy system and miss the block (#135).
             audioThread = std::make_unique<AudioThread> (*this);
-            audioThread->startThread (juce::Thread::Priority::highest);
+            const auto rate = juce::jmax (8000.0, (double) request[msg::rate]);
+            const auto blockSize = juce::jlimit (16, SharedBlock::maxSamples, (int) request[msg::block]);
+
+            if (! audioThread->startRealtimeThread (juce::Thread::RealtimeOptions{}.withApproximateAudioProcessingTime (blockSize, rate)))
+                audioThread->startThread (juce::Thread::Priority::highest);
 
             startTimer (reportMs);
             reply (request, answer);
@@ -1801,6 +1852,11 @@ std::unique_ptr<juce::AudioPluginInstance> PluginSandbox::createInstance (const 
     error = "Plug-ins can't run sandboxed on this platform";
     return {};
    #endif
+}
+
+void PluginSandbox::audioBlockFinished() noexcept
+{
+    blocksFinished.fetch_add (1, std::memory_order_relaxed);
 }
 
 bool PluginSandbox::isSandboxed (const juce::AudioProcessor* processor)

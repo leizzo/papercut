@@ -23,9 +23,11 @@ namespace resamper
     How the two talk:
     - audio and MIDI go through a block of shared memory (a mapped temp file)
       both processes map. Each audio block the stand-in copies its input in,
-      wakes the host (a named semaphore) and spins until the host is done or
-      the block's time is up: no extra latency, two context switches a block.
-      A late or dead host costs that block only: it passes through (bypassed).
+      wakes the host (a named semaphore) and waits until the host is done or
+      the block's time is up: a short spin, then short sleeps. The plug-ins of
+      a chain share one block's time; the host processes on a real-time thread.
+      No extra latency, two context switches a block. A late or dead host costs
+      that block only: it passes through (bypassed).
     - parameter values the host sets go through the shared block too, read by
       the host at its next audio block; the plug-in's own changes (its UI) and
       the text it shows come back as messages, ten times a second at most.
@@ -103,6 +105,11 @@ public:
         couldn't load it, or it hasn't finished loading. */
     std::unique_ptr<juce::AudioPluginInstance> createInstance (const juce::PluginDescription&, const juce::String& pluginId,
                                                                juce::String& error);
+
+    /** The audio device has finished a block (on its thread, after the engine's
+        processing): the sandboxed plug-ins of the next block share a fresh share
+        of its time to wait for their hosts in. Wait-free. */
+    static void audioBlockFinished() noexcept;
 
     /** Whether the instance is a sandboxed plug-in's stand-in. */
     static bool isSandboxed (const juce::AudioProcessor*);

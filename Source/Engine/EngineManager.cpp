@@ -74,6 +74,25 @@ namespace
         });
     }
 
+    /** On the audio device, beside the engine: each block it has finished, the sandbox hears. */
+    class BlockClock final : public juce::AudioIODeviceCallback
+    {
+    public:
+        void audioDeviceIOCallbackWithContext (const float* const*, int, float* const* outputs, int numOutputs,
+                                               int numSamples, const juce::AudioIODeviceCallbackContext&) override
+        {
+            // What a callback writes is mixed into the device's output: nothing, here.
+            for (int i = 0; i < numOutputs; ++i)
+                if (outputs[i] != nullptr)
+                    juce::FloatVectorOperations::clear (outputs[i], numSamples);
+
+            PluginSandbox::audioBlockFinished();
+        }
+
+        void audioDeviceAboutToStart (juce::AudioIODevice*) override {}
+        void audioDeviceStopped() override {}
+    };
+
     class ResamperEngineBehaviour : public te::EngineBehaviour
     {
     public:
@@ -147,6 +166,7 @@ namespace
 EngineManager::EngineManager (const juce::String& applicationName, AudioDevice audioDevice)
     : thumbnailPriority (std::make_unique<NormalPriority>()),
       sandbox (std::make_unique<PluginSandbox>()),
+      blockClock (std::make_unique<BlockClock>()),
       engine (std::make_unique<te::Engine> (applicationName,
                                             std::make_unique<ResamperUIBehaviour>(),
                                             std::make_unique<ResamperEngineBehaviour> (audioDevice, *sandbox)))
@@ -171,9 +191,15 @@ EngineManager::EngineManager (const juce::String& applicationName, AudioDevice a
     engine->getAudioFileManager().getAudioThumbnailCache().getTimeSliceThread().addTimeSliceClient (thumbnailPriority.get());
 
     registerNativeDevices (engine->getPluginManager());
+
+    // Added after the engine's, so it runs once the engine has processed the block.
+    engine->getDeviceManager().deviceManager.addAudioCallback (blockClock.get());
 }
 
-EngineManager::~EngineManager() = default;
+EngineManager::~EngineManager()
+{
+    engine->getDeviceManager().deviceManager.removeAudioCallback (blockClock.get());
+}
 
 te::Engine& EngineManager::getEngine() const noexcept
 {

@@ -4,6 +4,7 @@
 #include <memory>
 
 namespace tracktion::inline engine { class Engine; class ExternalPlugin; }
+namespace juce { class AudioIODeviceCallback; }
 
 namespace resamper
 {
@@ -49,6 +50,9 @@ private:
 
     // Before the engine, which creates plug-ins through it until it goes.
     std::unique_ptr<PluginSandbox> sandbox;
+
+    // Tells the sandbox when the device has finished a block; on the engine's device while both exist.
+    std::unique_ptr<juce::AudioIODeviceCallback> blockClock;
 
     std::unique_ptr<tracktion::Engine> engine;
 
