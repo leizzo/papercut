@@ -186,11 +186,21 @@ struct PluginSandboxTests : juce::UnitTest
             AsyncFormat::registerWith (f.projects.getEdit().engine.getPluginManager());
             juce::OwnedArray<juce::PluginDescription> found;
             AsyncFormat().findAllTypesForFile (found, "/Library/Audio/Plug-Ins/Components/" + name + AsyncFormat::extension);
-            desc = *found.getFirst();
-            known.addType (desc);
+            if (auto* d = found.getFirst())
+            {
+                desc = *d;
+                known.addType (desc);
+            }
         }
 
-        ~AsyncPlugin()   { known.removeType (desc); }
+        ~AsyncPlugin()
+        {
+            known.removeType (desc);
+
+            // The engine saves the list to the test run's settings when it hears of the change:
+            // now, or a later run would know a plug-in whose format it hasn't got.
+            known.dispatchPendingMessages();
+        }
 
         juce::KnownPluginList& known;
         juce::PluginDescription desc;

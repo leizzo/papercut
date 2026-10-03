@@ -344,7 +344,7 @@ juce::Result PluginHosting::reload (const juce::String& pluginId)
     auto* plugin = impl->find (pluginId);
 
     if (plugin == nullptr)
-        return juce::Result::fail ("Only a plug-in can be reloaded");
+        return juce::Result::fail ("No plug-in to reload: it isn't there, or isn't one that loads");
 
     impl->recreate (*plugin);
     return juce::Result::ok();
@@ -355,7 +355,7 @@ juce::Result PluginHosting::setSandboxed (const juce::String& pluginId, bool san
     auto* plugin = impl->find (pluginId);
 
     if (plugin == nullptr)
-        return juce::Result::fail ("Only a plug-in runs in a sandbox");
+        return juce::Result::fail ("No plug-in to run in a sandbox: it isn't there, or isn't one that loads");
 
     // Saved on the plug-in, as how it runs, not what it is: never an undo step.
     const juce::Identifier inProcess (inProcessProperty);

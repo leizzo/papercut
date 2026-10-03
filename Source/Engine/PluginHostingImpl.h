@@ -85,7 +85,8 @@ private:
         an instance, Failed (with the engine's reason) if not, unless it still creates one. */
     void settle (tracktion::ExternalPlugin&);
 
-    /** Sets the plug-in's state; Listeners hear of a change at once, or (deferred) from the message loop. */
+    /** Sets the plug-in's state. Listeners hear of a change at once, or (deferred) from the
+        message loop, through tell: a deferred change overtaken before then is heard as the newer one. */
     void setState (tracktion::ExternalPlugin&, const HostingState&, bool deferred = false);
 
     /** Tells Listeners the plug-in's state, unless it is the one they heard last. */
