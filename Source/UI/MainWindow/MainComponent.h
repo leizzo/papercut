@@ -124,7 +124,8 @@ private:
     ShortcutListener shortcuts { *this };
     int currentShortcutContext() const;
     void registerPianoRollCommands();
-    juce::TooltipWindow tooltips { this, 600 };
+    // Its own window, so a tip over a plug-in window's chrome stays above that plug-in's sandboxed UI.
+    juce::TooltipWindow tooltips { nullptr, 600 };
     std::unique_ptr<LayoutWatcher> layoutWatch;
     std::unique_ptr<LayoutWatcher> themeWatch;
     PluginWindows pluginWindows;

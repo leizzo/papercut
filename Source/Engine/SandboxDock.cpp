@@ -1,11 +1,69 @@
 #include "SandboxDock.h"
 
+namespace resamper::sandboxdock
+{
+
+void raisePopup (juce::Component&);
+void watchForPopups();
+
+namespace
+{
+    bool isPopupWindow (juce::Component& component)
+    {
+        auto* peer = component.getPeer();
+
+        if (peer == nullptr || ! component.isShowing())
+            return false;
+
+        // A menu, a tooltip, a toast: its own temporary window. A dialog (Save Preset): modal.
+        if ((peer->getStyleFlags() & juce::ComponentPeer::windowIsTemporary) != 0)
+            return true;
+
+        return component.isCurrentlyModal();
+    }
+}
+
+void orderPopupsAboveSandboxedUi()
+{
+    static bool raising = false;
+
+    if (raising)
+        return;
+
+    const juce::ScopedValueSetter<bool> guard (raising, true);
+    watchForPopups();
+
+    auto& desktop = juce::Desktop::getInstance();
+
+    for (int i = 0; i < desktop.getNumComponents(); ++i)
+        if (auto* component = desktop.getComponent (i); component != nullptr && isPopupWindow (*component))
+            raisePopup (*component);
+}
+
+} // namespace resamper::sandboxdock
+
 // macOS: SandboxDock_mac.mm. Elsewhere a plain borderless window over the
 // area; it can't be ordered by another process's window, only kept on top.
 #if ! JUCE_MAC
 
 namespace resamper::sandboxdock
 {
+
+void watchForPopups() {}
+
+void raisePopup (juce::Component& component)
+{
+    component.setAlwaysOnTop (true);
+    component.toFront (false);
+}
+
+bool isInFrontOf (const juce::Component&, juce::Rectangle<int>)
+{
+    // The host panel is another process's window, so this can't see it.
+    // Check by hand that the preset menu, Save Preset, a tooltip on the chrome,
+    // and a toast each stay above the vendor area.
+    return false;
+}
 
 WindowRef windowOf (juce::Component& component)
 {

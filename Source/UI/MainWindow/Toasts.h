@@ -11,8 +11,9 @@ namespace resamper
 /** Toasts (PRD §16.7): short notes at the bottom centre for outcomes that
     aren't obvious (and for errors, instead of modal dialogs), each gone after
     4 s, optionally with actions (Undo; a toggle such as "Auto-open window on
-    insert"). The newest sits at the bottom; at most three show. Covers its
-    parent but lets clicks through except on a toast. */
+    insert"). The newest sits at the bottom; at most three show. While any are
+    showing they float in their own window above a sandboxed plug-in's UI,
+    still at the bottom centre of the window they belong to. */
 class Toasts : public juce::Component,
                private juce::Timer
 {
@@ -36,6 +37,10 @@ public:
 
     /** A toast with any actions, in order. */
     void show (const juce::String& message, std::vector<Action> actions, bool isError = false);
+
+    /** Lays toasts out at the bottom centre of their host. While any are showing,
+        that is a window of their own above plug-in UI. */
+    void followHost();
 
     /** The messages on screen, oldest first. */
     juce::StringArray getMessages() const;
@@ -62,8 +67,13 @@ private:
 
     ThemeManager& themeManager;
     std::deque<Toast> toasts;
+    juce::Component::SafePointer<juce::Component> host;
+    juce::Rectangle<int> anchored;
+    bool placing = false;
 
-    void layoutToasts();
+    /** Bounds in the host's coordinates, from its bottom centre. */
+    void layoutToasts (int hostWidth, int hostHeight);
+    void returnToHost();
     int actionWidth (const Action&) const;
 
     /** Runs one of a toast's actions: a toggle flips and stays, anything else closes the toast first. */

@@ -10,6 +10,7 @@
 #include "Commands/TrackCommands.h"
 #include "Engine/PluginHosting.h"
 #include "Engine/PluginSandbox.h"
+#include "Engine/SandboxDock.h"
 #include "UI/MainWindow/MainComponent.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -301,6 +302,46 @@ struct PluginSandboxTests : juce::UnitTest
     {
         return f.plugins.getPlugin (pluginId);
     }
+
+#if JUCE_MAC
+    static juce::Button* findButton (juce::Component& root, const juce::String& name)
+    {
+        for (auto* child : root.getChildren())
+        {
+            if (auto* button = dynamic_cast<juce::Button*> (child); button != nullptr && button->getName() == name)
+                return button;
+
+            if (auto* found = findButton (*child, name))
+                return found;
+        }
+
+        return nullptr;
+    }
+
+    /** The open preset menu: a temporary modal window, not a tooltip or a toast. */
+    static juce::Component* findPresetMenu()
+    {
+        auto& desktop = juce::Desktop::getInstance();
+
+        for (int i = 0; i < desktop.getNumComponents(); ++i)
+        {
+            auto* c = desktop.getComponent (i);
+
+            if (c == nullptr || ! c->isShowing() || c->getPeer() == nullptr)
+                continue;
+
+            if ((c->getPeer()->getStyleFlags() & juce::ComponentPeer::windowIsTemporary) == 0 || ! c->isCurrentlyModal())
+                continue;
+
+            if (dynamic_cast<juce::TooltipWindow*> (c) != nullptr || dynamic_cast<Toasts*> (c) != nullptr)
+                continue;
+
+            return c;
+        }
+
+        return nullptr;
+    }
+#endif
 
     void runTest() override
     {
@@ -757,6 +798,99 @@ struct PluginSandboxTests : juce::UnitTest
             main.reset();
         }
 
+        // The macOS window list can see the host's panel. Elsewhere that order is manual QA.
+#if JUCE_MAC
+        beginTest ("Popups over a sandboxed plug-in's window show above its own UI");
+        {
+            Fixture f;
+            TestPlugin gain (f, "Sandbox Popups", "plugin Popups Gain");
+            f.theme.load();
+            const auto track = addTrack (f);
+            f.invoke (cmd::trackSelect, { track });
+            juce::ApplicationCommandManager commandManager;
+            auto main = std::make_unique<MainComponent> (f.app, commandManager);
+            main->setSize (1400, 900);
+
+            const auto id = insert (f, track, gain.path());
+            auto* window = main->getPluginWindows().getWindow (id);
+            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }));
+            auto* instance = instanceOf (f, id);
+
+            if (window == nullptr || instance == nullptr || window->getVendorComponent() == nullptr)
+                return;
+
+            auto ownUi = [&] { return PluginSandbox::getOwnEditorScreenBounds (instance); };
+            expect (dispatchUntil ([&] { return ownUi() == window->getVendorComponent()->getScreenBounds(); }),
+                    "the plug-in UI isn't up");
+
+            auto above = [&] (juce::Component* popup)
+            {
+                return popup != nullptr && popup->isShowing() && sandboxdock::isInFrontOf (*popup, ownUi());
+            };
+
+            // Dismisses whatever this test opened, before the window goes.
+            struct PopupsDown
+            {
+                ~PopupsDown()
+                {
+                    juce::PopupMenu::dismissAllActiveMenus();
+
+                    if (auto* modal = juce::Component::getCurrentlyModalComponent())
+                        modal->exitModalState (0);
+
+                    juce::MessageManager::getInstance()->runDispatchLoopUntil (30);
+                }
+            } popupsDown;
+
+            // The menu closes unless the app is in front or the pointer is over it.
+            // Parking the pointer on it keeps it up when this process can't take focus.
+            juce::Process::makeForegroundProcess();
+            window->toFront (true);
+            auto mouse = juce::Desktop::getInstance().getMainMouseSource();
+            const auto savedMouse = mouse.getScreenPosition();
+
+            if (auto* preset = findOne (*window, "preset"))
+            {
+                const auto b = preset->getScreenBounds();
+                mouse.setScreenPosition ({ (float) b.getCentreX(), (float) b.getBottom() + 8.0f });
+            }
+
+            click (findOne (*window, "preset"));
+            expect (dispatchUntil ([&] { return findPresetMenu() != nullptr; }), "the preset menu didn't open");
+            expect (dispatchUntil ([&] { return above (findPresetMenu()); }),
+                    "the preset menu is behind the plug-in UI " + ownUi().toString());
+            juce::PopupMenu::dismissAllActiveMenus();
+            mouse.setScreenPosition (savedMouse);
+
+            click (findButton (*window, "Save preset"));
+            auto* dialog = juce::Component::getCurrentlyModalComponent();
+            expect (dialog != nullptr && dispatchUntil ([&] { return above (dialog); }),
+                    "Save Preset is behind the plug-in UI");
+
+            // The panel is reordered when its window moves. The dialog stays above it.
+            window->setFramePosition (window->getFrameScreenBounds().getPosition() + juce::Point<int> (30, 20));
+            expect (dispatchUntil ([&] { return above (juce::Component::getCurrentlyModalComponent()); }),
+                    "moving the window put the plug-in UI over Save Preset");
+
+            if (auto* modal = juce::Component::getCurrentlyModalComponent())
+                modal->exitModalState (0);
+
+            expect (findType<juce::TooltipWindow> (*main) == nullptr, "tooltips are drawn in the main window, under plug-in UI");
+            juce::TooltipWindow tip;
+            auto* preset = findOne (*window, "preset");
+            tip.displayTip (preset != nullptr ? preset->getScreenBounds().getCentre() : ownUi().getCentre(), "Presets");
+            expect (dispatchUntil ([&] { return tip.isShowing() && sandboxdock::isInFrontOf (tip, ownUi()); }),
+                    "a tooltip over the chrome is behind the plug-in UI");
+
+            main->showToast ("Saved the preset", false);
+            auto* toasts = findTypeOrOnDesktop<Toasts> (*main);
+            expect (toasts != nullptr && dispatchUntil ([&] { return above (toasts); }),
+                    "a toast is behind the plug-in UI");
+
+            main.reset();
+        }
+#endif
+
         beginTest ("Space the sandboxed UI doesn't use plays; Esc hands focus back to the window");
         {
             Fixture f;
@@ -898,7 +1032,7 @@ struct PluginSandboxTests : juce::UnitTest
 
             expect (dispatchUntil ([&] { return ! windows.isOpen (id); }), "the window stayed open");
 
-            auto* toasts = findType<Toasts> (*main);
+            auto* toasts = findTypeOrOnDesktop<Toasts> (*main);
             const auto message = "Window Gain crashed on " + f.model.getTracks().back().name
                                + juce::String (juce::CharPointer_UTF8 (" \xc2\xb7 ")) + "its audio is bypassed; the rest plays on";
             expect (toasts != nullptr && toasts->getMessages().contains (message),

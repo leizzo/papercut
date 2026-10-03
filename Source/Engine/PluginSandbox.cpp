@@ -915,11 +915,11 @@ private:
 //==============================================================================
 /** In the plug-in window's vendor area: the place the plug-in's own UI shows.
     The UI itself runs in the sandbox host, in a panel the host lays over
-    this editor's bounds on screen and keeps just above its window; the editor
-    tells the host where that is whenever it moves, resizes, shows or hides,
-    or its window comes to the front or changes level. The editor has the UI's
-    native size: the plug-in resizing its UI resizes it, and resizing it (the
-    window's grip) resizes the UI. */
+    this editor's bounds on screen and keeps just above its window and below
+    Resamper's popups; the editor tells the host where that is whenever it
+    moves, resizes, shows or hides, or its window comes to the front or changes
+    level. The editor has the UI's native size: the plug-in resizing its UI
+    resizes it, and resizing it (the window's grip) resizes the UI. */
 class PluginSandbox::Instance::Editor final : public juce::AudioProcessorEditor,
                                               private juce::ComponentMovementWatcher,
                                               private juce::Timer
@@ -1006,6 +1006,11 @@ private:
         if (now == last)
             return;
 
+        // The host puts the panel just above this window. Raise popups first —
+        // a drag docks immediately, without waiting for the 100 ms poll — so
+        // that reorder can't cover a menu, dialog, tooltip or toast.
+        sandboxdock::orderPopupsAboveSandboxedUi();
+
         last = now;
         juce::ValueTree message (msg::dock);
         message.setProperty (msg::x, now.area.getX(), nullptr);
@@ -1021,7 +1026,11 @@ private:
 
     // The watcher hears every parent, the window too: one brought to the front
     // goes over the UI, which the host puts back above it.
-    void componentBroughtToFront (juce::Component&) override   { ++raised; dock(); }
+    void componentBroughtToFront (juce::Component&) override
+    {
+        ++raised;
+        dock();
+    }
 
     /** Resized here (the window's grip): the plug-in's UI follows. */
     void componentMovedOrResized (bool, bool wasResized) override
@@ -1049,7 +1058,11 @@ private:
     void componentPeerChanged() override                       { dock(); }
     void componentVisibilityChanged() override                 { dock(); }
     using juce::ComponentMovementWatcher::componentVisibilityChanged;
-    void timerCallback() override                              { dock(); }
+    void timerCallback() override
+    {
+        sandboxdock::orderPopupsAboveSandboxedUi();
+        dock();
+    }
 };
 
 void PluginSandbox::Instance::ownEditorResized (juce::Point<int> size)

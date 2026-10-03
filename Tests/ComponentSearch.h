@@ -49,6 +49,29 @@ Type* findType (juce::Component& root)
     return nullptr;
 }
 
+/** The first top-level desktop window of this type. */
+template <typename Type>
+Type* findOnDesktop()
+{
+    auto& desktop = juce::Desktop::getInstance();
+
+    for (int i = 0; i < desktop.getNumComponents(); ++i)
+        if (auto* match = dynamic_cast<Type*> (desktop.getComponent (i)))
+            return match;
+
+    return nullptr;
+}
+
+/** findType, or a top-level desktop window of this type when it has left the tree. */
+template <typename Type>
+Type* findTypeOrOnDesktop (juce::Component& root)
+{
+    if (auto* found = findType<Type> (root))
+        return found;
+
+    return findOnDesktop<Type>();
+}
+
 /** The desktop windows with this component ID that are on screen. */
 inline std::vector<juce::Component*> visibleDesktopWindows (const juce::String& id)
 {
