@@ -414,6 +414,62 @@ struct PluginSandboxTests : juce::UnitTest
             expect (is (f, id, HostingState::Kind::sandboxed));
         }
 
+        beginTest ("A load still pending when the Edit is replaced is the old Edit's: the next Edit's plug-in of that id settles on its own");
+        {
+            // The old Edit's plug-in is undone while it loads, and another inserted: its load stays pending.
+            Fixture f;
+            TestPlugin sluggish (f, "Sandbox Sluggish Replaced", "plugin Sluggish Replaced Gain");
+            const auto oldTrack = addTrack (f);
+            f.invoke (cmd::pluginInsert, { oldTrack, sluggish.path(), PluginChain::device });
+            const auto id = f.plugins.getChain (oldTrack, PluginChain::device).back().id;
+            expect (is (f, id, HostingState::Kind::loading));
+            f.invoke (cmd::editUndo);
+            f.invoke (cmd::pluginInsert, { oldTrack, sluggish.path(), PluginChain::device });
+
+            // Nothing of the new Edit loads: an offline render there doesn't wait for the old Edit's loads.
+            f.invoke (cmd::projectNew);
+            const auto started = juce::Time::getMillisecondCounterHiRes();
+            expect (f.app.engine.getPluginHosting().waitForLoads());
+            expectLessThan (juce::Time::getMillisecondCounterHiRes() - started, TestPluginFormat::sluggishLoadMs / 2.0,
+                            "it waited for the old Edit's loads");
+
+            // A new Edit numbers its ids afresh: the same steps give its plug-in the same id.
+            f.app.engine.getPluginHosting().removeHostedFormat (TestPluginFormat::formatName);
+            const auto track = addTrack (f);
+            f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
+            const auto chain = f.plugins.getChain (track, PluginChain::device);
+            expect (! chain.empty() && chain.back().id == id, "the ids don't collide");
+
+            expect (loaded (f, id), "it stayed Loading");
+            expect (is (f, id, HostingState::Kind::inProcess), "it is " + nameOf (state (f, id).kind) + ": " + state (f, id).reason);
+            expect (instanceOf (f, id) != nullptr && ! PluginSandbox::isSandboxed (instanceOf (f, id)));
+        }
+
+        beginTest ("A load still pending when the Edit is replaced isn't adopted by the next Edit's sandboxed plug-in of that id");
+        {
+            Fixture f;
+            TestPlugin sluggish (f, "Sandbox Sluggish Adopted", "plugin Sluggish Adopted Gain");
+            f.invoke (cmd::pluginInsert, { addTrack (f), sluggish.path(), PluginChain::device });
+            const auto id = f.plugins.getChain (f.model.getTracks().back().id, PluginChain::device).back().id;
+
+            // Most of the old load's time goes by: adopted, it would finish well before a load of its own.
+            bool waited = false;
+            juce::Timer::callAfterDelay (TestPluginFormat::sluggishLoadMs * 2 / 3, [&waited] { waited = true; });
+            dispatchUntil ([&] { return waited; });
+            expect (is (f, id, HostingState::Kind::loading));
+
+            f.invoke (cmd::projectNew);
+            const auto track = addTrack (f);
+            const auto started = juce::Time::getMillisecondCounterHiRes();
+            f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
+            const auto chain = f.plugins.getChain (track, PluginChain::device);
+            expect (! chain.empty() && chain.back().id == id, "the ids don't collide");
+
+            expect (loaded (f, id) && is (f, id, HostingState::Kind::sandboxed), "it is " + nameOf (state (f, id).kind) + ": " + state (f, id).reason);
+            expectGreaterOrEqual (juce::Time::getMillisecondCounterHiRes() - started, (double) TestPluginFormat::sluggishLoadMs,
+                                  "it took over the old Edit's load");
+        }
+
         beginTest ("An export straight after inserting a slow plug-in waits for it: the mix has it in");
         {
             Fixture f;

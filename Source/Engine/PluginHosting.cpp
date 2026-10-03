@@ -168,6 +168,28 @@ bool PluginHosting::Impl::takeLoading (const juce::String& identifier, juce::Str
     return false;
 }
 
+void PluginHosting::Impl::forgetGoneEdits (const te::ExternalPlugin* joining)
+{
+    const auto joiningId = joining != nullptr ? joining->itemID.toString() : juce::String();
+
+    for (auto it = hosted.begin(); it != hosted.end();)
+    {
+        auto& [id, entry] = *it;
+        const auto* edit = entry.edit.get();
+
+        if (edit == nullptr || (joining != nullptr && id == joiningId && edit != &joining->edit))
+        {
+            sandbox.dropLoad (id);
+            stopListening (entry);
+            it = hosted.erase (it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
 te::ExternalPlugin* PluginHosting::Impl::find (const juce::String& pluginId) const
 {
     const auto found = hosted.find (pluginId);
@@ -177,17 +199,16 @@ te::ExternalPlugin* PluginHosting::Impl::find (const juce::String& pluginId) con
 void PluginHosting::Impl::startLoading (te::ExternalPlugin& plugin, bool deferred)
 {
     const auto pluginId = plugin.itemID.toString();
-
-    // Plug-ins that have gone (deleted, or their Edit closed) are forgotten.
-    std::erase_if (hosted, [] (const auto& e) { return e.second.plugin.get() == nullptr; });
+    forgetGoneEdits (&plugin);
 
     auto& entry = hosted[pluginId];
 
-    // A plug-in undone and redone, or of a newly opened Edit, is a new object under the same id.
+    // A plug-in undone and redone is a new object under the same id.
     if (entry.plugin.get() != &plugin)
     {
         stopListening (entry);
         entry.plugin = te::makeSafeRef (plugin);
+        entry.edit = te::makeSafeRef (plugin.edit);
     }
 
     const auto load = ++entry.loads;
@@ -371,6 +392,8 @@ juce::Result PluginHosting::setSandboxed (const juce::String& pluginId, bool san
 
 bool PluginHosting::waitForLoads()
 {
+    // Not for a load of an Edit that has gone.
+    impl->forgetGoneEdits();
     return impl->sandbox.waitForLoads();
 }
 

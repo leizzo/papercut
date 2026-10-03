@@ -84,6 +84,10 @@ public:
     bool loadInBackground (const juce::PluginDescription&, const juce::String& pluginId, double sampleRate,
                            int blockSize, std::function<void()> onDone);
 
+    /** Drops the plug-in's load, whether still loading or loaded and not yet taken:
+        its host quits and its onDone never runs. On the message thread. */
+    void dropLoad (const juce::String& pluginId);
+
     /** Whether the plug-in is loading into its sandbox host. On the message thread. */
     bool isLoading (const juce::String& pluginId) const;
 
