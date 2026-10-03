@@ -178,16 +178,34 @@ void PluginHosting::Impl::startLoading (te::ExternalPlugin& plugin, bool deferre
 {
     const auto pluginId = plugin.itemID.toString();
 
-    // Plug-ins that have gone (deleted, or their Edit closed) are forgotten.
-    std::erase_if (hosted, [] (const auto& e) { return e.second.plugin.get() == nullptr; });
+    // Plug-ins that have gone (deleted, or their Edit closed) are forgotten. Sandbox loads go by
+    // plug-in id, and a new Edit numbers its ids afresh: a load an Edit left pending is dropped
+    // once that Edit has gone, or (Open makes the new Edit before the old one goes) once a plug-in
+    // of another Edit takes its id. An undone plug-in's load stays, for its Redo.
+    for (auto it = hosted.begin(); it != hosted.end();)
+    {
+        auto& [id, entry] = *it;
+
+        if (entry.edit.get() == nullptr || (id == pluginId && entry.edit.get() != &plugin.edit))
+        {
+            sandbox.dropLoad (id);
+            stopListening (entry);
+            it = hosted.erase (it);
+        }
+        else
+        {
+            it = entry.plugin.get() == nullptr ? hosted.erase (it) : std::next (it);
+        }
+    }
 
     auto& entry = hosted[pluginId];
 
-    // A plug-in undone and redone, or of a newly opened Edit, is a new object under the same id.
+    // A plug-in undone and redone is a new object under the same id.
     if (entry.plugin.get() != &plugin)
     {
         stopListening (entry);
         entry.plugin = te::makeSafeRef (plugin);
+        entry.edit = te::makeSafeRef (plugin.edit);
     }
 
     const auto load = ++entry.loads;

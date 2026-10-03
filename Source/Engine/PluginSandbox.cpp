@@ -1781,6 +1781,14 @@ bool PluginSandbox::loadInBackground (const juce::PluginDescription& desc, const
    #endif
 }
 
+void PluginSandbox::dropLoad (const juce::String& pluginId)
+{
+    JUCE_ASSERT_MESSAGE_THREAD
+
+    if (auto found = loads.find (pluginId); found != loads.end())
+        dropLoad (pluginId, found->second.get());
+}
+
 bool PluginSandbox::isLoading (const juce::String& pluginId) const
 {
     const auto found = loads.find (pluginId);

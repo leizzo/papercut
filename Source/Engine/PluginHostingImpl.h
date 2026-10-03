@@ -45,6 +45,7 @@ private:
     struct Hosted
     {
         tracktion::SafeSelectable<tracktion::ExternalPlugin> plugin;
+        tracktion::SafeSelectable<tracktion::Edit> edit;   ///< the plug-in's Edit: a load it leaves pending is that Edit's only
         HostingState state;
         HostingState heard;           ///< the state Listeners last heard for its id
         bool creatingAsync = false;   ///< the engine creates it asynchronously (AUv3): its end of Loading comes as a change
