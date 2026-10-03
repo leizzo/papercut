@@ -170,7 +170,6 @@ bool PluginHosting::Impl::takeLoading (const juce::String& identifier, juce::Str
 
 void PluginHosting::Impl::forgetGoneEdits (const te::ExternalPlugin* joining)
 {
-    // Open makes the new Edit before the old one goes: then an id the new Edit takes is the old one's no more.
     const auto joiningId = joining != nullptr ? joining->itemID.toString() : juce::String();
 
     for (auto it = hosted.begin(); it != hosted.end();)

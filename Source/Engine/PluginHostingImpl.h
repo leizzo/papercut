@@ -71,9 +71,10 @@ private:
     void willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed);
     bool takeLoading (const juce::String& identifier, juce::String& pluginId, bool& sandboxed);
 
-    /** Forgets the plug-ins of Edits that have gone, and the one of another Edit under joining's id,
-        dropping any Sandbox load they left: loads go by plug-in id, and a new Edit numbers its ids
-        afresh. A plug-in gone from an Edit still there (undone) stays, its load kept for its Redo. */
+    /** Forgets the plug-ins of Edits that have gone, and the one of another Edit under joining's id
+        (Open makes the new Edit before the old one goes), dropping any Sandbox load they left: loads
+        go by plug-in id, and a new Edit numbers its ids afresh. A plug-in gone from an Edit still
+        there (undone) stays, its load kept for its Redo. */
     void forgetGoneEdits (const tracktion::ExternalPlugin* joining = nullptr);
 
     /** The plug-in, if Plug-in Hosting started it and it is still there. */
