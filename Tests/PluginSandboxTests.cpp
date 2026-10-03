@@ -147,7 +147,7 @@ struct PluginSandboxTests : juce::UnitTest
         }
 
         bool fileMightContainThisPluginType (const juce::String& path) override   { return path.endsWith (extension); }
-        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return path; }
+        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return juce::File (path).getFileNameWithoutExtension(); }
         bool pluginNeedsRescanning (const juce::PluginDescription&) override      { return false; }
         bool doesPluginStillExist (const juce::PluginDescription&) override       { return true; }
         bool canScanForPlugins() const override                                   { return false; }
