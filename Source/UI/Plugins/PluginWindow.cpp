@@ -46,9 +46,9 @@ namespace
     }
 
     /** Where the plug-in runs, as the footer says it. */
-    juce::String processText (const HostingState& hosting)
+    juce::String processText (const HostingState& state)
     {
-        switch (hosting.kind)
+        switch (state.kind)
         {
             case HostingState::Kind::loading:     return "loading";
             case HostingState::Kind::sandboxed:   return "out-of-process";
@@ -61,9 +61,9 @@ namespace
     }
 
     /** The toolbar's sandbox status. */
-    juce::String sandboxText (const HostingState& hosting)
+    juce::String sandboxText (const HostingState& state)
     {
-        switch (hosting.kind)
+        switch (state.kind)
         {
             case HostingState::Kind::loading:     return "Loading";
             case HostingState::Kind::sandboxed:   return "Sandboxed: out-of-process";
@@ -329,9 +329,9 @@ void PluginWindow::updateTexts()
         b->setEnabled (! presets.isEmpty());
 
     stats->setText (juce::String (plugin.latencySamples) + " smp " + middleDot + " " + cpuText);
-    sandbox->setText (sandboxText (hosting), hosting.kind == HostingState::Kind::sandboxed);
+    sandbox->setText (sandboxText (hostingState), hostingState.kind == HostingState::Kind::sandboxed);
     footerInfo->setText ("Plug-in UI " + middleDot + " rendered by " + vendorOf (plugin) + " " + middleDot + " "
-                         + (plugin.formatBadge() + " " + plugin.version).trim() + " " + middleDot + " " + processText (hosting));
+                         + (plugin.formatBadge() + " " + plugin.version).trim() + " " + middleDot + " " + processText (hostingState));
 }
 
 void PluginWindow::setUiScale (int percent)
@@ -368,7 +368,7 @@ void PluginWindow::showParameters (bool shouldShow)
 
 void PluginWindow::setHostingState (const HostingState& state)
 {
-    hosting = state;
+    hostingState = state;
     updateTexts();
 
     if (state.kind == HostingState::Kind::loading)
@@ -418,7 +418,7 @@ void PluginWindow::showFailed()
 
 void PluginWindow::handleAsyncUpdate()
 {
-    if (hosting.isRunning() && status != Status::ready)
+    if (hostingState.isRunning() && status != Status::ready)
         loadVendor();
 }
 
@@ -598,7 +598,7 @@ void PluginWindow::paintBody (juce::Graphics& g)
         {
             drawStyledText (g, themeManager, plugin.name + " didn't load", stateStyle, area.removeFromTop (stateLineHeight),
                             juce::Justification::centred, theme.rec);
-            drawStyledText (g, themeManager, hosting.reason.isNotEmpty() ? hosting.reason : juce::String ("It couldn't be loaded."),
+            drawStyledText (g, themeManager, hostingState.reason.isNotEmpty() ? hostingState.reason : juce::String ("It couldn't be loaded."),
                             stateDetailStyle, area.removeFromTop (stateLineHeight), juce::Justification::centred, theme.textDim);
         }
     }

@@ -81,7 +81,7 @@ private:
     CommandRegistry& commands;
     int uiScale = 100;
     Status status = Status::loading;
-    HostingState hosting;
+    HostingState hostingState;
     juce::String cpuText;
     std::unique_ptr<juce::VBlankAttachment> spinnerTurn;   ///< turns the loading state's spinner
 

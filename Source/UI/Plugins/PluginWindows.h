@@ -124,7 +124,8 @@ private:
     void openWindowsChanged();
 
     void modelChanged() override;
-    void pluginCrashed (const juce::String& pluginId);
+    /** The plug-in crashed: its window closes, and a toast offers Reload. */
+    void closeCrashed (const juce::String& pluginId);
     void hostingStateChanged (const juce::String& pluginId, const HostingState&) override;
     void pluginUiClicked (const juce::String& pluginId) override;
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;

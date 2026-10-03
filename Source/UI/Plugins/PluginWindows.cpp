@@ -265,12 +265,12 @@ void PluginWindows::pluginUiClicked (const juce::String& pluginId)
 void PluginWindows::hostingStateChanged (const juce::String& pluginId, const HostingState& state)
 {
     if (state.kind == HostingState::Kind::crashed)
-        pluginCrashed (pluginId);
+        closeCrashed (pluginId);
     else if (auto* window = getWindow (pluginId))
         window->setHostingState (state);
 }
 
-void PluginWindows::pluginCrashed (const juce::String& pluginId)
+void PluginWindows::closeCrashed (const juce::String& pluginId)
 {
     const auto info = rack.getPlugin (pluginId);
 
