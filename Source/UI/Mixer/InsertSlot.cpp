@@ -14,25 +14,46 @@ namespace
     const TypeStyle nameStyle { 10.0f, false, 400 }, formatStyle { 7.0f, true, 400 };
 }
 
-InsertSlot::InsertSlot (ThemeManager& tm, int i) : themeManager (tm), index (i)
+InsertSlot::InsertSlot (ThemeManager& tm, PluginHosting& h, int i) : themeManager (tm), hosting (h), index (i)
 {
     setRepaintsOnMouseActivity (true);
     setTitle ("Insert " + juce::String (i + 1));
+    hosting.addListener (this);
+}
+
+InsertSlot::~InsertSlot()
+{
+    hosting.removeListener (this);
 }
 
 void InsertSlot::setPlugin (std::optional<PluginInfo> p)
 {
     plugin = std::move (p);
+    hostingState = plugin ? hosting.getState (plugin->id) : HostingState();
+    updateTooltip();
+    repaint();
+}
 
+void InsertSlot::hostingStateChanged (const juce::String& pluginId, const HostingState& state)
+{
+    if (! plugin || pluginId != plugin->id)
+        return;
+
+    hostingState = state;
+    updateTooltip();
+    repaint();
+}
+
+void InsertSlot::updateTooltip()
+{
     if (! plugin)
         setTooltip ("Empty insert: click to add an effect, or drop one here");
     else if (plugin->external)
-        setTooltip (plugin->name + " (" + plugin->formatBadge() + " plug-in" + (plugin->missing ? ", missing)" : "): click to open its window"));
+        setTooltip (plugin->name + " (" + plugin->formatBadge() + " plug-in" + (isMissing() ? ", missing)" : "): click to open its window"));
     else
         setTooltip (plugin->name + ": click to open its editor");
 
     setDescription (getTooltip());
-    repaint();
 }
 
 InsertSlot::Look InsertSlot::getLook() const noexcept
@@ -68,11 +89,11 @@ void InsertSlot::paint (juce::Graphics& g)
         const auto isPlugin = getLook() == Look::plugin;
         const auto gap = isPlugin ? pluginGap : filledGap;
         auto r = getLocalBounds().reduced (isPlugin ? pluginPadding : filledPadding, 0);
-        g.setColour (plugin->missing ? theme.rec : on ? theme.accent : theme.textDim);
+        g.setColour (isMissing() ? theme.rec : on ? theme.accent : theme.textDim);
         g.fillEllipse (r.removeFromLeft (ledSize).withSizeKeepingCentre (ledSize, ledSize).toFloat());
         r.removeFromLeft (gap);
 
-        if (plugin->missing)
+        if (isMissing())
         {
             auto badge = r.removeFromRight (badgeWidth).withSizeKeepingCentre (badgeWidth, 12);
             g.setColour (theme.rec.withAlpha (0.2f));
@@ -97,7 +118,7 @@ void InsertSlot::paint (juce::Graphics& g)
         drawStyledText (g, themeManager, plugin->name, nameStyle, r, juce::Justification::centredLeft,
                         on ? theme.textPrimary : theme.textDim);
 
-        if (plugin->missing)
+        if (isMissing())
         {
             juce::Path outline, dashed;
             outline.addRoundedRectangle (bounds.reduced (0.75f), radius);

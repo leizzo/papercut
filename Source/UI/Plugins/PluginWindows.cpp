@@ -115,7 +115,8 @@ void PluginWindows::open (const juce::String& pluginId, bool focus)
     const auto info = rack.getPlugin (pluginId);
 
     // A missing plug-in has nothing to show; a crashed one is reloaded from its card first.
-    if (! info.has_value() || info->missing || hosting.getState (pluginId).kind == HostingState::Kind::crashed)
+    if (const auto kind = hosting.getState (pluginId).kind;
+        ! info.has_value() || kind == HostingState::Kind::missing || kind == HostingState::Kind::crashed)
         return;
 
     if (auto existing = windows.find (pluginId); existing != windows.end())
@@ -268,6 +269,13 @@ void PluginWindows::hostingStateChanged (const juce::String& pluginId, const Hos
         closeCrashed (pluginId);
     else if (auto* window = getWindow (pluginId))
         window->setHostingState (state);
+    else if (state.kind == HostingState::Kind::loading)
+        refresh();   // a Missing plug-in, found, starts: its window comes back if it was saved open
+}
+
+bool PluginWindows::isMissing (const juce::String& pluginId) const
+{
+    return hosting.getState (pluginId).kind == HostingState::Kind::missing;
 }
 
 void PluginWindows::closeCrashed (const juce::String& pluginId)
@@ -300,7 +308,7 @@ void PluginWindows::pluginAdded (const juce::String& trackId, const juce::String
     const auto info = rack.getPlugin (pluginId);
 
     // Only a plug-in gets a window; a native device's card takes focus instead (§9.2.3).
-    if (! info.has_value() || ! info->external || info->missing)
+    if (! info.has_value() || ! info->external || isMissing (pluginId))
         return;
 
     const auto autoOpen = preferences.getAutoOpenPluginWindows();
@@ -409,7 +417,7 @@ void PluginWindows::refresh()
     {
         const auto info = rack.getPlugin (it->first);
 
-        if (! info.has_value() || info->missing)
+        if (! info.has_value() || isMissing (it->first))
         {
             it = windows.erase (it);
             changed = true;
@@ -423,7 +431,7 @@ void PluginWindows::refresh()
     // A project's open windows come back when it loads, where they were, unfocused.
     for (auto& info : rack.getAllPlugins())
     {
-        if (isOpen (info.id) || info.missing || ! rack.getWindowState (info.id).open)
+        if (isOpen (info.id) || isMissing (info.id) || ! rack.getWindowState (info.id).open)
             continue;
 
         addWindow (info);

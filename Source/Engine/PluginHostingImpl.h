@@ -14,14 +14,18 @@ namespace resamper
 
 /** Plug-in Hosting's engine side: what the engine owner wires into Tracktion. */
 struct PluginHosting::Impl : private PluginSandbox::Listener,
-                             private tracktion::SelectableListener
+                             private tracktion::SelectableListener,
+                             private juce::ChangeListener
 {
     Impl();
     ~Impl() override;
 
-    /** Installs the engine's plug-in creation hook. Once, when the engine is built:
-        test doubles chain onto it, so it is never installed again. */
+    /** Installs the engine's plug-in creation hook and listens to its catalogue. Once, when
+        the engine is built: test doubles chain onto the hook, so it is never installed again. */
     void attachTo (tracktion::Engine&);
+
+    /** Stops listening to the engine's catalogue. Before the engine goes. */
+    void detach();
 
     /** The engine is about to create a plug-in of an Edit (EngineBehaviour::shouldLoadPlugin,
         after the default check): it is Loading. False while a sandboxed one loads into its
@@ -34,9 +38,19 @@ struct PluginHosting::Impl : private PluginSandbox::Listener,
         if it crashed) staying till then. Never an undo step. */
     void recreate (tracktion::ExternalPlugin&);
 
+    /** Whether the plug-in is Missing: Plug-in Hosting never started it, it has no
+        instance, and the catalogue doesn't know it. */
+    bool isMissing (tracktion::ExternalPlugin&) const;
+
+    /** Has the engine look for a plug-in Plug-in Hosting never started in the catalogue
+        again (Locate, or a catalogue that changed) and start it, Loading, if found there:
+        the engine takes the plug-in's description from what it finds. Still Missing if not. */
+    void startMissing (tracktion::ExternalPlugin&);
+
 private:
     friend class PluginHosting;
 
+    tracktion::Engine* engine = nullptr;
     PluginSandbox sandbox;
     juce::StringArray hostedFormats;
     juce::ListenerList<PluginHosting::Listener> listeners;
@@ -80,6 +94,16 @@ private:
     /** The plug-in, if Plug-in Hosting started it and it is still there. */
     tracktion::ExternalPlugin* find (const juce::String& pluginId) const;
 
+    /** The plug-in with this id in the newest Edit that has one (Open makes the new Edit
+        before the old one goes, and a new Edit numbers its ids afresh), or nullptr. */
+    tracktion::Plugin* findInEdits (const juce::String& pluginId) const;
+
+    /** findInEdits's plug-in, if it is the one Plug-in Hosting started under its id. */
+    tracktion::ExternalPlugin* findStarted (const juce::String& pluginId) const;
+
+    /** Whether Plug-in Hosting started this plug-in object. */
+    bool isStarted (const tracktion::ExternalPlugin&) const;
+
     /** The plug-in is Loading (again); its entry follows the plug-in object. Listeners hear at
         once, or, inside the engine's creation of it (deferred), once that has returned. */
     void startLoading (tracktion::ExternalPlugin&, bool deferred);
@@ -106,6 +130,9 @@ private:
 
     void selectableObjectChanged (tracktion::Selectable*) override;
     void selectableObjectAboutToBeDeleted (tracktion::Selectable*) override;
+
+    /** The catalogue changed (a scan found plug-ins, or Locate): Missing plug-ins it knows now start. */
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
     JUCE_DECLARE_WEAK_REFERENCEABLE (Impl)
     JUCE_DECLARE_NON_COPYABLE (Impl)

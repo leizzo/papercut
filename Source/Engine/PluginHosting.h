@@ -6,8 +6,7 @@
 namespace resamper
 {
 
-/** A Plug-in's Hosting State (CONTEXT.md): the one state it is in at a time.
-    Missing is still PluginInfo::missing. */
+/** A Plug-in's Hosting State (CONTEXT.md): the one state it is in at a time. */
 struct HostingState
 {
     enum class Kind
@@ -16,7 +15,8 @@ struct HostingState
         sandboxed,   ///< runs in its Sandbox
         inProcess,   ///< runs in-process (Run in-process, a format the Sandbox can't host, or a built-in)
         crashed,     ///< its Sandbox died: its audio is bypassed until Reload
-        failed       ///< it couldn't be loaded: reason says why
+        failed,      ///< it couldn't be loaded: reason says why
+        missing      ///< saved in the Project but not installed (the catalogue doesn't know it): audio passes through
     };
 
     Kind kind = Kind::inProcess;
@@ -46,6 +46,11 @@ struct HostingState
     has; an AUv3 the engine creates asynchronously gets as long (the engine
     doesn't say when such a creation fails).
 
+    A Plug-in the engine didn't find in its catalogue when it made it is
+    Missing, never started. Plug-in Hosting listens to the catalogue: once it
+    knows a Missing Plug-in (a scan found it), that Plug-in starts, and
+    Listeners hear it go Loading and on from there.
+
     The engine owner (EngineManager) holds the one Plug-in Hosting, and the
     engine reaches it through its Impl (PluginHostingImpl.h, engine module only).
 */
@@ -69,14 +74,16 @@ public:
         creates a format's plug-ins itself, through the engine's creation hook). */
     void removeHostedFormat (const juce::String& formatName);
 
-    /** The plug-in's Hosting State. In-process for one Plug-in Hosting never
-        started (a built-in device, or a missing plug-in). On the message thread. */
+    /** The Hosting State of the plug-in with this id in the newest Edit that has one.
+        Missing for an external plug-in the catalogue doesn't know; In-process for
+        anything else Plug-in Hosting never started (a built-in device). On the
+        message thread. */
     HostingState getState (const juce::String& pluginId) const;
 
     /** Starts the plug-in again from the state last saved on it: Retry, and a
         crashed plug-in's Reload. It is Loading till then; if sandboxed, its old
         instance plays (or stays bypassed) until the new one is ready. Never an
-        undo step. Fails for a plug-in Plug-in Hosting never started. */
+        undo step. Fails for a plug-in Plug-in Hosting never started (a Missing one). */
     juce::Result reload (const juce::String& pluginId);
 
     /** Runs the plug-in in its Sandbox (the default) or in-process (Run

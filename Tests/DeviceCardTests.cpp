@@ -8,6 +8,7 @@
 #include "UI/Detail/DetailView.h"
 #include "UI/Detail/PluginDeviceCard.h"
 #include "UI/MainWindow/MainComponent.h"
+#include "UI/Mixer/InsertSlot.h"
 #include "UI/State/ShellState.h"
 
 #include <tracktion_engine/tracktion_engine.h>
@@ -41,6 +42,20 @@ struct DeviceCardTests : juce::UnitTest
             return chain.empty() ? juce::String() : chain.back().id;
         }
 
+        /** Until every plug-in has loaded, and Listeners have heard: another Fixture's
+            Edit numbers its ids the same, so what they hear later is under the same ids. */
+        void settle()
+        {
+            dispatchUntil ([this]
+            {
+                for (auto& plugin : plugins.getAllPlugins())
+                    if (hostingOf (plugin.id) == HostingState::Kind::loading)
+                        return false;
+
+                return true;
+            });
+        }
+
         std::unique_ptr<DetailView> view()
         {
             auto v = std::make_unique<DetailView> (model, plugins, app.engine.getPluginHosting(), commands, theme, shell, uiState);
@@ -48,9 +63,60 @@ struct DeviceCardTests : juce::UnitTest
             return v;
         }
 
+        HostingState::Kind hostingOf (const juce::String& pluginId) const
+        {
+            return app.engine.getPluginHosting().getState (pluginId).kind;
+        }
+
         juce::ValueTree uiState { "detail" };
         ShellState shell { juce::ValueTree ("shell") };
     };
+
+    /** Hears one plug-in's Hosting States, in the order Plug-in Hosting pushed them. */
+    struct Transitions : PluginHosting::Listener
+    {
+        Transitions (Fixture& f, juce::String id) : hosting (f.app.engine.getPluginHosting()), pluginId (std::move (id))
+        {
+            hosting.addListener (this);
+        }
+
+        ~Transitions() override   { hosting.removeListener (this); }
+
+        void hostingStateChanged (const juce::String& id, const HostingState& state) override
+        {
+            if (id != pluginId)
+                return;
+
+            switch (state.kind)
+            {
+                case HostingState::Kind::loading:     heard.add ("loading"); break;
+                case HostingState::Kind::sandboxed:   heard.add ("sandboxed"); break;
+                case HostingState::Kind::inProcess:   heard.add ("in-process"); break;
+                case HostingState::Kind::crashed:     heard.add ("crashed"); break;
+                case HostingState::Kind::failed:      heard.add ("failed"); break;
+                case HostingState::Kind::missing:     heard.add ("missing"); break;
+            }
+        }
+
+        PluginHosting& hosting;
+        juce::String pluginId;
+        juce::StringArray heard;
+    };
+
+    /** The mixer insert slots in root that hold a plug-in. */
+    static std::vector<InsertSlot*> filledInsertSlots (juce::Component& root)
+    {
+        std::vector<InsertSlot*> slots;
+
+        if (auto* slot = dynamic_cast<InsertSlot*> (&root); slot != nullptr && slot->getPlugin().has_value())
+            slots.push_back (slot);
+
+        for (auto* child : root.getChildren())
+            for (auto* slot : filledInsertSlots (*child))
+                slots.push_back (slot);
+
+        return slots;
+    }
 
     void runTest() override
     {
@@ -216,7 +282,8 @@ struct DeviceCardTests : juce::UnitTest
 
             auto chain = reopened.plugins.getChain (reopened.model.getTracks().front().id, PluginChain::device);
             expectEquals ((int) chain.size(), 1);
-            expect (! chain.empty() && chain[0].external && ! chain[0].missing);
+            expect (! chain.empty() && chain[0].external
+                    && reopened.app.engine.getPluginHosting().getState (chain[0].id).kind != HostingState::Kind::missing);
             expectEquals (chain.empty() ? juce::String() : chain[0].pinnedParameters.joinIntoString (","),
                           parameters[3].id + "," + parameters[1].id);
         }
@@ -387,6 +454,7 @@ struct DeviceCardTests : juce::UnitTest
             {
                 ScannedPlugin scanned (f);
                 f.insert (pinboard);
+                f.settle();
                 f.invoke (cmd::projectSaveAs);
             }
 
@@ -397,20 +465,31 @@ struct DeviceCardTests : juce::UnitTest
             reopened.projectToOpen = f.projectSaveLocation;
             reopened.invoke (cmd::projectOpen);
             reopened.invoke (cmd::trackSelect, { reopened.trackId() });
-            expect (reopened.plugins.getChain (reopened.trackId(), PluginChain::device).front().missing);
+            const auto id = reopened.plugins.getChain (reopened.trackId(), PluginChain::device).front().id;
+            expect (reopened.hostingOf (id) == HostingState::Kind::missing);
+            Transitions heard (reopened, id);
 
             // A file that holds no plug-in is refused.
             reopened.pluginFileToChoose = reopened.scratchDir().getChildFile ("Readme.txt");
             auto view = reopened.view();
             click (findOne (*findOne (*view, "DeviceCard/Plugin"), "locate"));
             expect (reopened.errors.size() == 1 && reopened.errors[0].contains ("No plug-in"), reopened.errors.joinIntoString ("; "));
+            expect (reopened.hostingOf (id) == HostingState::Kind::missing);
 
+            // Elsewhere than the project says: the engine takes the plug-in's description from the file.
             reopened.pluginFileToChoose = reopened.scratchDir().getChildFile (juce::String ("Moved/Pinboard") + FakeFormat::extension);
             click (findOne (*findOne (*view, "DeviceCard/Plugin"), "locate"));
             expectEquals (reopened.errors.size(), 1, reopened.errors.joinIntoString ("; "));
 
+            // Plug-in Hosting started it, and the card followed by push.
+            expect (dispatchUntil ([&] { return heard.heard.joinIntoString (", ") == "loading, in-process"; }),
+                    "heard: " + heard.heard.joinIntoString (", "));
+            auto* card = findOne (*view, "DeviceCard/Plugin");
+            expect (card != nullptr && findOne (*card, "openWindow")->isVisible() && ! findOne (*card, "locate")->isVisible());
+
             auto chain = reopened.plugins.getChain (reopened.trackId(), PluginChain::device);
-            expect (chain.size() == 1 && ! chain[0].missing && chain[0].name == "Pinboard");
+            expect (chain.size() == 1 && chain[0].name == "Pinboard");
+            expect (reopened.hostingOf (id) == HostingState::Kind::inProcess);
 
             reopened.invoke (cmd::projectNew);
             FakeFormat::forgetFound (manager);
@@ -472,7 +551,8 @@ struct DeviceCardTests : juce::UnitTest
             reopened.invoke (cmd::trackSelect, { reopened.trackId() });
 
             auto chain = reopened.plugins.getChain (reopened.trackId(), PluginChain::device);
-            expect (chain.size() == 1 && chain[0].missing && chain[0].name == "Pinboard");
+            expect (chain.size() == 1 && chain[0].name == "Pinboard");
+            expect (! chain.empty() && reopened.hostingOf (chain[0].id) == HostingState::Kind::missing);
 
             auto view = reopened.view();
             juce::StringArray opened;
@@ -487,6 +567,59 @@ struct DeviceCardTests : juce::UnitTest
             expect (findOne (*card, "openWindow") == nullptr || ! findOne (*card, "openWindow")->isVisible());
             card->mouseDoubleClick (mouseEvent (*card, { 60, 10 }, { 60, 10 }, false));
             expect (opened.isEmpty());
+        }
+
+        beginTest ("A scan that finds a missing plug-in starts it: its card and insert slot follow by push");
+        {
+            Cards f;
+            f.projectSaveLocation = f.scratchDir().getChildFile ("Found");
+
+            {
+                ScannedPlugin scanned (f);
+                f.insert (pinboard);
+                f.invoke (cmd::pluginInsert, { f.trackId(), pinboard, PluginChain::mixer });
+                f.settle();
+                f.invoke (cmd::projectSaveAs);
+            }
+
+            Cards reopened;
+            reopened.projectToOpen = f.projectSaveLocation;
+            reopened.invoke (cmd::projectOpen);
+            reopened.invoke (cmd::trackSelect, { reopened.trackId() });
+
+            const auto device = reopened.plugins.getChain (reopened.trackId(), PluginChain::device);
+            const auto mixer = reopened.plugins.getChain (reopened.trackId(), PluginChain::mixer);
+            expect (device.size() == 1 && mixer.size() == 1);
+
+            if (device.size() != 1 || mixer.size() != 1)
+                return;
+
+            expect (reopened.hostingOf (device[0].id) == HostingState::Kind::missing);
+            expect (reopened.hostingOf (mixer[0].id) == HostingState::Kind::missing);
+            Transitions heard (reopened, device[0].id);
+
+            juce::ApplicationCommandManager commandManager;
+            MainComponent main (reopened.app, commandManager);
+            main.setSize (1400, 900);
+            reopened.invoke (cmd::viewMixer);
+
+            auto view = reopened.view();
+            auto* card = findOne (*view, "DeviceCard/Plugin");
+            const auto slots = filledInsertSlots (main);
+            expect (card != nullptr && findOne (*card, "locate")->isVisible());
+            expect (slots.size() == 1 && slots[0]->getTooltip().contains ("missing"));
+
+            if (card == nullptr || slots.size() != 1)
+                return;
+
+            // The scan adds it to the catalogue; no model change follows.
+            ScannedPlugin scanned (reopened);
+            expect (dispatchUntil ([&] { return heard.heard.joinIntoString (", ") == "loading, in-process"; }),
+                    "heard: " + heard.heard.joinIntoString (", "));
+            expect (dispatchUntil ([&] { return reopened.hostingOf (mixer[0].id) == HostingState::Kind::inProcess; }));
+            expect (findOne (*card, "openWindow")->isVisible() && ! findOne (*card, "locate")->isVisible());
+            expect (! slots[0]->getTooltip().contains ("missing"), slots[0]->getTooltip());
+            expect (reopened.errors.isEmpty(), reopened.errors.joinIntoString ("; "));
         }
 
         beginTest ("The chain ends in a drop zone; a drop inserts through plugin.insert, where the opening rule hears it");

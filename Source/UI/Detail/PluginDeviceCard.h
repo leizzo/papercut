@@ -71,6 +71,7 @@ private:
     void hostingStateChanged (const juce::String& pluginId, const HostingState&) override;
 
     bool isCrashed() const noexcept   { return hostingState.kind == HostingState::Kind::crashed; }
+    bool isMissing() const noexcept   { return hostingState.kind == HostingState::Kind::missing; }
 
     void rebuildPins();
     void setLearningPins (bool);

@@ -1,6 +1,7 @@
 #include "PluginRack.h"
 #include "EditTracks.h"
 #include "EngineManager.h"
+#include "PluginHostingImpl.h"
 #include "PluginSandbox.h"
 #include "PluginScanner.h"
 #include "NativeDevicePlugins.h"
@@ -173,24 +174,6 @@ namespace
         return info;
     }
 
-    /** Whether the catalogue knows the plug-in (by its identifier or its file). */
-    bool isKnown (te::ExternalPlugin& plugin)
-    {
-        auto& known = plugin.engine.getPluginManager().knownPluginList;
-        return known.getTypeForIdentifierString (plugin.desc.createIdentifierString()) != nullptr
-            || known.getTypeForFile (plugin.desc.fileOrIdentifier) != nullptr;
-    }
-
-    /** Missing: no instance, and not installed. One the catalogue knows that
-        failed to load (its sandbox died or timed out) isn't: it has a load error. */
-    bool isMissing (te::Plugin& plugin)
-    {
-        if (auto* external = dynamic_cast<te::ExternalPlugin*> (&plugin))
-            return external->isMissing() && ! isKnown (*external);
-
-        return plugin.isMissing();
-    }
-
     PluginInfo infoFromPlugin (te::Plugin& plugin)
     {
         PluginInfo info;
@@ -222,7 +205,6 @@ namespace
         info.midiEffect = isMidiEffect (plugin);
         info.chain = chainOf (plugin);
         info.enabled = plugin.isEnabled();
-        info.missing = isMissing (plugin);
         info.presetName = plugin.state[presetProperty].toString();
         info.abSlot = (int) plugin.state[abSlotProperty] == 1 ? 1 : 0;
 
@@ -563,23 +545,9 @@ void PluginRack::runScan()
         }
     }
 
+    // Plug-in Hosting hears the catalogue change, and starts the missing plug-ins the scan found.
     manager.knownPluginList.scanFinished();
     publishExternalSnapshot();
-
-    // The destructor waits for this thread, so the reference is made while the rack is alive.
-    juce::MessageManager::callAsync ([rack = juce::WeakReference<PluginRack> (this)]
-    {
-        if (rack != nullptr)
-            rack->reloadMissing();
-    });
-}
-
-void PluginRack::reloadMissing()
-{
-    for (auto* plugin : te::getAllPlugins (projectManager.getEdit(), false))
-        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin);
-            external != nullptr && external->isMissing() && isKnown (*external))
-            external->forceFullReinitialise();
 }
 
 juce::StringArray PluginRack::getHostedFormats() const
@@ -1111,8 +1079,9 @@ juce::Result PluginRack::locate (const juce::String& pluginId, const juce::File&
 {
     auto plugin = findPlugin (projectManager.getEdit(), pluginId);
     auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
+    auto& hosting = projectManager.getEngineManager().getPluginHosting().getImpl();
 
-    if (external == nullptr || ! external->isMissing())
+    if (external == nullptr || ! hosting.isMissing (*external))
         return juce::Result::fail ("That plug-in isn't missing");
 
     if (scanning.load())
@@ -1140,9 +1109,9 @@ juce::Result PluginRack::locate (const juce::String& pluginId, const juce::File&
         return juce::Result::fail ("No plug-in in " + file.getFileName());
 
     publishExternalSnapshot();
-    external->forceFullReinitialise();
+    hosting.startMissing (*external);
 
-    if (external->isMissing())
+    if (hosting.isMissing (*external))
         return juce::Result::fail (file.getFileName() + " doesn't hold " + external->desc.name);
 
     return juce::Result::ok();
