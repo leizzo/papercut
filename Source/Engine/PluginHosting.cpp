@@ -440,7 +440,7 @@ HostingState PluginHosting::getState (const juce::String& pluginId) const
         return {};
 
     if (impl->isStarted (*external))
-        return impl->hosted[pluginId].state;
+        return impl->hosted.at (pluginId).state;
 
     return impl->isMissing (*external) ? HostingState { HostingState::Kind::missing, {} } : HostingState();
 }
