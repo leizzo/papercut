@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PluginHosting.h"
+
 #include <tracktion_engine/tracktion_engine.h>
 
 namespace resamper
@@ -18,10 +20,18 @@ namespace render
     juce::BigInteger bitForTrack (te::Track&);
 
     /** Renders the tracks to a 24-bit WAV, as they play (honouring mute and
-        solo). range: the whole Edit when empty. usePlugins false renders the
-        clips' own audio, without the tracks' plug-ins or faders. */
-    juce::Result toWav (te::Edit&, const juce::File& destFile, const juce::BigInteger& tracksToDo,
-                        te::TimeRange range = {}, bool usePlugins = true);
+        solo), with their plug-ins and faders. range: the whole Edit when empty.
+
+        Waits first for any plug-in still Loading into its Sandbox, so none is
+        left out; fails if one still is when its time is up. On the message thread. */
+    juce::Result toWav (PluginHosting&, te::Edit&, const juce::File& destFile, const juce::BigInteger& tracksToDo,
+                        te::TimeRange range = {});
+
+    /** Renders the clips' own audio to a 24-bit WAV, without the tracks'
+        plug-ins or faders (consolidate), so no plug-in load is waited for.
+        range: the whole Edit when empty. */
+    juce::Result clipsToWav (te::Edit&, const juce::File& destFile, const juce::BigInteger& tracksToDo,
+                             te::TimeRange range = {});
 }
 
 } // namespace resamper

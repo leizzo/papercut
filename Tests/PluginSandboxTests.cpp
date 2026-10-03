@@ -147,7 +147,7 @@ struct PluginSandboxTests : juce::UnitTest
         }
 
         bool fileMightContainThisPluginType (const juce::String& path) override   { return path.endsWith (extension); }
-        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return path; }
+        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return juce::File (path).getFileNameWithoutExtension(); }
         bool pluginNeedsRescanning (const juce::PluginDescription&) override      { return false; }
         bool doesPluginStillExist (const juce::PluginDescription&) override       { return true; }
         bool canScanForPlugins() const override                                   { return false; }
@@ -437,6 +437,33 @@ struct PluginSandboxTests : juce::UnitTest
                 juce::AudioBuffer<float> buffer ((int) reader->numChannels, (int) reader->lengthInSamples);
                 reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, true);
                 // The test plug-in halves its input: left out, the mix would be the dry tone.
+                expectWithinAbsoluteError (buffer.getMagnitude (0, buffer.getNumSamples()), dry * 0.5f, dry * 0.1f);
+            }
+        }
+
+        beginTest ("A bounce straight after inserting a slow plug-in waits for it: the bounce has it in");
+        {
+            Fixture f;
+            TestPlugin sluggish (f, "Sandbox Sluggish Bounce", "plugin Sluggish Bounce Gain");
+            const auto track = addTrack (f);
+            f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
+            f.invoke (cmd::clipInsertAt, { f.audioFileToChoose, track, 0.0 });
+            const auto dry = renderPeak (f);
+
+            f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
+            const auto bounce = f.scratchDir().getChildFile ("bounce.wav");
+            expect (f.invoke (cmd::trackBounce, { track, bounce.getFullPathName() }), f.errors.joinIntoString ("; "));
+
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (bounce));
+            expect (reader != nullptr && reader->lengthInSamples > 0, "no bounce");
+
+            if (reader != nullptr)
+            {
+                juce::AudioBuffer<float> buffer ((int) reader->numChannels, (int) reader->lengthInSamples);
+                reader->read (&buffer, 0, buffer.getNumSamples(), 0, true, true);
+                // The test plug-in halves its input: left out, the bounce would be the dry tone.
                 expectWithinAbsoluteError (buffer.getMagnitude (0, buffer.getNumSamples()), dry * 0.5f, dry * 0.1f);
             }
         }

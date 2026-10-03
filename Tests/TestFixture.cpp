@@ -101,7 +101,7 @@ float renderPeak (Fixture& f)
 
     auto& edit = f.projects.getEdit();
 
-    // As render::renderToFile does: an Edit that has restarted playback (a plug-in
+    // As render::toWav does: an Edit that has restarted playback (a plug-in
     // loaded in the background, say) has a playback context; this frees it and
     // keeps it from being rebuilt while rendering. false: headless, don't reattach.
     const tracktion::Edit::ScopedRenderStatus renderStatus (edit, false);
