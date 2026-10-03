@@ -83,7 +83,7 @@ struct ChannelStrip::SendRow : juce::Component
 };
 
 //==============================================================================
-ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm, StripRole role)
+ChannelStrip::ChannelStrip (CommandRegistry& c, PluginHosting& hosting, ThemeManager& tm, StripRole role)
     : commands (c), themeManager (tm),
       pan (tm, panKnobSpec(), "Pan", true), faderSection (tm, role == StripRole::bus ? busFaderGeometry : faderGeometry),
       mute (tm, TrackButton::Kind::mute), solo (tm, TrackButton::Kind::solo), arm (tm, TrackButton::Kind::arm)
@@ -116,7 +116,7 @@ ChannelStrip::ChannelStrip (CommandRegistry& c, ThemeManager& tm, StripRole role
 
     for (int i = 0; i < PluginRack::maxMixerInserts; ++i)
     {
-        insertSlots.push_back (std::make_unique<InsertSlot> (themeManager, i));
+        insertSlots.push_back (std::make_unique<InsertSlot> (themeManager, hosting, i));
         setUpInsertSlot (*insertSlots.back());
         addChildComponent (*insertSlots.back());
     }

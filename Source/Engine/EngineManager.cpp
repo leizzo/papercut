@@ -113,6 +113,7 @@ EngineManager::EngineManager (const juce::String& applicationName, AudioDevice a
 
 EngineManager::~EngineManager()
 {
+    hosting->getImpl().detach();
     engine->getDeviceManager().deviceManager.removeAudioCallback (blockClock.get());
 }
 

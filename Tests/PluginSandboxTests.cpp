@@ -83,6 +83,7 @@ struct PluginSandboxTests : juce::UnitTest
             case HostingState::Kind::inProcess:   return "in-process";
             case HostingState::Kind::crashed:     return "crashed";
             case HostingState::Kind::failed:      return "failed";
+            case HostingState::Kind::missing:     return "missing";
         }
 
         return {};
@@ -361,7 +362,6 @@ struct PluginSandboxTests : juce::UnitTest
             expect (window != nullptr && window->isVisible(), "the window isn't up at once");
             expect (is (f, id, HostingState::Kind::loading), "it isn't loading");
             expect (window != nullptr && window->getStatus() == PluginWindow::Status::loading);
-            expect (info (f, id).has_value() && ! info (f, id)->missing);
 
             // The message thread stays free while it loads.
             int ticks = 0;
@@ -391,6 +391,41 @@ struct PluginSandboxTests : juce::UnitTest
             }
 
             main.reset();
+        }
+
+        beginTest ("A plug-in the catalogue doesn't know is Missing; once it does, Plug-in Hosting loads it into its sandbox");
+        {
+            Fixture f;
+            f.projectSaveLocation = f.scratchDir().getChildFile ("Missing Sandboxed");
+
+            {
+                TestPlugin gain (f, "Sandbox Found", "plugin Sandbox Found");
+                insert (f, addTrack (f), gain.path());
+                f.invoke (cmd::projectSaveAs);
+            }
+
+            // f's Edit stays open, its plug-in under the same id: the newer Edit's is the one asked about.
+            Fixture reopened;
+            reopened.projectToOpen = f.projectSaveLocation;
+            reopened.invoke (cmd::projectOpen);
+            expect (reopened.errors.isEmpty(), reopened.errors.joinIntoString ("; "));
+
+            juce::String id;
+
+            for (auto& plugin : reopened.plugins.getAllPlugins())
+                if (plugin.external)
+                    id = plugin.id;
+
+            expect (id.isNotEmpty() && is (reopened, id, HostingState::Kind::missing), "it isn't Missing");
+            expect (reopened.app.engine.getPluginHosting().reload (id).failed(), "a Missing plug-in reloaded");
+
+            // A scan finds it: the catalogue changes, and nothing else does.
+            Transitions heard (reopened);
+            TestPlugin found (reopened, "Sandbox Found", "plugin Sandbox Found");
+            expect (dispatchUntil ([&] { return is (reopened, id, HostingState::Kind::sandboxed); }),
+                    "it never loaded: " + nameOf (state (reopened, id).kind) + " " + state (reopened, id).reason);
+            expectEquals (heard.take (id), juce::String ("loading, sandboxed"));
+            expect (PluginSandbox::isSandboxed (instanceOf (reopened, id)));
         }
 
         beginTest ("A plug-in undone while it loads comes back loaded on Redo");

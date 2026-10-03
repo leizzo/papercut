@@ -46,8 +46,9 @@ class ChannelStrip : public juce::Component,
 public:
     enum class Section { io, inserts, sends, fader };
 
-    /** The role picks the fader geometry; a Strip's role never changes. */
-    ChannelStrip (CommandRegistry&, ThemeManager&, StripRole);
+    /** The role picks the fader geometry; a Strip's role never changes. The insert
+        slots hear their plug-ins' Hosting States from Plug-in Hosting. */
+    ChannelStrip (CommandRegistry&, PluginHosting&, ThemeManager&, StripRole);
     ~ChannelStrip() override;
 
     void setState (const StripState&);

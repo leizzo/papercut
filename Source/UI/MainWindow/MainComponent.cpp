@@ -23,7 +23,7 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
                Library::defaultRoot()),
       detailView (app.model, app.plugins, app.engine.getPluginHosting(), app.commands, app.theme, shell,
                   app.uiState.getState ("detail")),
-      mixerView (app.model, app.mixer, app.plugins, app.commands, app.theme,
+      mixerView (app.model, app.mixer, app.plugins, app.engine.getPluginHosting(), app.commands, app.theme,
                  app.uiState.getState ("mixer")),
       sessionPlaceholder (app.theme, "The Session view arrives with M5."),
       editorPlaceholder (app.theme, "The audio Editor arrives with M4. Double-click an audio clip then."),

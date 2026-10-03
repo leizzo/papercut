@@ -33,7 +33,7 @@ class MixerView : public juce::Component,
 public:
     static constexpr const char* componentId = "mixer";
 
-    MixerView (ApplicationModel&, Mixer&, PluginRack&, CommandRegistry&, ThemeManager&, juce::ValueTree uiState);
+    MixerView (ApplicationModel&, Mixer&, PluginRack&, PluginHosting&, CommandRegistry&, ThemeManager&, juce::ValueTree uiState);
     ~MixerView() override;
 
     /** A strip's Track chain row was clicked. */
@@ -52,6 +52,7 @@ private:
     ApplicationModel& model;
     Mixer& mixer;
     PluginRack& plugins;
+    PluginHosting& hosting;
     CommandRegistry& commands;
     ThemeManager& themeManager;
 

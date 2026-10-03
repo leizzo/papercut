@@ -193,17 +193,17 @@ void PluginDeviceCard::setState (const PluginInfo& info)
     // Never colour-only (§18): the vendor and the format are always said.
     const auto vendor = plugin.manufacturer.isNotEmpty() ? plugin.manufacturer : juce::String ("Unknown vendor");
     setDescription (vendor + " " + middleDot + " " + plugin.formatBadge() + " plug-in"
-                    + (plugin.missing ? ", missing" : isCrashed() ? ", crashed" : ""));
+                    + (isMissing() ? ", missing" : isCrashed() ? ", crashed" : ""));
     setAlpha (plugin.enabled ? 1.0f : 0.5f);
     power.setToggleState (plugin.enabled, juce::dontSendNotification);
 
-    openWindow->setVisible (! plugin.missing && ! isCrashed());
-    pinLearn->setVisible (! plugin.missing && ! isCrashed());
-    locate->setVisible (plugin.missing);
-    replace->setVisible (plugin.missing);
-    reload->setVisible (isCrashed() && ! plugin.missing);
+    openWindow->setVisible (! isMissing() && ! isCrashed());
+    pinLearn->setVisible (! isMissing() && ! isCrashed());
+    locate->setVisible (isMissing());
+    replace->setVisible (isMissing());
+    reload->setVisible (isCrashed());
 
-    if (plugin.missing || isCrashed() || plugin.pinnedParameters.size() >= PluginRack::maxPinnedParameters)
+    if (isMissing() || isCrashed() || plugin.pinnedParameters.size() >= PluginRack::maxPinnedParameters)
         setLearningPins (false);
 
     rebuildPins();
@@ -215,7 +215,7 @@ void PluginDeviceCard::setLearningPins (bool learn)
 {
     touchWatch.reset();
 
-    if (learn && ! plugin.missing && ! isCrashed() && plugin.pinnedParameters.size() < PluginRack::maxPinnedParameters)
+    if (learn && ! isMissing() && ! isCrashed() && plugin.pinnedParameters.size() < PluginRack::maxPinnedParameters)
     {
         // Pinned after the touch's callback returns: the fourth pin ends learning, which deletes the watch.
         touchWatch = rack.watchTouches (plugin.id, [this] (const juce::String& parameterId)
@@ -299,7 +299,7 @@ void PluginDeviceCard::resized()
     auto area = body();
     auto buttons = area.removeFromTop (buttonHeight);
 
-    if (plugin.missing)
+    if (isMissing())
     {
         // The Missing badge sits left of Locate and Replace.
         buttons.removeFromLeft (missingBadgeWidth + bodyGap);
@@ -382,13 +382,13 @@ void PluginDeviceCard::paint (juce::Graphics& g)
                     vendorStyle, titles, juce::Justification::centredLeft, theme.textDim);
 
     // Body: the Missing or Crashed badge, or the Pinned Parameters header.
-    if (plugin.missing || isCrashed())
+    if (isMissing() || isCrashed())
     {
         const auto badgeArea = body().removeFromTop (buttonHeight).removeFromLeft (missingBadgeWidth)
                                      .withSizeKeepingCentre (missingBadgeWidth, 14);
         g.setColour (theme.rec.withAlpha (0.2f));
         g.fillRoundedRectangle (badgeArea.toFloat(), 3.0f);
-        drawStyledText (g, themeManager, plugin.missing ? "Missing" : "Crashed", theme.micro, badgeArea,
+        drawStyledText (g, themeManager, isMissing() ? "Missing" : "Crashed", theme.micro, badgeArea,
                         juce::Justification::centred, theme.rec);
     }
     else
@@ -421,13 +421,14 @@ void PluginDeviceCard::paint (juce::Graphics& g)
             case HostingState::Kind::crashed:     return "sandbox";
             case HostingState::Kind::inProcess:   return "in-process";
             case HostingState::Kind::failed:      return "failed";
+            case HostingState::Kind::missing:     return "missing";
         }
 
         return "";
     }());
 
     // Outline: red dashes when missing, red when crashed, 1.5 px accent-dim while the window is open.
-    if (plugin.missing)
+    if (isMissing())
     {
         drawDashedOutline (g, bounds.reduced (1.0f), radius, theme.rec);
     }
@@ -466,14 +467,14 @@ void PluginDeviceCard::timerCallback()
 void PluginDeviceCard::mouseDoubleClick (const juce::MouseEvent& e)
 {
     // Opens or focuses the window; a plug-in card never collapses.
-    if (getTitleBar().contains (e.getPosition()) && ! power.getBounds().contains (e.getPosition()) && ! plugin.missing
+    if (getTitleBar().contains (e.getPosition()) && ! power.getBounds().contains (e.getPosition()) && ! isMissing()
         && ! isCrashed() && onOpenEditor)
         onOpenEditor();
 }
 
 void PluginDeviceCard::addMenuItems (juce::PopupMenu& menu)
 {
-    menu.addItem ("Open Plug-in Window", ! plugin.missing && ! isCrashed(), false, [this] { if (onOpenEditor) onOpenEditor(); });
+    menu.addItem ("Open Plug-in Window", ! isMissing() && ! isCrashed(), false, [this] { if (onOpenEditor) onOpenEditor(); });
 
     if (isCrashed())
         menu.addItem ("Reload", [this] { commands.invoke (cmd::pluginReload, { trackId, plugin.id }); });
@@ -489,7 +490,7 @@ void PluginDeviceCard::addMenuItems (juce::PopupMenu& menu)
     }
 
     menu.addSubMenu ("Pin Parameter", pinMenu, pinMenu.getNumItems() > 0);
-    menu.addItem ("Pin by Touching in Window", ! plugin.missing && ! isCrashed() && ! full, isLearningPins(),
+    menu.addItem ("Pin by Touching in Window", ! isMissing() && ! isCrashed() && ! full, isLearningPins(),
                   [this] { setLearningPins (! isLearningPins()); });
     menu.addSeparator();
 }

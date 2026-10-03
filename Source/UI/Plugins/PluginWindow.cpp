@@ -55,6 +55,7 @@ namespace
             case HostingState::Kind::inProcess:   return "in-process";
             case HostingState::Kind::crashed:     return "crashed";
             case HostingState::Kind::failed:      return "not loaded";
+            case HostingState::Kind::missing:     return "missing";
         }
 
         return {};
@@ -70,6 +71,7 @@ namespace
             case HostingState::Kind::inProcess:   return "Not sandboxed: in-process";
             case HostingState::Kind::crashed:     return "Crashed: its sandbox died";
             case HostingState::Kind::failed:      return "Not loaded";
+            case HostingState::Kind::missing:     return "Missing: not installed";
         }
 
         return {};

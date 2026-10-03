@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/PluginHosting.h"
 #include "Engine/PluginRack.h"
 #include "UI/Theme/Interaction.h"
 
@@ -12,14 +13,17 @@ namespace resamper
     mixer insert slot, 19 high. A native device is Filled: a power LED (accent
     when on) and its name. A plug-in adds a plug icon and its format (VST3,
     AU, CLAP) after the name, so the two are told apart without colour. Empty:
-    a bg-slot well that stays visible as a drop target. A missing plug-in keeps
-    its name, gets a red dashed outline and a MISSING badge. The strip and the
-    mixer give it behaviour through the callbacks. */
+    a bg-slot well that stays visible as a drop target. A Missing plug-in keeps
+    its name, gets a red dashed outline and a MISSING badge; Plug-in Hosting
+    pushes its Hosting State to the slot. The strip and the mixer give it
+    behaviour through the callbacks. */
 class InsertSlot : public juce::Component,
-                   public juce::SettableTooltipClient
+                   public juce::SettableTooltipClient,
+                   private PluginHosting::Listener
 {
 public:
-    InsertSlot (ThemeManager&, int index);
+    InsertSlot (ThemeManager&, PluginHosting&, int index);
+    ~InsertSlot() override;
 
     int getIndex() const noexcept                              { return index; }
     const std::optional<PluginInfo>& getPlugin() const noexcept  { return plugin; }
@@ -43,10 +47,16 @@ public:
 
 private:
     ThemeManager& themeManager;
+    PluginHosting& hosting;
     int index;
     std::optional<PluginInfo> plugin;
+    HostingState hostingState;
     std::optional<bool> dropHighlight;
     bool dragStarted = false;
+
+    bool isMissing() const noexcept   { return plugin && hostingState.kind == HostingState::Kind::missing; }
+    void updateTooltip();
+    void hostingStateChanged (const juce::String& pluginId, const HostingState&) override;
 };
 
 } // namespace resamper

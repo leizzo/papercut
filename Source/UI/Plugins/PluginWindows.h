@@ -122,6 +122,7 @@ private:
     void selectTrackOf (const FloatingDeviceWindow&);
     void announceAndFocus (FloatingDeviceWindow&);
     void openWindowsChanged();
+    bool isMissing (const juce::String& pluginId) const;
 
     void modelChanged() override;
     /** The plug-in crashed: its window closes, and a toast offers Reload. */

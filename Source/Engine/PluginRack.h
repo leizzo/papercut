@@ -43,7 +43,6 @@ struct PluginInfo
     bool external = false;                      ///< a scanned plug-in (VST3, AU), not a built-in
     PluginChain chain = PluginChain::device;   ///< on a track: which chain it is on
     bool enabled = true;                        ///< false when bypassed
-    bool missing = false;                       ///< saved in the project but not installed; audio passes through
     bool failedScan = false;                    ///< in the catalogue: its scan crashed or timed out; it can only be retried
     int latencySamples = 0;                     ///< the latency the plug-in reports
     juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
@@ -125,7 +124,7 @@ public:
         file in its own scan worker process (PluginScanner) with a timeout, so
         one that hangs or crashes fails alone and the scan goes on. No-op if one
         is running. A file that failed before is not tried again until retried.
-        When it finishes, missing plug-ins it found load (a card's Locate). */
+        Plug-in Hosting starts the Missing plug-ins it finds. */
     void startScan();
     bool isScanning() const;
 
@@ -224,9 +223,10 @@ public:
         so not an undo step, but saved with the project. */
     juce::Result setSize (const juce::String& pluginId, DeviceSize);
 
-    /** Finds a missing plug-in in file (a bundle or plug-in file the user
-        points at): scans it, then loads the plug-in from it. Fails if the
-        plug-in isn't missing or the file doesn't hold it. */
+    /** Finds a Missing plug-in in file (a bundle or plug-in file the user
+        points at): scans it, then Plug-in Hosting starts the plug-in from it,
+        taking its description from the file. Fails if the plug-in isn't
+        Missing or the file doesn't hold it. */
     juce::Result locate (const juce::String& pluginId, const juce::File&);
 
     /** The share of the audio callback the plug-in last took, 0..1. */
@@ -319,10 +319,6 @@ private:
     void stopScan();
     void publishExternalSnapshot();
 
-    /** Loads each missing plug-in of the Edit that the scan now knows. Message thread. */
-    void reloadMissing();
-
-    JUCE_DECLARE_WEAK_REFERENCEABLE (PluginRack)
     JUCE_DECLARE_NON_COPYABLE (PluginRack)
 };
 

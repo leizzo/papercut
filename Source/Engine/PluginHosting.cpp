@@ -24,6 +24,14 @@ namespace
         return false;
     }
 
+    /** Whether the catalogue knows the plug-in, by its identifier or its file. */
+    bool isKnown (te::ExternalPlugin& plugin)
+    {
+        auto& known = plugin.engine.getPluginManager().knownPluginList;
+        return known.getTypeForIdentifierString (plugin.desc.createIdentifierString()) != nullptr
+            || known.getTypeForFile (plugin.desc.fileOrIdentifier) != nullptr;
+    }
+
     /** Creates the plug-in's instance anew, now, from the state saved on it; its old one goes first. */
     void createAgain (te::ExternalPlugin& plugin)
     {
@@ -68,11 +76,14 @@ PluginHosting::Impl::~Impl()
     sandbox.removeListener (this);
 }
 
-void PluginHosting::Impl::attachTo (te::Engine& engine)
+void PluginHosting::Impl::attachTo (te::Engine& e)
 {
+    engine = &e;
+
     // A plug-in of an Edit runs in its sandbox when shouldLoad said so (its host
     // has loaded it by now); anything else, as the engine would.
-    auto& plugins = engine.getPluginManager();
+    auto& plugins = e.getPluginManager();
+    plugins.knownPluginList.addChangeListener (this);
     plugins.createPluginInstance = [this, inProcess = plugins.createPluginInstance]
                                    (const juce::PluginDescription& desc, double rate, int blockSize, juce::String& error)
     {
@@ -84,6 +95,14 @@ void PluginHosting::Impl::attachTo (te::Engine& engine)
 
         return inProcess (desc, rate, blockSize, error);
     };
+}
+
+void PluginHosting::Impl::detach()
+{
+    if (engine != nullptr)
+        engine->getPluginManager().knownPluginList.removeChangeListener (this);
+
+    engine = nullptr;
 }
 
 bool PluginHosting::Impl::shouldLoad (te::ExternalPlugin& plugin)
@@ -114,6 +133,18 @@ void PluginHosting::Impl::recreate (te::ExternalPlugin& plugin)
         return;
 
     createAgain (plugin);
+}
+
+bool PluginHosting::Impl::isMissing (te::ExternalPlugin& plugin) const
+{
+    return ! isStarted (plugin) && plugin.isMissing() && ! isKnown (plugin);
+}
+
+void PluginHosting::Impl::startMissing (te::ExternalPlugin& plugin)
+{
+    // The engine looks for it again; found, it asks shouldLoad, and so it is Loading.
+    if (! isStarted (plugin))
+        plugin.forceFullReinitialise();
 }
 
 bool PluginHosting::Impl::runsSandboxed (te::ExternalPlugin& plugin) const
@@ -194,6 +225,32 @@ te::ExternalPlugin* PluginHosting::Impl::find (const juce::String& pluginId) con
 {
     const auto found = hosted.find (pluginId);
     return found != hosted.end() ? found->second.plugin.get() : nullptr;
+}
+
+te::Plugin* PluginHosting::Impl::findInEdits (const juce::String& pluginId) const
+{
+    if (engine == nullptr)
+        return nullptr;
+
+    const auto id = te::EditItemID::fromString (pluginId);
+    const auto edits = engine->getActiveEdits().getEdits();
+
+    for (int i = edits.size(); --i >= 0;)
+        if (auto plugin = te::findPluginForID (*edits.getUnchecked (i), id))
+            return plugin.get();
+
+    return nullptr;
+}
+
+te::ExternalPlugin* PluginHosting::Impl::findStarted (const juce::String& pluginId) const
+{
+    auto* started = find (pluginId);
+    return started != nullptr && findInEdits (pluginId) == started ? started : nullptr;
+}
+
+bool PluginHosting::Impl::isStarted (const te::ExternalPlugin& plugin) const
+{
+    return find (plugin.itemID.toString()) == &plugin;
 }
 
 void PluginHosting::Impl::startLoading (te::ExternalPlugin& plugin, bool deferred)
@@ -339,6 +396,27 @@ void PluginHosting::Impl::selectableObjectAboutToBeDeleted (te::Selectable* sele
             entry.listening = false;
 }
 
+void PluginHosting::Impl::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    if (engine == nullptr)
+        return;
+
+    // Starting one may change the Edit's plug-ins (the engine re-reads them): collect first.
+    // One not processing the engine wouldn't load anyway.
+    std::vector<te::SafeSelectable<te::ExternalPlugin>> found;
+
+    for (auto* edit : engine->getActiveEdits().getEdits())
+        for (auto* plugin : te::getAllPlugins (*edit, true))
+            if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin);
+                external != nullptr && external->isProcessingEnabled() && ! isStarted (*external)
+                && external->isMissing() && isKnown (*external))
+                found.push_back (te::makeSafeRef (*external));
+
+    for (auto& ref : found)
+        if (auto* plugin = ref.get())
+            startMissing (*plugin);
+}
+
 //==============================================================================
 PluginHosting::PluginHosting() : impl (std::make_unique<Impl>()) {}
 PluginHosting::~PluginHosting() = default;
@@ -356,13 +434,20 @@ void PluginHosting::removeHostedFormat (const juce::String& formatName)
 
 HostingState PluginHosting::getState (const juce::String& pluginId) const
 {
-    const auto found = impl->hosted.find (pluginId);
-    return found != impl->hosted.end() && found->second.plugin.get() != nullptr ? found->second.state : HostingState();
+    auto* external = dynamic_cast<te::ExternalPlugin*> (impl->findInEdits (pluginId));
+
+    if (external == nullptr)
+        return {};
+
+    if (impl->isStarted (*external))
+        return impl->hosted[pluginId].state;
+
+    return impl->isMissing (*external) ? HostingState { HostingState::Kind::missing, {} } : HostingState();
 }
 
 juce::Result PluginHosting::reload (const juce::String& pluginId)
 {
-    auto* plugin = impl->find (pluginId);
+    auto* plugin = impl->findStarted (pluginId);
 
     if (plugin == nullptr)
         return juce::Result::fail ("No plug-in to reload: it isn't there, or isn't one that loads");
@@ -373,7 +458,7 @@ juce::Result PluginHosting::reload (const juce::String& pluginId)
 
 juce::Result PluginHosting::setSandboxed (const juce::String& pluginId, bool sandboxed)
 {
-    auto* plugin = impl->find (pluginId);
+    auto* plugin = impl->findStarted (pluginId);
 
     if (plugin == nullptr)
         return juce::Result::fail ("No plug-in to run in a sandbox: it isn't there, or isn't one that loads");

@@ -14,8 +14,9 @@ namespace
     const char* const flowStages[] = { "Track chain", "Inserts", "Sends", "Fader" };
 }
 
-MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, CommandRegistry& c, ThemeManager& tm, juce::ValueTree uiState)
-    : model (m), mixer (mx), plugins (p), commands (c), themeManager (tm), state (std::move (uiState)),
+MixerView::MixerView (ApplicationModel& m, Mixer& mx, PluginRack& p, PluginHosting& h, CommandRegistry& c, ThemeManager& tm,
+                      juce::ValueTree uiState)
+    : model (m), mixer (mx), plugins (p), hosting (h), commands (c), themeManager (tm), state (std::move (uiState)),
       meterMode (tm, { "Peak", "RMS", "LUFS" }, Segmented::Style::sunken),
       resetPeaks (tm, "Reset Peaks", Button::Variant::outline, Icon::rotateCcw),
       master (c, tm)
@@ -199,7 +200,7 @@ void MixerView::refresh()
 
         if (strip == nullptr)
         {
-            strip = std::make_unique<ChannelStrip> (commands, themeManager, stripInfo.role);
+            strip = std::make_unique<ChannelStrip> (commands, hosting, themeManager, stripInfo.role);
             strip->onTrackChainClicked = [this, id] { if (onShowDeviceChain) onShowDeviceChain (id); };
             strip->onShowMenu = [this, s = strip.get()] { showStripMenu (s->getState().strip); };
             strip->onFlowStageHovered = [this] (int stage) { setFlowStage (stage); };
