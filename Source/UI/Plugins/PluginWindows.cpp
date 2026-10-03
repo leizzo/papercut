@@ -54,7 +54,7 @@ std::unique_ptr<FloatingDeviceWindow> PluginWindows::createWindow (const PluginI
                                                             trackNameOf (info.trackId));
 
         // The error state's Run in-process: this instance leaves its sandbox, saved with the project.
-        plugInWindow->onRunInProcess = [this, id] { commands.invoke (cmd::pluginSetSandboxed, { id, false }); };
+        plugInWindow->onRunInProcess = [this, id] { commands.invoke (cmd::pluginSetRunInProcess, { id, true }); };
 
         window = std::move (plugInWindow);
     }

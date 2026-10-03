@@ -86,11 +86,11 @@ public:
         undo step. Fails for a plug-in Plug-in Hosting never started (a Missing one). */
     juce::Result reload (const juce::String& pluginId);
 
-    /** Runs the plug-in in its Sandbox (the default) or in-process (Run
-        in-process), and starts it again that way. Saved with the project, per
-        instance; never an undo step. A plug-in whose format can't be sandboxed
-        runs in-process either way. */
-    juce::Result setSandboxed (const juce::String& pluginId, bool sandboxed);
+    /** Runs the plug-in in-process (Run in-process) or back in its Sandbox,
+        and starts it again that way. Saved with the project, per instance;
+        never an undo step. A plug-in whose format can't be sandboxed runs
+        in-process either way. */
+    juce::Result setRunInProcess (const juce::String& pluginId, bool runInProcess);
 
     /** Runs the message loop until no plug-in is loading into its Sandbox, or a
         load's time is up: an offline render mustn't leave a loading plug-in out.
