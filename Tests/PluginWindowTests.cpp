@@ -51,7 +51,7 @@ struct PluginWindowTests : juce::UnitTest
 
         PluginWindows& windows()   { return main->getPluginWindows(); }
 
-        Toasts* toasts()   { return findType<Toasts> (*main); }
+        Toasts* toasts()   { return findTypeOrOnDesktop<Toasts> (*main); }
 
         /** The mixer's slot holding the insert, once the mixer shows it; nullptr if none does. */
         InsertSlot* insertSlot (const juce::String& pluginId)

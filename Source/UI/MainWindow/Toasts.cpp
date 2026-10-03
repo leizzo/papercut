@@ -11,6 +11,7 @@ namespace
 Toasts::Toasts (ThemeManager& tm) : themeManager (tm)
 {
     setInterceptsMouseClicks (true, false);
+    setOpaque (false);
     setAlwaysOnTop (true);
 }
 
@@ -31,7 +32,7 @@ void Toasts::show (const juce::String& message, std::vector<Action> actions, boo
     while ((int) toasts.size() > maxShown)
         toasts.pop_front();
 
-    layoutToasts();
+    followHost();
     toFront (false);
     startTimer (100);
 }
@@ -87,7 +88,7 @@ void Toasts::trigger (std::deque<Toast>::iterator toast, size_t index)
     // Closed before it runs: what it runs may show a toast of its own.
     const auto run = action.run;
     toasts.erase (toast);
-    layoutToasts();
+    followHost();
 
     if (run)
         run (true);
@@ -100,11 +101,11 @@ int Toasts::actionWidth (const Action& action) const
     return text + 2 * paddingX + (action.toggle.has_value() ? switchWidth + switchGap : 0);
 }
 
-void Toasts::layoutToasts()
+void Toasts::layoutToasts (int hostWidth, int hostHeight)
 {
     auto& theme = themeManager.getTheme();
     const auto font = themeManager.font (theme.body);
-    auto y = getHeight() - bottomMargin;
+    auto y = hostHeight - bottomMargin;
 
     for (auto it = toasts.rbegin(); it != toasts.rend(); ++it)
     {
@@ -114,9 +115,9 @@ void Toasts::layoutToasts()
         for (auto& action : it->actions)
             actionsWidth += actionWidth (action);
 
-        const auto width = juce::jmin (getWidth() - 40, textWidth + 2 * paddingX + actionsWidth);
+        const auto width = juce::jmin (hostWidth - 40, textWidth + 2 * paddingX + actionsWidth);
         y -= toastHeight;
-        it->bounds = juce::Rectangle<int> ((getWidth() - width) / 2, y, width, toastHeight);
+        it->bounds = juce::Rectangle<int> ((hostWidth - width) / 2, y, width, toastHeight);
         it->actionBounds.clear();
 
         auto right = it->bounds;
@@ -130,9 +131,82 @@ void Toasts::layoutToasts()
     repaint();
 }
 
+void Toasts::followHost()
+{
+    if (placing)
+        return;
+
+    if (toasts.empty())
+    {
+        if (isOnDesktop())
+            returnToHost();
+        else if (auto* parent = getParentComponent())
+        {
+            const juce::ScopedValueSetter<bool> guard (placing, true);
+            setBounds (parent->getLocalBounds());
+        }
+
+        return;
+    }
+
+    if (auto* parent = getParentComponent())
+        host = parent;
+
+    if (host == nullptr)
+        return;
+
+    anchored = host->getScreenBounds();
+    layoutToasts (host->getWidth(), host->getHeight());
+
+    juce::Rectangle<int> stack;
+
+    for (auto& toast : toasts)
+        stack = stack.getUnion (toast.bounds);
+
+    if (stack.isEmpty())
+        return;
+
+    const auto screen = host->localAreaToGlobal (stack);
+
+    for (auto& toast : toasts)
+    {
+        toast.bounds -= stack.getPosition();
+
+        for (auto& action : toast.actionBounds)
+            action -= stack.getPosition();
+    }
+
+    if (! isOnDesktop())
+    {
+        const juce::ScopedValueSetter<bool> guard (placing, true);
+        addToDesktop (juce::ComponentPeer::windowIsTemporary | juce::ComponentPeer::windowIgnoresKeyPresses);
+    }
+
+    if (getBounds() != screen)
+    {
+        const juce::ScopedValueSetter<bool> guard (placing, true);
+        setBounds (screen);
+    }
+}
+
+void Toasts::returnToHost()
+{
+    if (! isOnDesktop() || placing)
+        return;
+
+    const juce::ScopedValueSetter<bool> guard (placing, true);
+    removeFromDesktop();
+
+    if (host == nullptr)
+        return;
+
+    host->addAndMakeVisible (this);
+    setBounds (host->getLocalBounds());
+}
+
 void Toasts::resized()
 {
-    layoutToasts();
+    followHost();
 }
 
 bool Toasts::hitTest (int x, int y)
@@ -212,7 +286,7 @@ void Toasts::mouseUp (const juce::MouseEvent& e)
         }
 
         toasts.erase (it);
-        layoutToasts();
+        followHost();
         return;
     }
 }
@@ -225,8 +299,10 @@ void Toasts::timerCallback()
     while (! toasts.empty() && now - toasts.front().shownAt > (juce::uint32) lifetimeMs)
         toasts.pop_front();
 
-    if (toasts.size() != before)
-        layoutToasts();
+    const auto moved = host != nullptr && host->getScreenBounds() != anchored;
+
+    if (toasts.size() != before || moved)
+        followHost();
 
     if (toasts.empty())
         stopTimer();

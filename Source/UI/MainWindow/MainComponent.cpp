@@ -234,7 +234,7 @@ void MainComponent::resized()
     using View = ShellState::View;
     auto& metrics = app.theme.getMetrics();
     auto r = getLocalBounds();
-    toasts.setBounds (r);
+    toasts.followHost();
     topBar.setBounds (r.removeFromTop (metrics.topBarHeight));
 
     if (statusBarHost.isVisible())
