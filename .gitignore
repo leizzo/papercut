@@ -8,3 +8,4 @@ cmake-build-*/
 .juggler/
 docs/research/**
 PRD.md
+.mcp.json
