@@ -168,6 +168,29 @@ bool PluginHosting::Impl::takeLoading (const juce::String& identifier, juce::Str
     return false;
 }
 
+void PluginHosting::Impl::forgetGoneEdits (const te::ExternalPlugin* joining)
+{
+    // Open makes the new Edit before the old one goes: then an id the new Edit takes is the old one's no more.
+    const auto joiningId = joining != nullptr ? joining->itemID.toString() : juce::String();
+
+    for (auto it = hosted.begin(); it != hosted.end();)
+    {
+        auto& [id, entry] = *it;
+        const auto* edit = entry.edit.get();
+
+        if (edit == nullptr || (joining != nullptr && id == joiningId && edit != &joining->edit))
+        {
+            sandbox.dropLoad (id);
+            stopListening (entry);
+            it = hosted.erase (it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
 te::ExternalPlugin* PluginHosting::Impl::find (const juce::String& pluginId) const
 {
     const auto found = hosted.find (pluginId);
@@ -177,26 +200,7 @@ te::ExternalPlugin* PluginHosting::Impl::find (const juce::String& pluginId) con
 void PluginHosting::Impl::startLoading (te::ExternalPlugin& plugin, bool deferred)
 {
     const auto pluginId = plugin.itemID.toString();
-
-    // Plug-ins that have gone (deleted, or their Edit closed) are forgotten. Sandbox loads go by
-    // plug-in id, and a new Edit numbers its ids afresh: a load an Edit left pending is dropped
-    // once that Edit has gone, or (Open makes the new Edit before the old one goes) once a plug-in
-    // of another Edit takes its id. An undone plug-in's load stays, for its Redo.
-    for (auto it = hosted.begin(); it != hosted.end();)
-    {
-        auto& [id, entry] = *it;
-
-        if (entry.edit.get() == nullptr || (id == pluginId && entry.edit.get() != &plugin.edit))
-        {
-            sandbox.dropLoad (id);
-            stopListening (entry);
-            it = hosted.erase (it);
-        }
-        else
-        {
-            it = entry.plugin.get() == nullptr ? hosted.erase (it) : std::next (it);
-        }
-    }
+    forgetGoneEdits (&plugin);
 
     auto& entry = hosted[pluginId];
 
@@ -389,6 +393,8 @@ juce::Result PluginHosting::setSandboxed (const juce::String& pluginId, bool san
 
 bool PluginHosting::waitForLoads()
 {
+    // Not for a load of an Edit that has gone.
+    impl->forgetGoneEdits();
     return impl->sandbox.waitForLoads();
 }
 

@@ -45,7 +45,7 @@ private:
     struct Hosted
     {
         tracktion::SafeSelectable<tracktion::ExternalPlugin> plugin;
-        tracktion::SafeSelectable<tracktion::Edit> edit;   ///< the plug-in's Edit: a load it leaves pending is that Edit's only
+        tracktion::SafeSelectable<tracktion::Edit> edit;   ///< the plug-in's Edit: the entry (and its Sandbox load) goes with it
         HostingState state;
         HostingState heard;           ///< the state Listeners last heard for its id
         bool creatingAsync = false;   ///< the engine creates it asynchronously (AUv3): its end of Loading comes as a change
@@ -70,6 +70,11 @@ private:
     bool loadInSandbox (tracktion::ExternalPlugin&);
     void willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed);
     bool takeLoading (const juce::String& identifier, juce::String& pluginId, bool& sandboxed);
+
+    /** Forgets the plug-ins of Edits that have gone, and the one of another Edit under joining's id,
+        dropping any Sandbox load they left: loads go by plug-in id, and a new Edit numbers its ids
+        afresh. A plug-in gone from an Edit still there (undone) stays, its load kept for its Redo. */
+    void forgetGoneEdits (const tracktion::ExternalPlugin* joining = nullptr);
 
     /** The plug-in, if Plug-in Hosting started it and it is still there. */
     tracktion::ExternalPlugin* find (const juce::String& pluginId) const;

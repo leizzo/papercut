@@ -1761,7 +1761,8 @@ bool PluginSandbox::loadInBackground (const juce::PluginDescription& desc, const
     // Made here, on the message thread: the loader only copies it, and it is read back here.
     juce::WeakReference<PluginSandbox> self (this);
 
-    loaders->addJob ([remote = load->remote, request, name = desc.name, self, pluginId, which = load.get()]() mutable
+    // Weakly: a load dropped since is gone, and a new one may have taken its address.
+    loaders->addJob ([remote = load->remote, request, name = desc.name, self, pluginId, which = std::weak_ptr<Load> (load)]() mutable
     {
         juce::String error;
         auto loaded = loadInHost (*remote, request, name, error);
@@ -1770,7 +1771,8 @@ bool PluginSandbox::loadInBackground (const juce::PluginDescription& desc, const
         juce::MessageManager::callAsync ([self, pluginId, which, loaded, error]
         {
             if (auto* sandbox = self.get())
-                sandbox->loadFinished (pluginId, which, loaded, error);
+                if (const auto load = which.lock())
+                    sandbox->loadFinished (pluginId, load.get(), loaded, error);
         });
     });
 
