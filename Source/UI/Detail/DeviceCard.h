@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/PluginHosting.h"
 #include "Engine/PluginRack.h"
 #include "UI/Controls/ContinuousValue.h"
 #include "UI/Controls/Controls.h"
@@ -29,9 +30,9 @@ class DeviceCard : public juce::Component
 public:
     static constexpr int height = 164;
 
-    /** The card for info's contract. */
-    static std::unique_ptr<DeviceCard> create (CommandRegistry&, PluginRack&, ThemeManager&, const juce::String& trackId,
-                                               const PluginInfo&);
+    /** The card for info's contract. A plug-in's card follows its Hosting State. */
+    static std::unique_ptr<DeviceCard> create (CommandRegistry&, PluginRack&, PluginHosting&, ThemeManager&,
+                                               const juce::String& trackId, const PluginInfo&);
 
     const PluginInfo& getPlugin() const noexcept   { return plugin; }
 

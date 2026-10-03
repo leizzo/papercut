@@ -23,7 +23,8 @@ class DetailView : public juce::Component,
                    private ApplicationModel::Listener
 {
 public:
-    DetailView (ApplicationModel&, PluginRack&, CommandRegistry&, ThemeManager&, ShellState&, juce::ValueTree uiState);
+    DetailView (ApplicationModel&, PluginRack&, PluginHosting&, CommandRegistry&, ThemeManager&, ShellState&,
+                juce::ValueTree uiState);
     ~DetailView() override;
 
     /** A card wants its device's window: a plug-in's window (its Open
@@ -58,6 +59,7 @@ private:
 
     ApplicationModel& model;
     PluginRack& rack;
+    PluginHosting& hosting;
     CommandRegistry& commands;
     ThemeManager& themeManager;
     ShellState& shell;

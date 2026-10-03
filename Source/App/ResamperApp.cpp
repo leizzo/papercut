@@ -16,7 +16,7 @@ ResamperApp::ResamperApp (EngineManager& e, ThemeManager& t)
 
     registerAppCommands (commands, model, host);
     registerProductionCommands (commands, production, model, theme, host);
-    registerPluginCommands (commands, plugins, host);
+    registerPluginCommands (commands, plugins, engine.getPluginHosting(), host);
     registerMixerCommands (commands, mixer, host);
     registerSessionCommands (commands, session, host);
     registerAutomationCommands (commands, automation, shaper, host);

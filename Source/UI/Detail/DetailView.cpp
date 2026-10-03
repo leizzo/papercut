@@ -174,7 +174,7 @@ struct DetailView::Chain : juce::Component,
                     continue;
                 }
 
-                auto card = DeviceCard::create (owner.commands, owner.rack, owner.themeManager, track, plugin);
+                auto card = DeviceCard::create (owner.commands, owner.rack, owner.hosting, owner.themeManager, track, plugin);
                 card->onSizeChange = [this, id = plugin.id] (DeviceSize size)
                 {
                     owner.commands.invoke (cmd::pluginSetSize, { id, size });
@@ -291,8 +291,9 @@ struct DetailView::Chain : juce::Component,
 };
 
 //==============================================================================
-DetailView::DetailView (ApplicationModel& m, PluginRack& r, CommandRegistry& c, ThemeManager& tm, ShellState& s, juce::ValueTree uiState)
-    : model (m), rack (r), commands (c), themeManager (tm), shell (s), state (std::move (uiState)),
+DetailView::DetailView (ApplicationModel& m, PluginRack& r, PluginHosting& h, CommandRegistry& c, ThemeManager& tm, ShellState& s,
+                        juce::ValueTree uiState)
+    : model (m), rack (r), hosting (h), commands (c), themeManager (tm), shell (s), state (std::move (uiState)),
       clipPanel (std::make_unique<ClipPanel> (tm)), chain (std::make_unique<Chain> (*this))
 {
     chainView.setViewedComponent (chain.get(), false);

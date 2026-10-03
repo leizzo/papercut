@@ -21,7 +21,7 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
       pianoRoll (app.model, app.commands, app.theme, app.uiState),
       browser (app.commands, app.plugins, app.model, app.theme, app.preview,
                Library::defaultRoot()),
-      detailView (app.model, app.plugins, app.commands, app.theme, shell,
+      detailView (app.model, app.plugins, app.engine.getPluginHosting(), app.commands, app.theme, shell,
                   app.uiState.getState ("detail")),
       mixerView (app.model, app.mixer, app.plugins, app.commands, app.theme,
                  app.uiState.getState ("mixer")),
@@ -30,7 +30,7 @@ MainComponent::MainComponent (ResamperApp& a, juce::ApplicationCommandManager& c
       pianoRollPlaceholder (app.theme, "Select a MIDI clip, or double-click one, to edit its notes."),
       developerOverlay (app.theme),
       toasts (app.theme),
-      pluginWindows (app.model, app.plugins, app.commands, app.theme, app.preferences)
+      pluginWindows (app.model, app.plugins, app.engine.getPluginHosting(), app.commands, app.theme, app.preferences)
 {
     // Every Command a layout or the menus may name must be registered before they build.
     registerPrimitives (factory, app.commands, app.theme);

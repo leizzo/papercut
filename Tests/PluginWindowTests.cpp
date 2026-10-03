@@ -175,7 +175,7 @@ struct PluginWindowTests : juce::UnitTest
             const auto id = f.insert (pinboard);
             auto* toasts = f.toasts();
             const auto message = toasts != nullptr ? toasts->getMessages()[toasts->getMessages().size() - 1] : juce::String();
-            expect (dispatchUntil ([&] { return ! f.plugins.isLoading (id); }));
+            expect (dispatchUntil ([&] { return f.app.engine.getPluginHosting().getState (id).isRunning(); }));
             expect (toasts != nullptr && toasts->runAction (message, "Undo"));
 
             // It was the insert itself undone: the history is back where it was, the insert waiting to be redone.

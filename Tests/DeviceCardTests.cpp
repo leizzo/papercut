@@ -43,7 +43,7 @@ struct DeviceCardTests : juce::UnitTest
 
         std::unique_ptr<DetailView> view()
         {
-            auto v = std::make_unique<DetailView> (model, plugins, commands, theme, shell, uiState);
+            auto v = std::make_unique<DetailView> (model, plugins, app.engine.getPluginHosting(), commands, theme, shell, uiState);
             v->setSize (1400, 240);
             return v;
         }
@@ -69,7 +69,7 @@ struct DeviceCardTests : juce::UnitTest
             expect (! chain[0].external && chain[1].external);
             expectEquals (chain[1].manufacturer, juce::String ("Resamper Tests"));
             expectEquals (chain[1].version, juce::String ("1.2.0"));
-            expect (! chain[1].sandboxed);
+            expect (dispatchUntil ([&] { return f.app.engine.getPluginHosting().getState (chain[1].id).kind == HostingState::Kind::inProcess; }));
 
             auto view = f.view();
             expectEquals ((int) findAll (*view, "DeviceCard/Native").size(), 1);

@@ -4,6 +4,8 @@
 #include "PluginSandbox.h"
 
 #include <tracktion_engine/tracktion_engine.h>
+#include <functional>
+#include <map>
 #include <mutex>
 #include <vector>
 
@@ -11,7 +13,8 @@ namespace resamper
 {
 
 /** Plug-in Hosting's engine side: what the engine owner wires into Tracktion. */
-struct PluginHosting::Impl : private PluginSandbox::Listener
+struct PluginHosting::Impl : private PluginSandbox::Listener,
+                             private tracktion::SelectableListener
 {
     Impl();
     ~Impl() override;
@@ -21,14 +24,14 @@ struct PluginHosting::Impl : private PluginSandbox::Listener
     void attachTo (tracktion::Engine&);
 
     /** The engine is about to create a plug-in of an Edit (EngineBehaviour::shouldLoadPlugin,
-        after the default check): false while a sandboxed one loads into its host in the
-        background (it has no instance till then; it is created again once it has). */
+        after the default check): it is Loading. False while a sandboxed one loads into its
+        host in the background (it has no instance till then; it is created again once it has). */
     bool shouldLoad (tracktion::ExternalPlugin&);
 
     /** Creates a plug-in's instance anew from the state saved on it (Reload, Run
-        in-process): at once if it runs in-process; if sandboxed, once its new host
-        has loaded it in the background, the old instance (bypassed, if it crashed)
-        staying till then. Never an undo step. */
+        in-process), Loading till it has: at once if it runs in-process; if sandboxed,
+        once its new host has loaded it in the background, the old instance (bypassed,
+        if it crashed) staying till then. Never an undo step. */
     void recreate (tracktion::ExternalPlugin&);
 
 private:
@@ -37,6 +40,19 @@ private:
     PluginSandbox sandbox;
     juce::StringArray hostedFormats;
     juce::ListenerList<PluginHosting::Listener> listeners;
+
+    /** A plug-in Plug-in Hosting has started, and its Hosting State. */
+    struct Hosted
+    {
+        tracktion::SafeSelectable<tracktion::ExternalPlugin> plugin;
+        HostingState state;
+        HostingState heard;           ///< the state Listeners last heard for its id
+        bool creatingAsync = false;   ///< the engine creates it asynchronously (AUv3): its end of Loading comes as a change
+        bool listening = false;       ///< listening to the plug-in as a selectable
+        int loads = 0;                ///< counts the times it started Loading: a timeout is the newest one's only
+    };
+
+    std::map<juce::String, Hosted> hosted;   ///< by plug-in id; on the message thread
 
     /** What shouldLoad decided about the plug-in the engine creates next with an
         identifier (PluginDescription::createIdentifierString), for the creation hook. */
@@ -54,9 +70,37 @@ private:
     void willLoad (const juce::String& identifier, const juce::String& pluginId, bool sandboxed);
     bool takeLoading (const juce::String& identifier, juce::String& pluginId, bool& sandboxed);
 
+    /** The plug-in, if Plug-in Hosting started it and it is still there. */
+    tracktion::ExternalPlugin* find (const juce::String& pluginId) const;
+
+    /** The plug-in is Loading (again); its entry follows the plug-in object. Listeners hear at
+        once, or, inside the engine's creation of it (deferred), once that has returned. */
+    void startLoading (tracktion::ExternalPlugin&, bool deferred);
+
+    /** Calls fn from the message loop (after delayMs), if the plug-in is still the one Plug-in
+        Hosting has under its id. */
+    void later (tracktion::ExternalPlugin&, std::function<void (tracktion::ExternalPlugin&)> fn, int delayMs = 0);
+
+    /** The engine has created the plug-in (or failed to): Sandboxed or In-process if it has
+        an instance, Failed (with the engine's reason) if not, unless it still creates one. */
+    void settle (tracktion::ExternalPlugin&);
+
+    /** Sets the plug-in's state. Listeners hear of a change at once, or (deferred) from the
+        message loop, through tell: a deferred change overtaken before then is heard as the newer one. */
+    void setState (tracktion::ExternalPlugin&, const HostingState&, bool deferred = false);
+
+    /** Tells Listeners the plug-in's state, unless it is the one they heard last. */
+    void tell (const juce::String& pluginId);
+
+    void stopListening (Hosted&);
+
     void pluginCrashed (const juce::String& pluginId) override;
     void pluginUiClicked (const juce::String& pluginId) override;
 
+    void selectableObjectChanged (tracktion::Selectable*) override;
+    void selectableObjectAboutToBeDeleted (tracktion::Selectable*) override;
+
+    JUCE_DECLARE_WEAK_REFERENCEABLE (Impl)
     JUCE_DECLARE_NON_COPYABLE (Impl)
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FloatingDeviceWindow.h"
+#include "Engine/PluginHosting.h"
 
 namespace resamper
 {
@@ -18,25 +19,28 @@ class CommandRegistry;
       Copy A→B, undo / redo, Parameters, latency, CPU and the sandbox status;
     - the vendor UI at its native size (times the UI scale), never restyled;
       the toolbar's Parameters swaps it for a host-drawn panel of the
-      plug-in's parameters in the same place, and back. While the plug-in
-      instantiates, a host-drawn loading state, and after loadTimeoutMs an
-      error state with Retry and Run in-process;
+      plug-in's parameters in the same place, and back. While the plug-in is
+      Loading, a host-drawn loading state; if it Failed, an error state with
+      its reason, Retry and Run in-process;
     - footer: who renders the UI, its format and version, in- or
       out-of-process, the UI scale and, if the plug-in resizes, a grip.
 
-    It changes the plug-in only through Commands. Where it goes, whether it
-    shows and what closing does are PluginWindows' rules: the window reports
-    through its callbacks and the manager decides. */
+    It follows the plug-in's Hosting State, pushed to it through
+    setHostingState; it has no load timeout of its own (the Sandbox's is the
+    one). Only CPU and latency are polled. It changes the plug-in only through
+    Commands. Where it goes, whether it shows and what closing does are
+    PluginWindows' rules: the window reports through its callbacks and the
+    manager decides. */
 class PluginWindow : public FloatingDeviceWindow,
                      private juce::Timer,
+                     private juce::AsyncUpdater,
                      private juce::ComponentListener,
                      private ThemeManager::Listener
 {
 public:
-    PluginWindow (PluginRack&, CommandRegistry&, ThemeManager&, const PluginInfo&, const juce::String& trackName);
+    PluginWindow (PluginRack&, CommandRegistry&, ThemeManager&, const PluginInfo&, const HostingState&,
+                  const juce::String& trackName);
     ~PluginWindow() override;
-
-    static constexpr int defaultLoadTimeoutMs = 10000;
 
     /** The plug-in's latest state (name, bypass, preset, A/B, latency) and its track's name. */
     void setState (const PluginInfo&, const juce::String& trackName) override;
@@ -45,14 +49,13 @@ public:
     void setUiScale (int percent) override;
     int getUiScale() const override                  { return uiScale; }
 
+    /** The plug-in's Hosting State changed: Loading shows the loading state (letting go of
+        the vendor UI first), Sandboxed or In-process the vendor UI (from the message loop,
+        so the chrome shows first), Failed the error state. */
+    void setHostingState (const HostingState&);
+
     enum class Status { loading, ready, failed };
     Status getStatus() const noexcept                { return status; }
-
-    /** How long instantiating may take before the error state shows. */
-    void setLoadTimeoutMs (int ms)                   { loadTimeoutMs = ms; }
-
-    /** Starts instantiating again: the loading state, then the vendor UI. */
-    void retryLoading();
 
     /** Whether the window can resize its vendor UI (the plug-in resizes). */
     bool hasResizeGrip() const;
@@ -78,9 +81,9 @@ private:
     CommandRegistry& commands;
     int uiScale = 100;
     Status status = Status::loading;
-    int loadTimeoutMs = defaultLoadTimeoutMs;
-    juce::uint32 loadStartedAt = 0;
+    HostingState hostingState;
     juce::String cpuText;
+    std::unique_ptr<juce::VBlankAttachment> spinnerTurn;   ///< turns the loading state's spinner
 
     std::unique_ptr<juce::Component> vendor, parameterPanel;
     std::unique_ptr<ChromeButton> bypass, previousPreset, presetName, nextPreset, savePreset,
@@ -96,6 +99,8 @@ private:
 
     void updateSize();
     void updateTexts();
+    void showLoading();
+    void showFailed();
     void loadVendor();
     void showPresetMenu();
     void askPresetName();
@@ -108,6 +113,7 @@ private:
     bool releaseContentFocus() override;
 
     void timerCallback() override;
+    void handleAsyncUpdate() override;
     void componentMovedOrResized (juce::Component&, bool wasMoved, bool wasResized) override;
     void themeChanged() override;
 

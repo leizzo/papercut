@@ -16,7 +16,7 @@ namespace resamper
     plug-in window button (reading "Window open · focus" in accent while it
     is, with an accent-dim outline on the card) and up to 4 pinned parameters
     (name, mini bar, mono value), edited inline. The status footer shows CPU,
-    reported latency and the sandbox state. Double-clicking the title opens or
+    reported latency and where it runs (its Hosting State). Double-clicking the title opens or
     focuses the window.
 
     Pinning: the pin button in the Pinned Parameters header starts learning
@@ -27,15 +27,18 @@ namespace resamper
     A missing plug-in keeps its name, gets a red dashed outline and a Missing
     badge, and offers Locate (point at its file) and Replace instead of its window.
     A crashed one (its sandbox died; its audio is bypassed) gets a red outline
-    and a Crashed badge, and offers Reload instead of its window. The card
-    polls the rack for a crash, a reload and the sandbox state. */
+    and a Crashed badge, and offers Reload instead of its window. Plug-in
+    Hosting pushes the Hosting State to the card; only CPU and latency are
+    polled. */
 class PluginDeviceCard : public DeviceCard,
+                         private PluginHosting::Listener,
                          private juce::Timer
 {
 public:
     static constexpr int width = 214;
 
-    PluginDeviceCard (CommandRegistry&, PluginRack&, ThemeManager&, const juce::String& trackId, const PluginInfo&);
+    PluginDeviceCard (CommandRegistry&, PluginRack&, PluginHosting&, ThemeManager&, const juce::String& trackId,
+                      const PluginInfo&);
     ~PluginDeviceCard() override;
 
     void setState (const PluginInfo&) override;
@@ -53,6 +56,8 @@ private:
     class CardButton;
     class PinnedParameter;
 
+    PluginHosting& hosting;
+    HostingState hostingState;
     DevicePowerButton power;
     std::unique_ptr<CardButton> openWindow, locate, replace, reload, pinLearn;
     std::vector<std::unique_ptr<PinnedParameter>> pins;
@@ -63,6 +68,9 @@ private:
     juce::Rectangle<int> getTitleBar() const override;
     void addMenuItems (juce::PopupMenu&) override;
     void timerCallback() override;
+    void hostingStateChanged (const juce::String& pluginId, const HostingState&) override;
+
+    bool isCrashed() const noexcept   { return hostingState.kind == HostingState::Kind::crashed; }
 
     void rebuildPins();
     void setLearningPins (bool);

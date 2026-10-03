@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CommandRegistry.h"
+#include "Engine/PluginHosting.h"
 #include "Engine/PluginRack.h"
 
 namespace resamper
@@ -167,7 +168,7 @@ namespace cmd
 /** Registers the plug-in Commands above. plugin.insert and plugin.replace
     tell AppCommandHost::pluginAdded about the plug-in they add: the plug-in
     window's opening rule (PRD §9.6) hangs off that one place, whichever view
-    the insert came from. */
-void registerPluginCommands (CommandRegistry&, PluginRack&, AppCommandHost&);
+    the insert came from. plugin.reload and plugin.setSandboxed go to Plug-in Hosting. */
+void registerPluginCommands (CommandRegistry&, PluginRack&, PluginHosting&, AppCommandHost&);
 
 } // namespace resamper
