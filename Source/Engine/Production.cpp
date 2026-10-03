@@ -168,20 +168,15 @@ juce::Result Production::bounceTrack (const juce::String& trackId, const juce::F
     if (track == nullptr)
         return juce::Result::fail ("No track with id " + trackId);
 
-    if (! projects.getEngineManager().getPluginHosting().waitForLoads())
-        return juce::Result::fail ("A plug-in is still loading: try again once it has");
-
-    return render::toWav (projects.getEdit(), destFile, render::bitForTrack (*track));
+    return render::toWav (projects.getEngineManager().getPluginHosting(), projects.getEdit(), destFile,
+                          render::bitForTrack (*track));
 }
 
 juce::Result Production::exportMix (const juce::File& destFile)
 {
-    // Rendered now, a plug-in still loading in the background would be left out.
-    if (! projects.getEngineManager().getPluginHosting().waitForLoads())
-        return juce::Result::fail ("A plug-in is still loading: try again once it has");
-
     auto& edit = projects.getEdit();
-    return render::toWav (edit, destFile, te::toBitSet (te::getAllTracks (edit)));
+    return render::toWav (projects.getEngineManager().getPluginHosting(), edit, destFile,
+                          te::toBitSet (te::getAllTracks (edit)));
 }
 
 juce::Result Production::saveTemplate (const juce::File& destFolder)

@@ -1036,7 +1036,7 @@ juce::Result ApplicationModel::consolidateSelectedClips()
     const auto folder = ProjectManager::getAudioFolder (impl->projectManager.getProjectFolder());
     const auto file = folder.getChildFile (name + " consolidated.wav").getNonexistentSibling (false);
 
-    if (auto r = render::toWav (edit, file, render::bitForTrack (*track), range, false); r.failed())
+    if (auto r = render::clipsToWav (edit, file, render::bitForTrack (*track), range); r.failed())
         return r;
 
     impl->undo().beginStep ("Consolidate");
