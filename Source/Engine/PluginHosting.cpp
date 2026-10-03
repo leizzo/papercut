@@ -1,6 +1,7 @@
 #include "PluginHostingImpl.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace te = tracktion;
 
@@ -61,6 +62,9 @@ PluginHosting::Impl::Impl()
 
 PluginHosting::Impl::~Impl()
 {
+    for (auto& [id, entry] : hosted)
+        stopListening (entry);
+
     sandbox.removeListener (this);
 }
 
@@ -86,15 +90,26 @@ bool PluginHosting::Impl::shouldLoad (te::ExternalPlugin& plugin)
 {
     const auto sandboxed = runsSandboxed (plugin);
 
+    // Inside the engine's creation of the plug-in: Listeners hear once it has returned.
+    startLoading (plugin, true);
+
     if (sandboxed && ! loadInSandbox (plugin))
         return false;
 
     willLoad (plugin.desc.createIdentifierString(), plugin.itemID.toString(), sandboxed);
+
+    // The engine creates it as soon as this returns, on the message thread (ExternalPlugin
+    // does through callBlocking), whatever creation hook a test chains on: then it settles.
+    later (plugin, [this] (te::ExternalPlugin& p) { settle (p); });
+
     return true;
 }
 
 void PluginHosting::Impl::recreate (te::ExternalPlugin& plugin)
 {
+    // Listeners hear before the old instance goes: a window lets go of its editor first.
+    startLoading (plugin, false);
+
     if (runsSandboxed (plugin) && ! loadInSandbox (plugin))
         return;
 
@@ -153,14 +168,154 @@ bool PluginHosting::Impl::takeLoading (const juce::String& identifier, juce::Str
     return false;
 }
 
+te::ExternalPlugin* PluginHosting::Impl::find (const juce::String& pluginId) const
+{
+    const auto found = hosted.find (pluginId);
+    return found != hosted.end() ? found->second.plugin.get() : nullptr;
+}
+
+void PluginHosting::Impl::startLoading (te::ExternalPlugin& plugin, bool deferred)
+{
+    const auto pluginId = plugin.itemID.toString();
+
+    // Plug-ins that have gone (deleted, or their Edit closed) are forgotten.
+    std::erase_if (hosted, [] (const auto& e) { return e.second.plugin.get() == nullptr; });
+
+    auto& entry = hosted[pluginId];
+
+    // A plug-in undone and redone, or of a newly opened Edit, is a new object under the same id.
+    if (entry.plugin.get() != &plugin)
+    {
+        stopListening (entry);
+        entry.plugin = te::makeSafeRef (plugin);
+    }
+
+    const auto load = ++entry.loads;
+    entry.creatingAsync = ! runsSandboxed (plugin) && createsAsynchronously (plugin.engine, plugin.desc);
+
+    if (entry.creatingAsync)
+    {
+        // The engine creates it past the creation hook and tells only its selectable listeners
+        // when it has. It never says it failed: a load that takes the Sandbox's time has.
+        if (! std::exchange (entry.listening, true))
+            plugin.addSelectableListener (this);
+
+        later (plugin, [this, load] (te::ExternalPlugin& p)
+        {
+            if (const auto& e = hosted[p.itemID.toString()]; e.loads == load && e.state.kind == HostingState::Kind::loading
+                                                              && p.getAudioPluginInstance() == nullptr)
+                setState (p, { HostingState::Kind::failed, p.desc.name + " didn't load within "
+                                                               + juce::String (PluginSandbox::loadTimeoutMs / 1000) + " s" });
+        }, PluginSandbox::loadTimeoutMs);
+    }
+
+    setState (plugin, { HostingState::Kind::loading, {} }, deferred);
+}
+
+void PluginHosting::Impl::later (te::ExternalPlugin& plugin, std::function<void (te::ExternalPlugin&)> fn, int delayMs)
+{
+    // Ids repeat (an Edit opened after another starts numbering afresh): only the same plug-in object counts.
+    auto call = [self = juce::WeakReference<Impl> (this), ref = te::makeSafeRef (plugin), fn = std::move (fn)]
+    {
+        if (auto* p = ref.get(); self != nullptr && p != nullptr && self->find (p->itemID.toString()) == p)
+            fn (*p);
+    };
+
+    if (delayMs > 0)
+        juce::Timer::callAfterDelay (delayMs, std::move (call));
+    else
+        juce::MessageManager::callAsync (std::move (call));
+}
+
+void PluginHosting::Impl::settle (te::ExternalPlugin& plugin)
+{
+    // Loading into its sandbox again since.
+    if (sandbox.isLoading (plugin.itemID.toString()))
+        return;
+
+    auto& entry = hosted[plugin.itemID.toString()];
+
+    if (auto* instance = plugin.getAudioPluginInstance())
+    {
+        entry.creatingAsync = false;
+        setState (plugin, { PluginSandbox::isSandboxed (instance) ? HostingState::Kind::sandboxed
+                                                                  : HostingState::Kind::inProcess, {} });
+    }
+    else if (! plugin.isInitialisingAsync())
+    {
+        entry.creatingAsync = false;
+        setState (plugin, { HostingState::Kind::failed, plugin.getLoadError() });
+    }
+}
+
+void PluginHosting::Impl::setState (te::ExternalPlugin& plugin, const HostingState& state, bool deferred)
+{
+    auto& entry = hosted[plugin.itemID.toString()];
+
+    if (entry.state == state)
+        return;
+
+    entry.state = state;
+
+    if (deferred)
+        later (plugin, [this] (te::ExternalPlugin& p) { tell (p.itemID.toString()); });
+    else
+        tell (plugin.itemID.toString());
+}
+
+void PluginHosting::Impl::tell (const juce::String& pluginId)
+{
+    auto& entry = hosted[pluginId];
+
+    if (entry.heard == entry.state)
+        return;
+
+    entry.heard = entry.state;
+    const auto state = entry.state;
+    listeners.call ([&] (PluginHosting::Listener& l) { l.hostingStateChanged (pluginId, state); });
+}
+
+void PluginHosting::Impl::stopListening (Hosted& entry)
+{
+    if (auto* plugin = entry.plugin.get(); plugin != nullptr && entry.listening)
+        plugin->removeSelectableListener (this);
+
+    entry.listening = false;
+}
+
 void PluginHosting::Impl::pluginCrashed (const juce::String& pluginId)
 {
-    listeners.call ([&] (PluginHosting::Listener& l) { l.pluginCrashed (pluginId); });
+    auto* plugin = find (pluginId);
+
+    // Only its current instance's death counts, and a plug-in being reloaded is Loading.
+    if (plugin != nullptr && PluginSandbox::hasCrashed (plugin->getAudioPluginInstance())
+        && hosted[pluginId].state.kind != HostingState::Kind::loading)
+        setState (*plugin, { HostingState::Kind::crashed, {} });
 }
 
 void PluginHosting::Impl::pluginUiClicked (const juce::String& pluginId)
 {
     listeners.call ([&] (PluginHosting::Listener& l) { l.pluginUiClicked (pluginId); });
+}
+
+void PluginHosting::Impl::selectableObjectChanged (te::Selectable* selectable)
+{
+    // An asynchronously created plug-in has its instance now, or the engine gave up on it.
+    if (auto* plugin = dynamic_cast<te::ExternalPlugin*> (selectable))
+    {
+        const auto pluginId = plugin->itemID.toString();
+
+        if (auto found = hosted.find (pluginId); found != hosted.end() && found->second.plugin.get() == plugin
+                                                 && found->second.creatingAsync)
+            settle (*plugin);
+    }
+}
+
+void PluginHosting::Impl::selectableObjectAboutToBeDeleted (te::Selectable* selectable)
+{
+    for (auto& [id, entry] : hosted)
+        if (entry.plugin.get() == selectable)
+            entry.listening = false;
 }
 
 //==============================================================================
@@ -178,9 +333,40 @@ void PluginHosting::removeHostedFormat (const juce::String& formatName)
     impl->hostedFormats.removeString (formatName);
 }
 
-bool PluginHosting::isLoading (const juce::String& pluginId) const
+HostingState PluginHosting::getState (const juce::String& pluginId) const
 {
-    return impl->sandbox.isLoading (pluginId);
+    const auto found = impl->hosted.find (pluginId);
+    return found != impl->hosted.end() && found->second.plugin.get() != nullptr ? found->second.state : HostingState();
+}
+
+juce::Result PluginHosting::reload (const juce::String& pluginId)
+{
+    auto* plugin = impl->find (pluginId);
+
+    if (plugin == nullptr)
+        return juce::Result::fail ("Only a plug-in can be reloaded");
+
+    impl->recreate (*plugin);
+    return juce::Result::ok();
+}
+
+juce::Result PluginHosting::setSandboxed (const juce::String& pluginId, bool sandboxed)
+{
+    auto* plugin = impl->find (pluginId);
+
+    if (plugin == nullptr)
+        return juce::Result::fail ("Only a plug-in runs in a sandbox");
+
+    // Saved on the plug-in, as how it runs, not what it is: never an undo step.
+    const juce::Identifier inProcess (inProcessProperty);
+
+    if (sandboxed)
+        plugin->state.removeProperty (inProcess, nullptr);
+    else
+        plugin->state.setProperty (inProcess, true, nullptr);
+
+    impl->recreate (*plugin);
+    return juce::Result::ok();
 }
 
 bool PluginHosting::waitForLoads()

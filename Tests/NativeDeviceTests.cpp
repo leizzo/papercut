@@ -134,7 +134,7 @@ struct NativeDeviceTests : juce::UnitTest
         std::unique_ptr<DetailView> view()
         {
             theme.load();
-            auto v = std::make_unique<DetailView> (model, plugins, commands, theme, shell, uiState);
+            auto v = std::make_unique<DetailView> (model, plugins, app.engine.getPluginHosting(), commands, theme, shell, uiState);
             v->setSize (1400, 240);
             return v;
         }

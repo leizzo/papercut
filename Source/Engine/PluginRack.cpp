@@ -1,7 +1,7 @@
 #include "PluginRack.h"
 #include "EditTracks.h"
 #include "EngineManager.h"
-#include "PluginHostingImpl.h"
+#include "PluginSandbox.h"
 #include "PluginScanner.h"
 #include "NativeDevicePlugins.h"
 #include "ProjectManager.h"
@@ -191,7 +191,7 @@ namespace
         return plugin.isMissing();
     }
 
-    PluginInfo infoFromPlugin (te::Plugin& plugin, const PluginHosting& hosting)
+    PluginInfo infoFromPlugin (te::Plugin& plugin)
     {
         PluginInfo info;
         info.id = plugin.itemID.toString();
@@ -211,9 +211,6 @@ namespace
             info.external = true;
             info.pinnedParameters = pinsOf (plugin);
             info.pinnedParameters.removeEmptyStrings();
-            // Loading into its host: it runs there next.
-            info.sandboxed = PluginSandbox::isSandboxed (external->getAudioPluginInstance()) || hosting.isLoading (info.id);
-            info.crashed = PluginSandbox::hasCrashed (external->getAudioPluginInstance());
         }
         else
         {
@@ -393,31 +390,8 @@ struct PluginRack::ScanThread : juce::Thread
     PluginRack& rack;
 };
 
-/** Hears Plug-in Hosting, and passes on the crashes and UI clicks of this rack's plug-ins. */
-struct PluginRack::CrashWatch : PluginHosting::Listener
-{
-    CrashWatch (PluginRack& r, PluginHosting& h) : rack (r), hosting (h)   { hosting.addListener (this); }
-    ~CrashWatch() override                                                { hosting.removeListener (this); }
-
-    void pluginCrashed (const juce::String& pluginId) override
-    {
-        if (rack.contains (pluginId))
-            rack.listeners.call ([&] (PluginRack::Listener& l) { l.pluginCrashed (pluginId); });
-    }
-
-    void pluginUiClicked (const juce::String& pluginId) override
-    {
-        if (rack.contains (pluginId))
-            rack.listeners.call ([&] (PluginRack::Listener& l) { l.pluginUiClicked (pluginId); });
-    }
-
-    PluginRack& rack;
-    PluginHosting& hosting;
-};
-
 PluginRack::PluginRack (ProjectManager& pm)
-    : projectManager (pm),
-      crashWatch (std::make_unique<CrashWatch> (*this, pm.getEngineManager().getPluginHosting()))
+    : projectManager (pm)
 {
     installScanner (PluginScanner::defaultTimeoutMs);
     publishExternalSnapshot();
@@ -425,12 +399,8 @@ PluginRack::PluginRack (ProjectManager& pm)
 
 PluginRack::~PluginRack()
 {
-    crashWatch.reset();
     stopScan();
 }
-
-void PluginRack::addListener (Listener* l)      { listeners.add (l); }
-void PluginRack::removeListener (Listener* l)   { listeners.remove (l); }
 
 void PluginRack::stopScan()
 {
@@ -868,7 +838,7 @@ std::vector<PluginInfo> PluginRack::getChain (const juce::String& trackId, Plugi
     auto chains = chainsFor (projectManager.getEdit(), trackId);
 
     for (auto& plugin : chains[chain])
-        result.push_back (infoFromPlugin (*plugin, projectManager.getEngineManager().getPluginHosting()));
+        result.push_back (infoFromPlugin (*plugin));
 
     return result;
 }
@@ -943,7 +913,7 @@ std::vector<PluginInfo> PluginRack::getAllPlugins() const
 
         for (auto* list : { &chains.device, &chains.mixer })
             for (auto& plugin : *list)
-                result.push_back (infoFromPlugin (*plugin, projectManager.getEngineManager().getPluginHosting()));
+                result.push_back (infoFromPlugin (*plugin));
     }
 
     return result;
@@ -956,7 +926,7 @@ std::optional<PluginInfo> PluginRack::getPlugin (const juce::String& pluginId) c
     // Only a chain member: never the fader, a meter or a send.
     if (auto plugin = findPlugin (edit, pluginId))
         if (auto* track = plugin->getOwnerTrack(); track != nullptr && chainsFor (edit, track->itemID.toString()).find (pluginId) != nullptr)
-            return infoFromPlugin (*plugin, projectManager.getEngineManager().getPluginHosting());
+            return infoFromPlugin (*plugin);
 
     return std::nullopt;
 }
@@ -1265,63 +1235,6 @@ juce::Result PluginRack::setWindowState (const juce::String& pluginId, const Plu
     }
 
     return juce::Result::ok();
-}
-
-bool PluginRack::isLoading (const juce::String& pluginId) const
-{
-    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
-
-    if (plugin == nullptr)
-        return false;
-
-    if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
-        return external->isInitialisingAsync() || plugin->isInitialising()
-            || projectManager.getEngineManager().getPluginHosting().isLoading (pluginId);
-
-    return plugin->isInitialising();
-}
-
-juce::String PluginRack::getLoadError (const juce::String& pluginId) const
-{
-    // Not loaded yet isn't failed.
-    if (isLoading (pluginId))
-        return {};
-
-    if (auto plugin = findPlugin (projectManager.getEdit(), pluginId))
-        if (auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get()))
-            return external->getLoadError();
-
-    return {};
-}
-
-juce::Result PluginRack::reload (const juce::String& pluginId)
-{
-    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
-    auto* external = dynamic_cast<te::ExternalPlugin*> (plugin.get());
-
-    if (external == nullptr)
-        return juce::Result::fail ("Only a plug-in can be reloaded");
-
-    projectManager.getEngineManager().getPluginHosting().getImpl().recreate (*external);
-    return juce::Result::ok();
-}
-
-juce::Result PluginRack::setSandboxed (const juce::String& pluginId, bool sandboxed)
-{
-    auto plugin = findPlugin (projectManager.getEdit(), pluginId);
-
-    if (dynamic_cast<te::ExternalPlugin*> (plugin.get()) == nullptr)
-        return juce::Result::fail ("Only a plug-in runs in a sandbox");
-
-    // Saved on the plug-in, as how it runs, not what it is: never an undo step.
-    const juce::Identifier inProcess (PluginHosting::inProcessProperty);
-
-    if (sandboxed)
-        plugin->state.removeProperty (inProcess, nullptr);
-    else
-        plugin->state.setProperty (inProcess, true, nullptr);
-
-    return reload (pluginId);
 }
 
 namespace

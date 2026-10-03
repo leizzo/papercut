@@ -6,10 +6,33 @@
 namespace resamper
 {
 
+/** A Plug-in's Hosting State (CONTEXT.md): the one state it is in at a time.
+    Missing is still PluginInfo::missing. */
+struct HostingState
+{
+    enum class Kind
+    {
+        loading,     ///< being started, or started again; an old instance may still play (or stay bypassed) till then
+        sandboxed,   ///< runs in its Sandbox
+        inProcess,   ///< runs in-process (Run in-process, a format the Sandbox can't host, or a built-in)
+        crashed,     ///< its Sandbox died: its audio is bypassed until Reload
+        failed       ///< it couldn't be loaded: reason says why
+    };
+
+    Kind kind = Kind::inProcess;
+    juce::String reason;   ///< Failed: why it couldn't be loaded; empty otherwise
+
+    /** Sandboxed or In-process: it has an instance that plays. */
+    bool isRunning() const noexcept   { return kind == Kind::sandboxed || kind == Kind::inProcess; }
+
+    bool operator== (const HostingState&) const = default;
+};
+
 /** Plug-in Hosting (CONTEXT.md): where each Plug-in of an Edit runs, in its
-    Sandbox or in-process, and starting it there. The Sandbox (PluginSandbox)
-    is the mechanism; this decides which Plug-ins use it, loads them into it in
-    the background, and creates them again (Reload, Run in-process).
+    Sandbox or in-process, starting it there, and its Hosting State. The
+    Sandbox (PluginSandbox) is the mechanism; this decides which Plug-ins use
+    it, loads them into it in the background, and creates them again (Reload,
+    Run in-process).
 
     Which plug-ins run sandboxed: those of a hosted format (the formats the
     sandbox host process knows, plus any added with addHostedFormat), unless
@@ -17,6 +40,11 @@ namespace resamper
     that needs the message thread free while it creates a plug-in (AUv3) runs
     in-process, and so does anything the engine creates without loading it
     into an Edit (scans, ARA factories).
+
+    Each Plug-in it has started has one Hosting State, pushed to Listeners on
+    every transition. The Sandbox's load timeout is the one a sandboxed load
+    has; an AUv3 the engine creates asynchronously gets as long (the engine
+    doesn't say when such a creation fails).
 
     The engine owner (EngineManager) holds the one Plug-in Hosting, and the
     engine reaches it through its Impl (PluginHostingImpl.h, engine module only).
@@ -41,8 +69,21 @@ public:
         creates a format's plug-ins itself, through the engine's creation hook). */
     void removeHostedFormat (const juce::String& formatName);
 
-    /** Whether the plug-in is loading into its Sandbox. On the message thread. */
-    bool isLoading (const juce::String& pluginId) const;
+    /** The plug-in's Hosting State. In-process for one Plug-in Hosting never
+        started (a built-in device, or a missing plug-in). On the message thread. */
+    HostingState getState (const juce::String& pluginId) const;
+
+    /** Starts the plug-in again from the state last saved on it: Retry, and a
+        crashed plug-in's Reload. It is Loading till then; if sandboxed, its old
+        instance plays (or stays bypassed) until the new one is ready. Never an
+        undo step. Fails for a plug-in Plug-in Hosting never started. */
+    juce::Result reload (const juce::String& pluginId);
+
+    /** Runs the plug-in in its Sandbox (the default) or in-process (Run
+        in-process), and starts it again that way. Saved with the project, per
+        instance; never an undo step. A plug-in whose format can't be sandboxed
+        runs in-process either way. */
+    juce::Result setSandboxed (const juce::String& pluginId, bool sandboxed);
 
     /** Runs the message loop until no plug-in is loading into its Sandbox, or a
         load's time is up: an offline render mustn't leave a loading plug-in out.
@@ -50,13 +91,13 @@ public:
     bool waitForLoads();
 
     //==============================================================================
-    /** Hears the Sandbox's events for every plug-in, whichever Edit it is in. */
+    /** Hears every Plug-in's Hosting State, whichever Edit it is in. */
     struct Listener
     {
         virtual ~Listener() = default;
 
-        /** A sandboxed plug-in's host died. On the message thread. */
-        virtual void pluginCrashed (const juce::String& pluginId) = 0;
+        /** The plug-in's Hosting State changed to state. In order, on the message thread. */
+        virtual void hostingStateChanged (const juce::String& pluginId, const HostingState& state) = 0;
 
         /** A sandboxed plug-in's own UI was clicked. On the message thread. */
         virtual void pluginUiClicked (const juce::String& /*pluginId*/) {}

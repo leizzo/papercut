@@ -45,8 +45,6 @@ struct PluginInfo
     bool enabled = true;                        ///< false when bypassed
     bool missing = false;                       ///< saved in the project but not installed; audio passes through
     bool failedScan = false;                    ///< in the catalogue: its scan crashed or timed out; it can only be retried
-    bool sandboxed = false;                     ///< runs out of process, in its sandbox (see PluginSandbox)
-    bool crashed = false;                       ///< its sandbox died: its audio is bypassed until it is reloaded
     int latencySamples = 0;                     ///< the latency the plug-in reports
     juce::StringArray pinnedParameters;         ///< parameter ids shown on a plug-in's card, in pin order
     DeviceSize size = DeviceSize::compact;      ///< a native device's card
@@ -250,38 +248,6 @@ public:
     /** Saves the window's state on the plug-in. A view: never an undo step. */
     juce::Result setWindowState (const juce::String& pluginId, const PluginWindowState&);
 
-    /** Whether an external plug-in is still being instantiated (its window
-        shows the host's loading state meanwhile). */
-    bool isLoading (const juce::String& pluginId) const;
-
-    /** Why an external plug-in couldn't be instantiated; empty if it was, or isn't external. */
-    juce::String getLoadError (const juce::String& pluginId) const;
-
-    /** Instantiates a plug-in again from its last saved state: the window's
-        Retry, and a crashed plug-in's Reload. Not an undo step. */
-    juce::Result reload (const juce::String& pluginId);
-
-    /** Runs an external plug-in in its sandbox (out of process, the default)
-        or in-process (the window's Run in-process), and instantiates it again
-        that way. Saved with the project, per instance; not an undo step. A
-        plug-in whose format can't be sandboxed runs in-process either way. */
-    juce::Result setSandboxed (const juce::String& pluginId, bool sandboxed);
-
-    /** Told when a plug-in's sandbox dies (PluginInfo::crashed), or its own UI there is clicked. */
-    struct Listener
-    {
-        virtual ~Listener() = default;
-
-        /** A plug-in of this rack's Edit crashed. On the message thread. */
-        virtual void pluginCrashed (const juce::String& pluginId) = 0;
-
-        /** The own UI of a plug-in of this rack's Edit, shown by its sandbox, was clicked. On the message thread. */
-        virtual void pluginUiClicked (const juce::String& /*pluginId*/) {}
-    };
-
-    void addListener (Listener*);
-    void removeListener (Listener*);
-
     /** The presets the window's menu offers: the plug-in's own programs, then
         those saved with savePreset, in that order. */
     juce::StringArray getPresetNames (const juce::String& pluginId) const;
@@ -311,14 +277,11 @@ public:
 
 private:
     struct ScanThread;
-    struct CrashWatch;
     friend struct test::PluginRackTests;
 
     ProjectManager& projectManager;
     NativeDevices nativeDevices { projectManager };
     std::unique_ptr<ScanThread> scanThread;
-    std::unique_ptr<CrashWatch> crashWatch;
-    juce::ListenerList<Listener> listeners;
     std::atomic<bool> scanning { false };
 
     /** Set: the running scan is a retry of this one file only. */

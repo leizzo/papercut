@@ -23,7 +23,7 @@ namespace
     }
 }
 
-void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCommandHost& host)
+void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, PluginHosting& hosting, AppCommandHost& host)
 {
     registry.add (cmd::pluginScan, { "Scan Plug-ins", [&rack] { return ! rack.isScanning(); } }, [&rack] { rack.startScan(); });
 
@@ -123,14 +123,14 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, AppCom
         host.report (rack.setWindowState (a.pluginId, a.window));
     });
 
-    registry.add (cmd::pluginReload, { "Reload Plug-in" }, [&rack, &host] (const PluginArgs& a)
+    registry.add (cmd::pluginReload, { "Reload Plug-in" }, [&hosting, &host] (const PluginArgs& a)
     {
-        host.report (rack.reload (a.pluginId));
+        host.report (hosting.reload (a.pluginId));
     });
 
-    registry.add (cmd::pluginSetSandboxed, { "Run Plug-in Sandboxed" }, [&rack, &host] (const PluginSandboxArgs& a)
+    registry.add (cmd::pluginSetSandboxed, { "Run Plug-in Sandboxed" }, [&hosting, &host] (const PluginSandboxArgs& a)
     {
-        host.report (rack.setSandboxed (a.pluginId, a.sandboxed));
+        host.report (hosting.setSandboxed (a.pluginId, a.sandboxed));
     });
 
     registry.add (cmd::pluginSelectPreset, { "Select Preset" }, [&rack, &host] (const PluginPresetArgs& a)

@@ -1,4 +1,5 @@
 #include "ComponentSearch.h"
+#include "FakePlugin.h"
 #include "TestFixture.h"
 #include "TestPluginFormat.h"
 #include "Commands/ClipCommands.h"
@@ -73,17 +74,137 @@ struct PluginSandboxTests : juce::UnitTest
         juce::PluginDescription desc;
     };
 
-    /** Hears the rack's crashes. */
-    struct Crashes : PluginRack::Listener
+    static juce::String nameOf (HostingState::Kind kind)
     {
-        explicit Crashes (PluginRack& r) : rack (r)   { rack.addListener (this); }
-        ~Crashes() override                          { rack.removeListener (this); }
+        switch (kind)
+        {
+            case HostingState::Kind::loading:     return "loading";
+            case HostingState::Kind::sandboxed:   return "sandboxed";
+            case HostingState::Kind::inProcess:   return "in-process";
+            case HostingState::Kind::crashed:     return "crashed";
+            case HostingState::Kind::failed:      return "failed";
+        }
 
-        void pluginCrashed (const juce::String& pluginId) override   { ids.add (pluginId); }
+        return {};
+    }
 
-        PluginRack& rack;
-        juce::StringArray ids;
+    /** Hears Plug-in Hosting: every plug-in's Hosting States, in the order they were pushed. */
+    struct Transitions : PluginHosting::Listener
+    {
+        explicit Transitions (Fixture& f) : hosting (f.app.engine.getPluginHosting())   { hosting.addListener (this); }
+        ~Transitions() override                                                         { hosting.removeListener (this); }
+
+        void hostingStateChanged (const juce::String& pluginId, const HostingState& state) override
+        {
+            heard.push_back ({ pluginId, nameOf (state.kind) });
+        }
+
+        /** The plug-in's states heard since last asked, comma-separated. */
+        juce::String take (const juce::String& pluginId)
+        {
+            juce::StringArray kinds;
+
+            for (auto it = heard.begin(); it != heard.end();)
+            {
+                if (it->first == pluginId)
+                {
+                    kinds.add (it->second);
+                    it = heard.erase (it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            return kinds.joinIntoString (", ");
+        }
+
+        PluginHosting& hosting;
+        std::vector<std::pair<juce::String, juce::String>> heard;
     };
+
+    /** An AUv3 stand-in: a format the engine creates asynchronously (it needs the message
+        thread free), in-process. A ".asynctest" file holds FakePlugin, created after
+        createMs; one whose name has "fail" in it can't be created. */
+    struct AsyncFormat : juce::AudioPluginFormat
+    {
+        static constexpr const char* extension = ".asynctest";
+        static constexpr int createMs = 100;
+
+        juce::String getName() const override   { return "AsyncTest"; }
+
+        void findAllTypesForFile (juce::OwnedArray<juce::PluginDescription>& results, const juce::String& path) override
+        {
+            if (! fileMightContainThisPluginType (path))
+                return;
+
+            auto d = FakePlugin::description();
+            d.pluginFormatName = getName();
+            d.fileOrIdentifier = path;
+            d.name = juce::File (path).getFileNameWithoutExtension();
+            results.add (new juce::PluginDescription (d));
+        }
+
+        bool fileMightContainThisPluginType (const juce::String& path) override   { return path.endsWith (extension); }
+        juce::String getNameOfPluginFromIdentifier (const juce::String& path) override { return path; }
+        bool pluginNeedsRescanning (const juce::PluginDescription&) override      { return false; }
+        bool doesPluginStillExist (const juce::PluginDescription&) override       { return true; }
+        bool canScanForPlugins() const override                                   { return false; }
+        bool isTrivialToScan() const override                                     { return true; }
+        juce::StringArray searchPathsForPlugins (const juce::FileSearchPath&, bool, bool) override { return {}; }
+        juce::FileSearchPath getDefaultLocationsToSearch() override               { return {}; }
+        bool requiresUnblockedMessageThreadDuringCreation (const juce::PluginDescription&) const override { return true; }
+
+        void createPluginInstance (const juce::PluginDescription& d, double, int, PluginCreationCallback callback) override
+        {
+            juce::Timer::callAfterDelay (createMs, [fails = d.fileOrIdentifier.contains ("fail"), done = std::move (callback)]
+            {
+                if (fails)
+                    done (nullptr, "It needs a licence");
+                else
+                    done (std::make_unique<FakePlugin>(), {});
+            });
+        }
+
+        /** Registers the format with the engine once per run (a format can't be removed). */
+        static void registerWith (te::PluginManager& manager)
+        {
+            static bool registered = false;
+
+            if (! std::exchange (registered, true))
+                manager.pluginFormatManager.addFormat (std::make_unique<AsyncFormat>());
+        }
+    };
+
+    /** While alive, the engine knows an AsyncFormat plug-in called name. */
+    struct AsyncPlugin
+    {
+        AsyncPlugin (Fixture& f, const juce::String& name)
+            : known (f.projects.getEdit().engine.getPluginManager().knownPluginList)
+        {
+            AsyncFormat::registerWith (f.projects.getEdit().engine.getPluginManager());
+            juce::OwnedArray<juce::PluginDescription> found;
+            AsyncFormat().findAllTypesForFile (found, "/Library/Audio/Plug-Ins/Components/" + name + AsyncFormat::extension);
+            desc = *found.getFirst();
+            known.addType (desc);
+        }
+
+        ~AsyncPlugin()   { known.removeType (desc); }
+
+        juce::KnownPluginList& known;
+        juce::PluginDescription desc;
+    };
+
+    static HostingState state (Fixture& f, const juce::String& pluginId)
+    {
+        return f.app.engine.getPluginHosting().getState (pluginId);
+    }
+
+    static bool is (Fixture& f, const juce::String& pluginId, HostingState::Kind kind)
+    {
+        return state (f, pluginId).kind == kind;
+    }
 
     static juce::String addTrack (Fixture& f)
     {
@@ -91,10 +212,10 @@ struct PluginSandboxTests : juce::UnitTest
         return f.model.getTracks().back().id;
     }
 
-    /** Until the plug-in has loaded into its sandbox (in the background) or failed to. */
+    /** Until the plug-in is no longer Loading (into its sandbox, in the background, say). */
     static bool loaded (Fixture& f, const juce::String& pluginId)
     {
-        return dispatchUntil ([&] { return ! f.plugins.isLoading (pluginId); });
+        return dispatchUntil ([&] { return ! is (f, pluginId, HostingState::Kind::loading); });
     }
 
     /** Inserts the plug-in, and waits until it has loaded. */
@@ -176,16 +297,17 @@ struct PluginSandboxTests : juce::UnitTest
         {
             Fixture f;
             TestPlugin gain (f, "Sandbox Gain", "plugin Sandbox Gain");
+            Transitions heard (f);
             const auto track = addTrack (f);
             const auto id = insert (f, track, gain.path());
 
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
+            expectEquals (heard.take (id), juce::String ("loading, sandboxed"), "insert");
             auto plugin = info (f, id);
-            expect (plugin.has_value() && plugin->sandboxed && ! plugin->crashed);
 
             auto* instance = instanceOf (f, id);
             expect (instance != nullptr && PluginSandbox::isSandboxed (instance),
-                    "id " + id + ", load error: " + f.plugins.getLoadError (id) + ", instance " + juce::String (instance != nullptr ? 1 : 0));
+                    "id " + id + ", reason: " + state (f, id).reason + ", instance " + juce::String (instance != nullptr ? 1 : 0));
 
             if (instance == nullptr)
                 return;
@@ -207,7 +329,7 @@ struct PluginSandboxTests : juce::UnitTest
                     "latency " + juce::String (plugin.has_value() ? plugin->latencySamples : -1));
         }
 
-        beginTest ("A slow plug-in loads in the background: the insert returns, the window shows loading, then the plug-in");
+        beginTest ("A slow plug-in loads in the background: the insert returns, the window shows loading, then the plug-in, never Failed");
         {
             Fixture f;
             TestPlugin sluggish (f, "Sandbox Sluggish", "plugin Sluggish Gain");
@@ -227,18 +349,27 @@ struct PluginSandboxTests : juce::UnitTest
             const auto id = chain.empty() ? juce::String() : chain.back().id;
             auto* window = main->getPluginWindows().getWindow (id);
             expect (window != nullptr && window->isVisible(), "the window isn't up at once");
-            expect (f.plugins.isLoading (id), "it isn't loading");
+            expect (is (f, id, HostingState::Kind::loading), "it isn't loading");
             expect (window != nullptr && window->getStatus() == PluginWindow::Status::loading);
-            expect (info (f, id).has_value() && info (f, id)->sandboxed && ! info (f, id)->missing);
-            expect (f.plugins.getLoadError (id).isEmpty(), "loading reads as failed: " + f.plugins.getLoadError (id));
+            expect (info (f, id).has_value() && ! info (f, id)->missing);
 
             // The message thread stays free while it loads.
             int ticks = 0;
             juce::Timer::callAfterDelay (50, [&ticks] { ++ticks; });
-            expect (dispatchUntil ([&] { return ticks > 0; }) && f.plugins.isLoading (id), "the message thread was held up");
+            expect (dispatchUntil ([&] { return ticks > 0; }) && is (f, id, HostingState::Kind::loading),
+                    "the message thread was held up");
 
-            expect (window != nullptr && dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }),
-                    "it never loaded");
+            // The window has no load timeout of its own. Its old one (shortened to a second, say)
+            // showed Failed here, and never picked up the load that finished after it.
+            bool showedFailed = false;
+            expect (window != nullptr && dispatchUntil ([&]
+            {
+                showedFailed = showedFailed || window->getStatus() == PluginWindow::Status::failed;
+                return window->getStatus() == PluginWindow::Status::ready;
+            }), "it never loaded");
+            expect (! showedFailed, "the window showed Failed while the plug-in loaded");
+            expectGreaterThan (juce::Time::getMillisecondCounterHiRes() - started, 1000.0, "the load wasn't slow");
+            expect (is (f, id, HostingState::Kind::sandboxed));
             auto* instance = instanceOf (f, id);
             expect (instance != nullptr && PluginSandbox::isSandboxed (instance));
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
@@ -260,17 +391,17 @@ struct PluginSandboxTests : juce::UnitTest
             f.invoke (cmd::pluginInsert, { track, sluggish.path(), PluginChain::device });
             const auto chain = f.plugins.getChain (track, PluginChain::device);
             const auto id = chain.empty() ? juce::String() : chain.back().id;
-            expect (f.plugins.isLoading (id));
+            expect (is (f, id, HostingState::Kind::loading));
 
             f.invoke (cmd::editUndo);
             expect (! f.plugins.contains (id));
-            auto& hosting = f.app.engine.getPluginHosting();
-            expect (dispatchUntil ([&] { return ! hosting.isLoading (id); }), "the load never ended");
+            expect (f.app.engine.getPluginHosting().waitForLoads(), "the load never ended");
 
             f.invoke (cmd::editRedo);
             expect (f.plugins.contains (id) && loaded (f, id));
             expect (instanceOf (f, id) != nullptr && PluginSandbox::isSandboxed (instanceOf (f, id)),
-                    "redo left it unloaded: " + f.plugins.getLoadError (id));
+                    "redo left it unloaded: " + state (f, id).reason);
+            expect (is (f, id, HostingState::Kind::sandboxed));
         }
 
         beginTest ("An export straight after inserting a slow plug-in waits for it: the mix has it in");
@@ -333,7 +464,7 @@ struct PluginSandboxTests : juce::UnitTest
         {
             Fixture f;
             TestPlugin gain (f, "Sandbox Crash", "plugin Crashing Gain");
-            Crashes crashes (f.plugins);
+            Transitions heard (f);
             const auto first = addTrack (f);
             const auto second = addTrack (f);
             f.audioFileToChoose = writeSineWav (f.scratchDir().getChildFile ("tone.wav"), 1.0);
@@ -360,6 +491,8 @@ struct PluginSandboxTests : juce::UnitTest
 
             f.model.play();
             expect (f.model.isPlaying());
+            expectEquals (heard.take (id), juce::String ("loading, sandboxed"), "insert");
+            heard.take (other);
 
             // The plug-in dies in the middle of an audio block.
             setParameter (f, id, "Crash", 1.0f);
@@ -367,8 +500,9 @@ struct PluginSandboxTests : juce::UnitTest
             expectWithinAbsoluteError (processOnes (*instance, &elapsed), 1.0f, 1.0e-6f);
             expectLessThan (elapsed, 50.0, "the audio thread waited on a dead sandbox");
 
-            expect (dispatchUntil ([&] { auto p = info (f, id); return p.has_value() && p->crashed; }), "the crash went unnoticed");
-            expectEquals (crashes.ids.joinIntoString (","), id);
+            expect (dispatchUntil ([&] { return is (f, id, HostingState::Kind::crashed); }), "the crash went unnoticed");
+            expectEquals (heard.take (id), juce::String ("crashed"));
+            expect (heard.take (other).isEmpty(), "the other plug-in's state changed");
             expect (f.model.isPlaying(), "the crash stopped playback");
 
             // Bypassed: the input passes, at once.
@@ -377,16 +511,16 @@ struct PluginSandboxTests : juce::UnitTest
 
             // The other track's plug-in, in its own sandbox, plays on.
             expectWithinAbsoluteError (processOnes (*otherInstance), 0.5f, 1.0e-6f);
-            expect (info (f, other).has_value() && ! info (f, other)->crashed);
+            expect (is (f, other, HostingState::Kind::sandboxed));
 
             f.model.stop();
             expectGreaterThan (renderPeak (f), 0.1f, "the Edit stopped sounding");
 
             // Reload: a new sandbox, from the state last saved.
             f.invoke (cmd::pluginReload, { first, id });
+            expect (is (f, id, HostingState::Kind::loading), "a plug-in being reloaded isn't Loading");
             expect (loaded (f, id), "Reload never finished loading");
-            auto reloaded = info (f, id);
-            expect (reloaded.has_value() && reloaded->sandboxed && ! reloaded->crashed);
+            expectEquals (heard.take (id), juce::String ("loading, sandboxed"), "Reload");
             expectWithinAbsoluteError (parameterValue (f, id, "Gain"), 0.3f, 1.0e-6f);
 
             if (auto* fresh = instanceOf (f, id))
@@ -405,13 +539,16 @@ struct PluginSandboxTests : juce::UnitTest
             Fixture f;
             TestPlugin gain (f, "Sandbox Choice", "plugin Choice Gain");
             const auto track = addTrack (f);
+            Transitions heard (f);
             const auto inProcess = insert (f, track, gain.path());
             const auto sandboxed = insert (f, track, gain.path());
+            heard.take (inProcess);
 
             expect (f.invoke (cmd::pluginSetSandboxed, { inProcess, false }));
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
-            expect (info (f, inProcess).has_value() && ! info (f, inProcess)->sandboxed);
-            expect (info (f, sandboxed).has_value() && info (f, sandboxed)->sandboxed);
+            expect (loaded (f, inProcess));
+            expectEquals (heard.take (inProcess), juce::String ("loading, in-process"), "Run in-process");
+            expect (is (f, sandboxed, HostingState::Kind::sandboxed));
 
             auto* instance = instanceOf (f, inProcess);
             expect (instance != nullptr && ! PluginSandbox::isSandboxed (instance), "it isn't running in-process");
@@ -423,13 +560,14 @@ struct PluginSandboxTests : juce::UnitTest
             reopened.projectToOpen = f.projectSaveLocation;
             reopened.invoke (cmd::projectOpen);
             expect (loaded (reopened, inProcess) && loaded (reopened, sandboxed));
-            expect (info (reopened, inProcess).has_value() && ! info (reopened, inProcess)->sandboxed);
-            expect (info (reopened, sandboxed).has_value() && info (reopened, sandboxed)->sandboxed);
+            expect (is (reopened, inProcess, HostingState::Kind::inProcess));
+            expect (is (reopened, sandboxed, HostingState::Kind::sandboxed));
 
             // And back into the sandbox.
+            Transitions reheard (reopened);
             expect (reopened.invoke (cmd::pluginSetSandboxed, { inProcess, true }));
             expect (loaded (reopened, inProcess));
-            expect (info (reopened, inProcess).has_value() && info (reopened, inProcess)->sandboxed);
+            expectEquals (reheard.take (inProcess), juce::String ("loading, sandboxed"), "back into the sandbox");
             expect (instanceOf (reopened, inProcess) != nullptr && PluginSandbox::isSandboxed (instanceOf (reopened, inProcess)));
         }
 
@@ -571,10 +709,11 @@ struct PluginSandboxTests : juce::UnitTest
             auto main = std::make_unique<MainComponent> (f.app, commandManager);
             main->setSize (1400, 900);
 
+            Transitions heard (f);
             const auto id = insert (f, track, fragile.path());
             expect (id.isNotEmpty());
-            expect (info (f, id).has_value() && ! info (f, id)->sandboxed && ! f.plugins.isLoading (id));
-            expect (f.plugins.getLoadError (id).isNotEmpty(), "no load error");
+            expectEquals (heard.take (id), juce::String ("loading, failed"), "a load that failed");
+            expect (state (f, id).reason.contains ("crashed while loading"), "the reason: " + state (f, id).reason);
 
             auto* window = main->getPluginWindows().getWindow (id);
             expect (window != nullptr, "the window didn't open");
@@ -592,6 +731,7 @@ struct PluginSandboxTests : juce::UnitTest
             expect (dispatchUntil ([&] { return window->getStatus() == PluginWindow::Status::ready; }),
                     "it didn't load in-process");
             expect (instanceOf (f, id) != nullptr && ! PluginSandbox::isSandboxed (instanceOf (f, id)));
+            expectEquals (heard.take (id), juce::String ("loading, in-process"), "Run in-process");
             main.reset();
         }
 
@@ -636,10 +776,35 @@ struct PluginSandboxTests : juce::UnitTest
 
             expect (toasts != nullptr && toasts->runAction (message, "Reload"));
             expect (loaded (f, id));
-            expect (info (f, id).has_value() && ! info (f, id)->crashed && info (f, id)->sandboxed);
+            expect (is (f, id, HostingState::Kind::sandboxed));
             expect (dispatchUntil ([&] { auto* r = findOne (*main, "reload"); return r == nullptr || ! r->isVisible(); }),
                     "the card still offers Reload");
             main.reset();
+        }
+
+        beginTest ("An AUv3 the engine creates asynchronously reports its end of Loading by push: In-process, or Failed");
+        {
+            Fixture f;
+            AsyncPlugin works (f, "Async Gain");
+            AsyncPlugin fails (f, "Async fail Gain");
+            Transitions heard (f);
+            const auto track = addTrack (f);
+
+            f.invoke (cmd::pluginInsert, { track, works.desc.fileOrIdentifier, PluginChain::device });
+            const auto id = f.plugins.getChain (track, PluginChain::device).back().id;
+            expect (is (f, id, HostingState::Kind::loading), "it isn't loading");
+            expect (dispatchUntil ([&] { return is (f, id, HostingState::Kind::inProcess); }), "it never ran");
+            expectEquals (heard.take (id), juce::String ("loading, in-process"));
+            expect (instanceOf (f, id) != nullptr);
+
+            // The engine never says such a creation failed: it has once it took the Sandbox's load time.
+            f.invoke (cmd::pluginInsert, { track, fails.desc.fileOrIdentifier, PluginChain::device });
+            const auto failing = f.plugins.getChain (track, PluginChain::device).back().id;
+            expect (failing != id && is (f, failing, HostingState::Kind::loading));
+            expect (dispatchUntil ([&] { return is (f, failing, HostingState::Kind::failed); }),
+                    "it never failed");
+            expectEquals (heard.take (failing), juce::String ("loading, failed"));
+            expect (state (f, failing).reason.isNotEmpty());
         }
     }
 };

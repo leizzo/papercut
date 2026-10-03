@@ -16,11 +16,12 @@ namespace
     const juce::String middleDot (juce::CharPointer_UTF8 ("\xc2\xb7"));
 }
 
-PluginWindows::PluginWindows (ApplicationModel& m, PluginRack& r, CommandRegistry& c, ThemeManager& tm, Preferences& p)
-    : model (m), rack (r), commands (c), themeManager (tm), preferences (p)
+PluginWindows::PluginWindows (ApplicationModel& m, PluginRack& r, PluginHosting& h, CommandRegistry& c, ThemeManager& tm,
+                              Preferences& p)
+    : model (m), rack (r), hosting (h), commands (c), themeManager (tm), preferences (p)
 {
     model.addListener (this);
-    rack.addListener (this);
+    hosting.addListener (this);
     preferences.getState().addListener (this);
     startTimer (displayCheckMs);
 }
@@ -28,17 +29,8 @@ PluginWindows::PluginWindows (ApplicationModel& m, PluginRack& r, CommandRegistr
 PluginWindows::~PluginWindows()
 {
     preferences.getState().removeListener (this);
-    rack.removeListener (this);
+    hosting.removeListener (this);
     model.removeListener (this);
-}
-
-void PluginWindows::setLoadTimeoutMs (int ms)
-{
-    loadTimeoutMs = ms;
-
-    for (auto& [id, entry] : windows)
-        if (auto* plugInWindow = dynamic_cast<PluginWindow*> (entry.window.get()))
-            plugInWindow->setLoadTimeoutMs (ms);
 }
 
 juce::String PluginWindows::trackNameOf (const juce::String& trackId) const
@@ -58,17 +50,11 @@ std::unique_ptr<FloatingDeviceWindow> PluginWindows::createWindow (const PluginI
     // A plug-in gets its host-chromed window; a native device its card, floating expanded (#70).
     if (info.external)
     {
-        auto plugInWindow = std::make_unique<PluginWindow> (rack, commands, themeManager, info, trackNameOf (info.trackId));
-        plugInWindow->setLoadTimeoutMs (loadTimeoutMs);
+        auto plugInWindow = std::make_unique<PluginWindow> (rack, commands, themeManager, info, hosting.getState (id),
+                                                            trackNameOf (info.trackId));
 
         // The error state's Run in-process: this instance leaves its sandbox, saved with the project.
-        plugInWindow->onRunInProcess = [this, id]
-        {
-            commands.invoke (cmd::pluginSetSandboxed, { id, false });
-
-            if (auto* w = getWindow (id))
-                w->retryLoading();
-        };
+        plugInWindow->onRunInProcess = [this, id] { commands.invoke (cmd::pluginSetSandboxed, { id, false }); };
 
         window = std::move (plugInWindow);
     }
@@ -129,7 +115,7 @@ void PluginWindows::open (const juce::String& pluginId, bool focus)
     const auto info = rack.getPlugin (pluginId);
 
     // A missing plug-in has nothing to show; a crashed one is reloaded from its card first.
-    if (! info.has_value() || info->missing || info->crashed)
+    if (! info.has_value() || info->missing || hosting.getState (pluginId).kind == HostingState::Kind::crashed)
         return;
 
     if (auto existing = windows.find (pluginId); existing != windows.end())
@@ -274,6 +260,14 @@ void PluginWindows::pluginUiClicked (const juce::String& pluginId)
     // A click in a sandboxed plug-in's own UI is a click in its window.
     if (auto* window = getDeviceWindow (pluginId))
         selectTrackOf (*window);
+}
+
+void PluginWindows::hostingStateChanged (const juce::String& pluginId, const HostingState& state)
+{
+    if (state.kind == HostingState::Kind::crashed)
+        pluginCrashed (pluginId);
+    else if (auto* window = getWindow (pluginId))
+        window->setHostingState (state);
 }
 
 void PluginWindows::pluginCrashed (const juce::String& pluginId)

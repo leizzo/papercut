@@ -16,7 +16,7 @@ namespace
     constexpr int toolbarPadding = 10, footerPaddingLeft = 12, footerPaddingRight = 8, bypassWidth = 46, controlHeight = 22,
                   presetStepWidth = 18, presetNameWidth = 120, slotWidth = 22, slotHeight = 16, copyWidth = 66,
                   statsWidth = 92, sandboxWidth = 16, scaleWidth = 120, scaleHeight = 18, gripSize = 14,
-                  minFrameWidth = 565, loadingHeight = 180, statusPollMs = 500, loadingPollMs = 20, footerGap = 8,
+                  minFrameWidth = 565, loadingHeight = 180, statusPollMs = 500, footerGap = 8,
                   slotWellPadding = 2, slotsGap = 6;
 
     // Parameters: an icon button as wide as the preset steps. The design's 540 px minimum frame
@@ -45,9 +45,34 @@ namespace
         return info.manufacturer.isNotEmpty() ? info.manufacturer : juce::String ("Unknown vendor");
     }
 
-    juce::String processText (const PluginInfo& info)
+    /** Where the plug-in runs, as the footer says it. */
+    juce::String processText (const HostingState& hosting)
     {
-        return info.sandboxed ? "out-of-process" : "in-process";
+        switch (hosting.kind)
+        {
+            case HostingState::Kind::loading:     return "loading";
+            case HostingState::Kind::sandboxed:   return "out-of-process";
+            case HostingState::Kind::inProcess:   return "in-process";
+            case HostingState::Kind::crashed:     return "crashed";
+            case HostingState::Kind::failed:      return "not loaded";
+        }
+
+        return {};
+    }
+
+    /** The toolbar's sandbox status. */
+    juce::String sandboxText (const HostingState& hosting)
+    {
+        switch (hosting.kind)
+        {
+            case HostingState::Kind::loading:     return "Loading";
+            case HostingState::Kind::sandboxed:   return "Sandboxed: out-of-process";
+            case HostingState::Kind::inProcess:   return "Not sandboxed: in-process";
+            case HostingState::Kind::crashed:     return "Crashed: its sandbox died";
+            case HostingState::Kind::failed:      return "Not loaded";
+        }
+
+        return {};
     }
 
     /** The plug-in's own editor inside the engine's wrapper, if it is a JUCE AudioProcessorEditor. */
@@ -185,7 +210,7 @@ private:
 
 //==============================================================================
 PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm, const PluginInfo& info,
-                            const juce::String& track)
+                            const HostingState& state, const juce::String& track)
     : FloatingDeviceWindow (tm, info, track, "PluginWindow"), rack (r), commands (c)
 {
     using Kind = ChromeButton::Kind;
@@ -235,14 +260,7 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
     undo->onClick = [this] { commands.invoke (cmd::editUndo); };
     redo->onClick = [this] { commands.invoke (cmd::editRedo); };
     parameters->onClick = [this] { showParameters (! isShowingParameters()); };
-    retry->onClick = [this]
-    {
-        // A load that failed starts again; one still under way is waited for afresh.
-        if (rack.getLoadError (plugin.id).isNotEmpty())
-            commands.invoke (cmd::pluginReload, { plugin.trackId, plugin.id });
-
-        retryLoading();
-    };
+    retry->onClick = [this] { commands.invoke (cmd::pluginReload, { plugin.trackId, plugin.id }); };
     runInProcess->onClick = [this] { if (onRunInProcess) onRunInProcess(); };
     scale->onChange = [this] (int index)
     {
@@ -267,11 +285,18 @@ PluginWindow::PluginWindow (PluginRack& r, CommandRegistry& c, ThemeManager& tm,
 
     themeManager.addListener (this);
     setState (info, track);
-    retryLoading();
+
+    // The chrome and the loading state show first; the vendor UI follows when the plug-in runs (§19).
+    showLoading();
+    setHostingState (state);
+
+    // Only its CPU and latency are polled: they aren't its Hosting State.
+    startTimer (statusPollMs);
 }
 
 PluginWindow::~PluginWindow()
 {
+    cancelPendingUpdate();
     themeManager.removeListener (this);
 
     if (vendor != nullptr)
@@ -304,9 +329,9 @@ void PluginWindow::updateTexts()
         b->setEnabled (! presets.isEmpty());
 
     stats->setText (juce::String (plugin.latencySamples) + " smp " + middleDot + " " + cpuText);
-    sandbox->setText (plugin.sandboxed ? "Sandboxed: out-of-process" : "Not sandboxed: in-process", plugin.sandboxed);
+    sandbox->setText (sandboxText (hosting), hosting.kind == HostingState::Kind::sandboxed);
     footerInfo->setText ("Plug-in UI " + middleDot + " rendered by " + vendorOf (plugin) + " " + middleDot + " "
-                         + (plugin.formatBadge() + " " + plugin.version).trim() + " " + middleDot + " " + processText (plugin));
+                         + (plugin.formatBadge() + " " + plugin.version).trim() + " " + middleDot + " " + processText (hosting));
 }
 
 void PluginWindow::setUiScale (int percent)
@@ -341,8 +366,26 @@ void PluginWindow::showParameters (bool shouldShow)
     resized();
 }
 
-void PluginWindow::retryLoading()
+void PluginWindow::setHostingState (const HostingState& state)
 {
+    hosting = state;
+    updateTexts();
+
+    if (state.kind == HostingState::Kind::loading)
+        showLoading();
+    else if (state.kind == HostingState::Kind::failed)
+        showFailed();
+    else if (state.isRunning() && status != Status::ready)
+        triggerAsyncUpdate();
+
+    repaint();
+}
+
+void PluginWindow::showLoading()
+{
+    cancelPendingUpdate();
+
+    // The vendor UI goes before the instance it belongs to does.
     showParameters (false);
 
     if (vendor != nullptr)
@@ -353,18 +396,37 @@ void PluginWindow::retryLoading()
 
     status = Status::loading;
     parameters->setEnabled (false);
-    loadStartedAt = juce::Time::getMillisecondCounter();
     retry->setVisible (false);
     runInProcess->setVisible (false);
+
+    if (spinnerTurn == nullptr)
+        spinnerTurn = std::make_unique<juce::VBlankAttachment> (this, [this] { repaint (vendorArea()); });
+
     updateSize();
     repaint();
+}
 
-    // The chrome and the loading state show first; the vendor UI follows when ready (§19).
-    startTimer (loadingPollMs);
+void PluginWindow::showFailed()
+{
+    showLoading();
+    spinnerTurn.reset();
+    status = Status::failed;
+    retry->setVisible (true);
+    runInProcess->setVisible (true);
+    repaint();
+}
+
+void PluginWindow::handleAsyncUpdate()
+{
+    if (hosting.isRunning() && status != Status::ready)
+        loadVendor();
 }
 
 void PluginWindow::loadVendor()
 {
+    spinnerTurn.reset();
+    retry->setVisible (false);
+    runInProcess->setVisible (false);
     vendor = rack.createEditor (plugin.id);
 
     if (vendor == nullptr)
@@ -375,7 +437,7 @@ void PluginWindow::loadVendor()
     addAndMakeVisible (*vendor);
     vendor->addComponentListener (this);
     updateSize();
-    startTimer (statusPollMs);
+    repaint();
 }
 
 juce::Point<int> PluginWindow::vendorSize() const
@@ -534,10 +596,9 @@ void PluginWindow::paintBody (juce::Graphics& g)
         }
         else
         {
-            const auto error = rack.getLoadError (plugin.id);
             drawStyledText (g, themeManager, plugin.name + " didn't load", stateStyle, area.removeFromTop (stateLineHeight),
                             juce::Justification::centred, theme.rec);
-            drawStyledText (g, themeManager, error.isNotEmpty() ? error : "It took longer than " + juce::String (loadTimeoutMs / 1000.0, 1) + " s to start.",
+            drawStyledText (g, themeManager, hosting.reason.isNotEmpty() ? hosting.reason : juce::String ("It couldn't be loaded."),
                             stateDetailStyle, area.removeFromTop (stateLineHeight), juce::Justification::centred, theme.textDim);
         }
     }
@@ -634,33 +695,9 @@ void PluginWindow::askPresetName()
 
 void PluginWindow::timerCallback()
 {
-    if (status == Status::loading)
+    // Its latency changes without an Edit change.
+    if (auto info = rack.getPlugin (plugin.id); info.has_value() && info->latencySamples != plugin.latencySamples)
     {
-        const auto loading = rack.isLoading (plugin.id);
-
-        if (! loading && rack.getLoadError (plugin.id).isEmpty())
-        {
-            loadVendor();
-            return;
-        }
-
-        // Failed to load (its sandbox died or timed out), or still loading after the timeout.
-        if (! loading || juce::Time::getMillisecondCounter() - loadStartedAt > (juce::uint32) loadTimeoutMs)
-        {
-            status = Status::failed;
-            retry->setVisible (true);
-            runInProcess->setVisible (true);
-            startTimer (statusPollMs);
-        }
-
-        repaint (vendorArea());
-    }
-
-    // In or out of its sandbox, and its latency, change without an Edit change.
-    if (auto info = rack.getPlugin (plugin.id);
-        info.has_value() && (info->sandboxed != plugin.sandboxed || info->latencySamples != plugin.latencySamples))
-    {
-        plugin.sandboxed = info->sandboxed;
         plugin.latencySamples = info->latencySamples;
         updateTexts();
     }

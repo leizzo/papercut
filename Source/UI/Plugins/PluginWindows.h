@@ -32,22 +32,23 @@ namespace resamper
     - Each window's open / pinned / position / UI scale is written through
       plugin.setWindow; a window is never left over once its plug-in is gone,
       and a project's open windows come back when it loads.
-    - Crash (the sandbox): a crashed plug-in's window closes, and a toast
-      explains, offering Reload. Run in-process (the error state's) takes
-      that instance out of its sandbox, through plugin.setSandboxed.
+    - Hosting State (Plug-in Hosting pushes it): each plug-in window shows
+      its plug-in's. On the transition into Crashed, the window closes and a
+      toast explains, offering Reload. Run in-process (the error state's)
+      takes that instance out of its sandbox, through plugin.setSandboxed.
 
     The rules are kept apart from what a window shows: windows are made in
     one place (createWindow), and the rules only use a FloatingDeviceWindow's
     position, pin, focus and callbacks, never what it holds. Whether a
     plug-in runs in or out of process (the sandbox, #69) only changes what
-    the window reports (PluginInfo::sandboxed) and what onRunInProcess does. */
+    the window reports (its Hosting State) and what onRunInProcess does. */
 class PluginWindows : private ApplicationModel::Listener,
-                      private PluginRack::Listener,
+                      private PluginHosting::Listener,
                       private juce::ValueTree::Listener,
                       private juce::Timer
 {
 public:
-    PluginWindows (ApplicationModel&, PluginRack&, CommandRegistry&, ThemeManager&, Preferences&);
+    PluginWindows (ApplicationModel&, PluginRack&, PluginHosting&, CommandRegistry&, ThemeManager&, Preferences&);
     ~PluginWindows() override;
 
     /** The desktop area a first window centres over (the arrangement). The main display's when unset. */
@@ -92,9 +93,6 @@ public:
     /** A plug-in's window; nullptr if it has none or the device is native. */
     PluginWindow* getWindow (const juce::String& pluginId) const;
 
-    /** The loading timeout every window gets (10 s; tests shorten it). */
-    void setLoadTimeoutMs (int);
-
     /** Applies the rules now (the model notifies asynchronously). */
     void refresh();
 
@@ -107,11 +105,11 @@ private:
 
     ApplicationModel& model;
     PluginRack& rack;
+    PluginHosting& hosting;
     CommandRegistry& commands;
     ThemeManager& themeManager;
     Preferences& preferences;
     std::map<juce::String, Entry> windows;
-    int loadTimeoutMs = PluginWindow::defaultLoadTimeoutMs;
     bool refreshing = false, refreshAgain = false;
 
     std::unique_ptr<FloatingDeviceWindow> createWindow (const PluginInfo&);
@@ -126,7 +124,8 @@ private:
     void openWindowsChanged();
 
     void modelChanged() override;
-    void pluginCrashed (const juce::String& pluginId) override;
+    void pluginCrashed (const juce::String& pluginId);
+    void hostingStateChanged (const juce::String& pluginId, const HostingState&) override;
     void pluginUiClicked (const juce::String& pluginId) override;
     void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void timerCallback() override;
