@@ -19,10 +19,11 @@ Source and test files are listed explicitly in `CMakeLists.txt` (no globbing) �
 
 ```sh
 cmake --build build --target ResamperTests
-build/ResamperTests_artefacts/Debug/ResamperTests [suite-name-filter]   # or: ctest --test-dir build
+build/ResamperTests_artefacts/Debug/ResamperTests "Mixer"   # implementing: each UnitTest name the change touches
+build/ResamperTests_artefacts/Debug/ResamperTests           # opening a PR: no filter
 ```
 
-Tests are headless `juce::UnitTest` suites in category `"Resamper"`, built on `Tests/TestFixture.h`, and drive the app through Commands / the Application Model. The run prints `ALL TESTS PASSED` or `N FAILURE(S)` and exits non-zero on failure. While implementing, run the suite the change touches. The full `ResamperTests` run is for opening a PR.
+Tests are headless `juce::UnitTest` suites in category `"Resamper"`, built on `Tests/TestFixture.h`, and drive the app through Commands / the Application Model. The run prints `ALL TESTS PASSED` or `N FAILURE(S)` and exits non-zero on failure. While implementing, pass each `UnitTest` name the change touches. The unfiltered binary waits until the user asks to open the pull request.
 
 ### Architecture rule
 
@@ -53,7 +54,7 @@ perch close <issue-id> --reason "..."              # set aside a false positive,
 
 `check` and `scan` exit 3 while something is still wrong. Results live in `.perch/`; only `closed.jsonl` and `rules/` there are committed. Custom rules go in `perch.yaml` or `.perch/rules/*.yaml` (`perch rules add ...`).
 
-Before a PR, in this order: the full `ResamperTests` run passes → `perch scan --since origin/main` exits 0 (fix or `close` every finding) → run the `code-review` skill against `main` → attach test evidence. perch covers method-level defects, code-review covers repo standards and the spec; neither replaces the other, and perch goes first so the review sees final code. Evidence is a screenshot when one frame shows the result, a video when the result is motion or a sequence, or one sentence when the change never draws. See `docs/agents/pr-evidence.md`.
+When the user asks to open a pull request, run the unfiltered `ResamperTests` before creating it. On `N FAILURE(S)`, explain each failed test from the log and stop. On `ALL TESTS PASSED`, continue in this order: `perch scan --since origin/main` exits 0 (fix or `close` every finding) → run the `code-review` skill against `main` → attach test evidence. perch covers method-level defects, code-review covers repo standards and the spec; neither replaces the other, and perch goes first so the review sees final code. Evidence is a screenshot when one frame shows the result, a video when the result is motion or a sequence, or one sentence when the change never draws. See `docs/agents/pr-evidence.md`.
 
 ## Agent skills
 
