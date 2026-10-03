@@ -35,7 +35,7 @@ namespace resamper
     - Hosting State (Plug-in Hosting pushes it): each plug-in window shows
       its plug-in's. On the transition into Crashed, the window closes and a
       toast explains, offering Reload. Run in-process (the error state's)
-      takes that instance out of its sandbox, through plugin.setSandboxed.
+      takes that instance out of its sandbox, through plugin.setRunInProcess.
 
     The rules are kept apart from what a window shows: windows are made in
     one place (createWindow), and the rules only use a FloatingDeviceWindow's

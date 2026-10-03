@@ -125,11 +125,11 @@ struct PluginABArgs
     int slot = 0;
 };
 
-/** Whether a plug-in runs in its sandbox (out of process) or in-process. */
-struct PluginSandboxArgs
+/** Whether a plug-in runs in-process (Run in-process) or in its Sandbox. */
+struct PluginRunInProcessArgs
 {
     juce::String pluginId;
-    bool sandboxed = true;
+    bool runInProcess = false;
 };
 
 /** A catalogue plug-in, by its path (what plugin.insert takes). */
@@ -158,7 +158,7 @@ namespace cmd
     inline constexpr CommandRef<PluginArgs> pluginUndoInsert { "plugin.undoInsert" };     ///< the "added" toast's Undo
     inline constexpr CommandRef<PluginWindowArgs> pluginSetWindow { "plugin.setWindow" }; ///< a view: never undoable
     inline constexpr CommandRef<PluginArgs> pluginReload { "plugin.reload" };             ///< Retry; a crashed plug-in's Reload
-    inline constexpr CommandRef<PluginSandboxArgs> pluginSetSandboxed { "plugin.setSandboxed" };  ///< Run in-process; never undoable
+    inline constexpr CommandRef<PluginRunInProcessArgs> pluginSetRunInProcess { "plugin.setRunInProcess" };  ///< Run in-process; never undoable
     inline constexpr CommandRef<PluginPresetArgs> pluginSelectPreset { "plugin.selectPreset" };
     inline constexpr CommandRef<PluginSavePresetArgs> pluginSavePreset { "plugin.savePreset" };
     inline constexpr CommandRef<PluginABArgs> pluginSelectAB { "plugin.selectAB" };
@@ -168,7 +168,7 @@ namespace cmd
 /** Registers the plug-in Commands above. plugin.insert and plugin.replace
     tell AppCommandHost::pluginAdded about the plug-in they add: the plug-in
     window's opening rule (PRD §9.6) hangs off that one place, whichever view
-    the insert came from. plugin.reload and plugin.setSandboxed go to Plug-in Hosting. */
+    the insert came from. plugin.reload and plugin.setRunInProcess go to Plug-in Hosting. */
 void registerPluginCommands (CommandRegistry&, PluginRack&, PluginHosting&, AppCommandHost&);
 
 } // namespace resamper

@@ -672,7 +672,12 @@ struct PluginSandboxTests : juce::UnitTest
             const auto sandboxed = insert (f, track, gain.path());
             heard.take (inProcess);
 
-            expect (f.invoke (cmd::pluginSetSandboxed, { inProcess, false }));
+            if (const auto* command = f.commands.find (cmd::pluginSetRunInProcess.id))
+                expectEquals (command->getName(), juce::String ("Run Plug-in In-process"));
+            else
+                expect (false, "plugin.setRunInProcess isn't registered");
+
+            expect (f.invoke (cmd::pluginSetRunInProcess, { inProcess, true }));
             expect (f.errors.isEmpty(), f.errors.joinIntoString ("; "));
             expect (loaded (f, inProcess));
             expectEquals (heard.take (inProcess), juce::String ("loading, in-process"), "Run in-process");
@@ -693,7 +698,7 @@ struct PluginSandboxTests : juce::UnitTest
 
             // And back into the sandbox.
             Transitions reheard (reopened);
-            expect (reopened.invoke (cmd::pluginSetSandboxed, { inProcess, true }));
+            expect (reopened.invoke (cmd::pluginSetRunInProcess, { inProcess, false }));
             expect (loaded (reopened, inProcess));
             expectEquals (reheard.take (inProcess), juce::String ("loading, sandboxed"), "back into the sandbox");
             expect (instanceOf (reopened, inProcess) != nullptr && PluginSandbox::isSandboxed (instanceOf (reopened, inProcess)));

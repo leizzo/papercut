@@ -128,9 +128,9 @@ void registerPluginCommands (CommandRegistry& registry, PluginRack& rack, Plugin
         host.report (hosting.reload (a.pluginId));
     });
 
-    registry.add (cmd::pluginSetSandboxed, { "Run Plug-in Sandboxed" }, [&hosting, &host] (const PluginSandboxArgs& a)
+    registry.add (cmd::pluginSetRunInProcess, { "Run Plug-in In-process" }, [&hosting, &host] (const PluginRunInProcessArgs& a)
     {
-        host.report (hosting.setSandboxed (a.pluginId, a.sandboxed));
+        host.report (hosting.setRunInProcess (a.pluginId, a.runInProcess));
     });
 
     registry.add (cmd::pluginSelectPreset, { "Select Preset" }, [&rack, &host] (const PluginPresetArgs& a)

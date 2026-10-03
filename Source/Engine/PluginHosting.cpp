@@ -456,20 +456,20 @@ juce::Result PluginHosting::reload (const juce::String& pluginId)
     return juce::Result::ok();
 }
 
-juce::Result PluginHosting::setSandboxed (const juce::String& pluginId, bool sandboxed)
+juce::Result PluginHosting::setRunInProcess (const juce::String& pluginId, bool runInProcess)
 {
     auto* plugin = impl->findStarted (pluginId);
 
     if (plugin == nullptr)
-        return juce::Result::fail ("No plug-in to run in a sandbox: it isn't there, or isn't one that loads");
+        return juce::Result::fail ("No plug-in to set Run in-process: it isn't there, or isn't one that loads");
 
     // Saved on the plug-in, as how it runs, not what it is: never an undo step.
     const juce::Identifier inProcess (inProcessProperty);
 
-    if (sandboxed)
-        plugin->state.removeProperty (inProcess, nullptr);
-    else
+    if (runInProcess)
         plugin->state.setProperty (inProcess, true, nullptr);
+    else
+        plugin->state.removeProperty (inProcess, nullptr);
 
     impl->recreate (*plugin);
     return juce::Result::ok();
